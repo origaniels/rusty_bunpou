@@ -1,0 +1,102 @@
+"""N4–N1 grammar points: each pattern must match its own example sentence, and known false
+positives (found while reviewing selected sentences) must stay rejected."""
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import grammar_n1  # noqa: E402,F401
+import grammar_n2  # noqa: E402,F401
+import grammar_n3  # noqa: E402,F401
+import grammar_n4  # noqa: E402,F401
+import grammar_n5  # noqa: E402
+from extra_examples import EXTRA  # noqa: E402
+from jp import tokenize  # noqa: E402
+from patterns import POINTS  # noqa: E402
+
+BY_ID = {p["id"]: p for p in POINTS}
+
+
+def blanks(pid, sentence):
+    toks = tokenize(sentence)
+    return ["".join(t.s for t in toks[a:b]) for a, b, _ in BY_ID[pid]["match"](toks)]
+
+
+@pytest.mark.parametrize("p", POINTS, ids=[p["id"] for p in POINTS])
+def test_example_matches_exactly_once(p):
+    assert len(p["match"](tokenize(p["ex"]))) == 1, p["ex"]
+
+
+def test_ids_unique_across_levels():
+    ids = [p["id"] for p in POINTS] + [p["id"] for p in grammar_n5.POINTS]
+    assert len(ids) == len(set(ids))
+
+
+def test_metadata_complete():
+    for p in POINTS:
+        assert p["level"] in ("N4", "N3", "N2", "N1")
+        assert p["title"] and p["meaning"] and p["structure"], p["id"]
+        assert len(p["explanation"]) > 60, p["id"]
+
+
+def test_level_sizes():
+    from collections import Counter
+    n = Counter(p["level"] for p in POINTS)
+    assert all(n[lv] >= 80 for lv in ("N4", "N3", "N2", "N1")), n
+
+
+def test_extra_examples_refer_to_known_points():
+    assert set(EXTRA) <= set(BY_ID) | {p["id"] for p in grammar_n5.POINTS}
+    for pid, items in EXTRA.items():
+        for ja, en in items:
+            assert ja.endswith(("。", "！", "？")) and en, (pid, ja)
+
+
+# (point, sentence, expected blank)
+POSITIVE = [
+    ("tara", "家に帰ったら電話します。", "帰ったら"),
+    ("sou_look", "このケーキはおいしそうですね。", "おいしそう"),
+    ("sou_hear", "明日は雨が降るそうです。", "そうです"),
+    ("potential", "私は漢字が読めます。", "読めます"),
+    ("passive", "私は先生に褒められました。", "褒められました"),
+    ("volitional", "一緒に行こう。", "行こう"),
+    ("te_shimau", "財布をなくしてしまいました。", "なくしてしまいました"),
+    ("wake_ni_wa_ikanai", "明日は試験なので、遊んでいるわけにはいかない。", "わけにはいかない"),
+    ("you_ni_naru", "日本語が話せるようになりました。", "ようになりました"),
+    ("zaru_wo_enai", "雨のため、試合を中止せざるを得ない。", "せざるを得ない"),
+    ("to_ii_to_ii", "味といい値段といい、申し分ない。", "といい"),
+]
+
+# (point, sentence) — false positives seen in real Tatoeba sentences
+NEGATIVE = [
+    ("deshita", "私のことでしたらご心配なく。"),
+    ("de_are", "必要であれば、明日来ますよ。"),             # conditional であれば
+    ("ni_shiro", "捕まらないようにしろよ。"),                # imperative of する
+    ("ta_tokoro_de", "私の聞いたところでは、彼は来ないそうだ。"),  # "from what I heard"
+    ("ijou_wa", "予想した以上に悪い天気だ。"),              # "more than"
+    ("ue_de", "犬が芝生の上で寝ている。"),                  # literal "on top of"
+    ("naku_shite", "なくしていた財布を見つけた。"),         # the verb なくす
+    ("o_suru", "彼はお金を返した。"),                       # お金 is a noun, not お〜する
+    ("ku_suru", "努力なくしては何もできない。"),
+    ("tsutsu_mo", "明日東京へ立つつもりだ。"),              # つもり, not つつも
+    ("sou_look", "彼女はもうすぐ結婚するそうだ。"),         # hearsay, not appearance
+    ("tokoro_wo", "彼がカンニングをしているところを見た。"),
+    ("noni", "この箱は本を入れるのに便利です。"),           # purpose のに, not "although"
+    ("bakari_only", "日本に来たばかりです。"),              # たばかり (just did)
+]
+
+
+@pytest.mark.parametrize("pid,sentence,expected", POSITIVE)
+def test_blank(pid, sentence, expected):
+    assert expected in blanks(pid, sentence), blanks(pid, sentence)
+
+
+@pytest.mark.parametrize("pid,sentence", NEGATIVE)
+def test_false_positive_rejected(pid, sentence):
+    if pid in BY_ID:
+        assert blanks(pid, sentence) == []
+    else:  # N5 point
+        p = next(p for p in grammar_n5.POINTS if p["id"] == pid)
+        assert p["match"](tokenize(sentence)) == []

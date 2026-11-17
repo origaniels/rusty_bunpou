@@ -1,0 +1,349 @@
+"""Original example sentences (written for this app) for grammar points that Tatoeba barely covers.
+
+They go through the same matcher as Tatoeba sentences, so a sentence that doesn't produce
+exactly one blank is skipped (and reported by the build). Shown in the app as
+"written for this app" instead of a Tatoeba attribution.
+"""
+
+EXTRA: dict[str, list[tuple[str, str]]] = {
+    # ------------------------------------------------------------------ N3
+    "nai_koto_wa_nai": [
+        ("辛い料理は食べられないことはないです。", "It's not that I can't eat spicy food."),
+        ("急げば間に合わないことはない。", "If we hurry, it's not impossible to make it."),
+        ("彼の気持ちも分からないことはない。", "It's not that I don't understand how he feels."),
+        ("歩いて行けないことはないが、遠いですよ。", "You could walk there, but it's far."),
+    ],
+    # ------------------------------------------------------------------ N2
+    "ageku": [
+        ("さんざん待たされたあげく、会議は中止になった。", "After being kept waiting for ages, the meeting was cancelled."),
+        ("悩んだあげく、彼は会社を辞めた。", "After agonizing over it, he quit the company."),
+    ],
+    "mo_kamawazu": [
+        ("彼は雨に濡れるのもかまわず走り続けた。", "He kept running without caring that he was getting wet."),
+        ("子供は服が汚れるのもかまわず泥の中で遊んだ。", "The child played in the mud without caring about getting dirty."),
+        ("彼女は人目もかまわず大声で泣いた。", "She cried loudly, not caring who saw."),
+        ("周りの迷惑もかまわず、彼は電話で話していた。", "He talked on the phone without minding the trouble to those around him."),
+        ("値段もかまわず、彼は一番高いワインを注文した。", "Without caring about the price, he ordered the most expensive wine."),
+    ],
+    "ni_kagirazu": [
+        ("この店は週末に限らず、平日も混んでいる。", "This shop is crowded not only on weekends but on weekdays too."),
+        ("この歌は子供に限らず、大人にも人気がある。", "This song is popular not only with children but with adults too."),
+        ("日本に限らず、多くの国で少子化が進んでいる。", "Not only in Japan, but in many countries the birthrate is falling."),
+    ],
+    "ni_saishite": [
+        ("帰国に際して、お世話になった人に挨拶をした。", "On returning home, I said goodbye to the people who had helped me."),
+        ("契約に際して、印鑑が必要です。", "A seal is required when signing the contract."),
+        ("入学に際して、いくつかの書類を提出してください。", "Please submit several documents upon enrolment."),
+    ],
+    "ni_tomonatte": [
+        ("経済の発展に伴って、生活も便利になった。", "Along with economic development, life has become more convenient."),
+        ("年齢に伴って、体力が落ちてくる。", "Physical strength declines with age."),
+    ],
+    "tsutsu_mo": [
+        ("悪いと知りつつも、嘘をついてしまった。", "Although I knew it was wrong, I ended up lying."),
+        ("早く寝ようと思いつつも、ついテレビを見てしまう。", "Although I mean to go to bed early, I end up watching TV."),
+        ("彼は文句を言いつつも、最後まで手伝ってくれた。", "Although he complained, he helped me until the end."),
+        ("体に悪いと分かりつつも、甘いものを食べてしまう。", "Even though I know it's bad for me, I eat sweets."),
+        ("返事をしなければと思いつつも、一週間が過ぎた。", "Although I kept thinking I had to reply, a week went by."),
+    ],
+    "ue_wa": [
+        ("試合に出る上は、絶対に勝ちたい。", "Now that I'm playing in the match, I absolutely want to win."),
+        ("引き受けた上は、責任を持ってやります。", "Now that I've accepted it, I'll take responsibility for it."),
+        ("決めた上は、もう迷わない。", "Now that I've decided, I won't hesitate any more."),
+        ("留学する上は、しっかり勉強するつもりだ。", "Since I'm going to study abroad, I intend to study hard."),
+    ],
+    "wa_motoyori": [
+        ("この本は学生はもとより、先生にも役に立つ。", "This book is useful not only for students but for teachers too."),
+        ("彼は英語はもとより、ドイツ語も話せる。", "He speaks German, to say nothing of English."),
+        ("平日はもとより、週末も働いている。", "I work on weekends, not to mention weekdays."),
+        ("この公園は子供はもとより、お年寄りにも人気だ。", "This park is popular with the elderly, not to mention children."),
+        ("経験はもとより、やる気も大切だ。", "Motivation matters too, not to mention experience."),
+    ],
+    "wa_tomokaku": [
+        ("見た目はともかく、この料理はおいしい。", "Looks aside, this dish is tasty."),
+        ("結果はともかく、最後まで頑張ったことが大切だ。", "Whatever the result, what matters is that you tried your best."),
+        ("値段はともかく、品質はいい。", "Price aside, the quality is good."),
+    ],
+    "wo_kikkake_ni": [
+        ("病気をきっかけに、タバコをやめた。", "Getting sick made me quit smoking."),
+    ],
+    "yohodo": [
+        ("彼がそう言うなら、よほど困っているのだろう。", "If he says so, he must be in real trouble."),
+    ],
+    # ------------------------------------------------------------------ N1
+    "atte_no": [
+        ("健康あっての人生だ。", "Life is only worth living if you have your health."),
+        ("家族の支えあっての今の私です。", "I am who I am today only thanks to my family's support."),
+        ("選手あってのチームだ。", "A team is nothing without its players."),
+    ],
+    "ba_koso": [
+        ("君を信じていればこそ、この仕事を任せるのだ。", "It's precisely because I trust you that I'm giving you this job."),
+        ("健康であればこそ、好きなことができる。", "It's only because you're healthy that you can do what you like."),
+        ("子供の将来を考えればこそ、厳しく育てた。", "I raised my children strictly precisely because I thought of their future."),
+    ],
+    "ba_sore_made": [
+        ("いくら勉強しても、試験の日に病気になればそれまでだ。", "However much you study, if you fall ill on exam day, that's the end of it."),
+        ("どんなにいい計画でも、実行しなければそれまでだ。", "However good a plan is, if you don't carry it out, that's that."),
+        ("せっかくの写真も、データが消えてしまえばそれまでだ。", "Even precious photos are gone for good once the data is deleted."),
+        ("チャンスがあっても、挑戦しなければそれまでだ。", "Even if there's a chance, if you don't try, that's the end of it."),
+    ],
+    "ga_hayai_ka": [
+        ("彼は家に帰るが早いか、ベッドに倒れ込んだ。", "No sooner had he got home than he collapsed onto the bed."),
+        ("子供は料理が出るが早いか、食べ始めた。", "The moment the food came out, the child started eating."),
+    ],
+    "gatera": [
+        ("買い物がてら、駅前を散歩した。", "I took a walk around the station while out shopping."),
+    ],
+    "ikan": [
+        ("参加するかどうかは、天気いかんで決めます。", "Whether we take part depends on the weather."),
+    ],
+    "kagiri_da": [
+        ("一人で外国に住むのは心細い限りだ。", "Living abroad alone is terribly lonely."),
+        ("こんなに大勢の方に来ていただき、嬉しい限りです。", "I'm delighted that so many of you have come."),
+        ("毎日海外旅行なんて、うらやましい限りだ。", "Travelling abroad every day? I'm so jealous."),
+    ],
+    "katagata": [
+        ("散歩かたがた、本屋に寄ってみた。", "While out for a walk, I dropped in at the bookshop."),
+        ("出張かたがた、昔の友人に会いに行った。", "While on a business trip, I went to see an old friend."),
+        ("ご挨拶かたがた、新しい商品のご紹介に参りました。", "I've come to greet you and also to introduce our new product."),
+        ("お見舞いかたがた、お礼を言いに行った。", "I went to visit him in hospital and to thank him as well."),
+        ("報告かたがた、先生の家を訪ねた。", "I visited my teacher's house, partly to report on how things were going."),
+    ],
+    "kirai_ga_aru": [
+        ("彼は人の話を最後まで聞かないきらいがある。", "He has a tendency not to listen to people until the end."),
+        ("最近の若者は、何でもインターネットに頼るきらいがある。", "Young people these days tend to rely on the internet for everything."),
+        ("彼女は物事を悪い方に考えるきらいがある。", "She tends to look on the dark side of things."),
+    ],
+    "koto_nashi_ni": [
+        ("練習することなしに、上手になることはできない。", "You can't improve without practising."),
+        ("リスクを取ることなしに、大きな成功はない。", "There's no great success without taking risks."),
+        ("話し合うことなしに、問題は解決しない。", "The problem won't be solved without talking it over."),
+    ],
+    "koto_tote": [
+        ("子供のしたこととて、許してやってください。", "It was a child who did it, so please forgive him."),
+        ("初めてのこととて、うまくできませんでした。", "As it was my first time, I couldn't do it well."),
+        ("慣れないこととて、ご迷惑をおかけしました。", "Being new to this, I'm afraid I caused you trouble."),
+        ("昔のこととて、よく覚えていない。", "It was long ago, so I don't remember it well."),
+        ("急なこととて、何の準備もできていない。", "It was so sudden that nothing is ready."),
+    ],
+    "made_shite": [
+        ("徹夜までして準備したのに、会議は中止になった。", "I even stayed up all night preparing, but the meeting was cancelled."),
+        ("借金までして家を建てたくはない。", "I don't want to build a house if it means going into debt."),
+        ("嘘までして、彼は何を守りたかったのだろう。", "What was he trying to protect, going as far as lying?"),
+        ("そこまでして勝ちたいとは思わない。", "I don't want to win badly enough to go that far."),
+    ],
+    "majiki": [
+        ("約束を破るなんて、社会人にあるまじき行為だ。", "Breaking a promise is behavior unacceptable for a working adult."),
+        ("患者に嘘をつくのは、医者にあるまじきことだ。", "Lying to a patient is unacceptable for a doctor."),
+        ("政治家にあるまじき発言が問題になった。", "A remark unbecoming of a politician caused a stir."),
+        ("それは許すまじき犯罪だ。", "That is an unforgivable crime."),
+    ],
+    "mo_sarukoto_nagara": [
+        ("彼の作品は、技術もさることながら、アイデアが素晴らしい。", "His work is great for its ideas, not to mention its technique."),
+        ("この店は、料理もさることながら、サービスも一流だ。", "This restaurant's service is first-class, to say nothing of its food."),
+        ("この町は、景色もさることながら、人々の優しさが印象的だ。", "The scenery of this town is great, but the kindness of the people is even more striking."),
+        ("試験の点数もさることながら、毎日の努力が大切だ。", "Exam scores matter, but daily effort matters even more."),
+    ],
+    "n_ga_tame": [
+        ("彼は試験に合格せんがため、毎晩遅くまで勉強した。", "He studied late every night in order to pass the exam."),
+        ("真実を知らんがために、彼は世界中を旅した。", "He travelled the world in order to know the truth."),
+        ("勝たんがために、手段を選ばない人もいる。", "Some people will stop at nothing in order to win."),
+        ("生きんがために、必死で働いた。", "I worked desperately just to survive."),
+        ("夢をかなえんがため、彼女は故郷を離れた。", "She left her hometown in order to realize her dream."),
+    ],
+    "nai_dewa_sumanai": [
+        ("あんなにお世話になったのだから、お礼を言わないではすまない。", "After all the help they gave me, I can't get away without thanking them."),
+        ("人に迷惑をかけたら、謝らないではすまない。", "If you cause someone trouble, you have to apologize."),
+        ("この件は、上司に報告しないではすまないだろう。", "We probably can't avoid reporting this matter to the boss."),
+        ("壊したのだから、弁償しないではすまない。", "Since I broke it, I'll have to pay for it."),
+        ("約束した以上、行かないではすまない。", "Since I promised, I can't not go."),
+    ],
+    "nai_made_mo": [
+        ("優勝はできないまでも、決勝には進みたい。", "Even if we can't win the championship, I want to reach the final."),
+        ("毎日とは言わないまでも、週に三回は運動したい。", "If not every day, I'd like to exercise at least three times a week."),
+        ("完璧ではないまでも、まあまあの出来だ。", "It's not perfect, but it's reasonably well done."),
+    ],
+    "nara_dewa": [
+        ("これは手作りならではの温かさがある。", "This has a warmth only handmade things have."),
+        ("子供ならではの自由な発想に驚いた。", "I was surprised by the free thinking that only a child could have."),
+        ("この祭りは、この町ならではの伝統だ。", "This festival is a tradition unique to this town."),
+    ],
+    "ni_hikikae": [
+        ("兄が活発なのにひきかえ、弟はおとなしい。", "Unlike his lively older brother, the younger one is quiet."),
+        ("去年の夏にひきかえ、今年は涼しい。", "In contrast to last summer, this year is cool."),
+        ("姉にひきかえ、妹は料理が苦手だ。", "Unlike her older sister, the younger one is bad at cooking."),
+        ("都会の便利さにひきかえ、田舎は不便だ。", "In contrast to the convenience of the city, the countryside is inconvenient."),
+        ("前の上司にひきかえ、今の上司は優しい。", "Compared with my previous boss, my current boss is kind."),
+    ],
+    "ni_itaru_made": [
+        ("食べ物から服に至るまで、すべて地元の物を使っている。", "Everything, from food down to clothes, is local."),
+    ],
+    "ni_kataku_nai": [
+        ("彼がどれほど悲しんだかは、想像に難くない。", "It's not hard to imagine how sad he was."),
+        ("この計画が失敗することは、予想に難くない。", "It's easy to predict that this plan will fail."),
+        ("彼女の苦労は察するに難くない。", "It's not hard to guess the hardships she went through."),
+        ("親の気持ちは理解に難くない。", "The parents' feelings are easy to understand."),
+    ],
+    "ni_soku_shite": [
+        ("規則に即して処理してください。", "Please handle it in accordance with the rules."),
+        ("現実に即した計画を立てるべきだ。", "We should make a plan that is in line with reality."),
+        ("実情に即して、制度を見直す。", "We will review the system in light of the actual circumstances."),
+        ("法律に即して判断が下された。", "The decision was made in accordance with the law."),
+    ],
+    "ni_todomarazu": [
+        ("彼の活動は国内にとどまらず、海外にも広がっている。", "His activities are not limited to Japan but extend overseas."),
+        ("この問題は一企業にとどまらず、業界全体に関係する。", "This problem is not limited to one company but affects the whole industry."),
+        ("被害は町にとどまらず、県全体に及んだ。", "The damage was not limited to the town but spread across the whole prefecture."),
+        ("彼女の人気は若者にとどまらず、お年寄りにまで広がった。", "Her popularity spread beyond young people, even to the elderly."),
+        ("その影響は経済にとどまらず、文化にも及んでいる。", "Its influence extends beyond the economy to culture."),
+    ],
+    "no_itari": [
+        ("このような賞をいただけるとは、光栄の至りです。", "It is the greatest honor to receive such an award."),
+        ("あの時の失敗は、若気の至りだった。", "That mistake back then was the folly of youth."),
+        ("皆様に祝っていただき、感激の至りです。", "I am deeply moved that you have all celebrated with me."),
+        ("お目にかかれて、恐縮の至りでございます。", "I am truly honored to meet you."),
+        ("こんな失礼をしてしまい、恥ずかしさの至りです。", "I'm utterly ashamed of having been so rude."),
+    ],
+    "no_kiwami": [
+        ("一流ホテルに泊まるなんて、贅沢の極みだ。", "Staying at a top hotel is the height of luxury."),
+        ("三日間眠れず、疲労の極みに達した。", "Unable to sleep for three days, I reached the limit of exhaustion."),
+        ("彼の態度は失礼の極みだった。", "His attitude was the height of rudeness."),
+        ("家族を失った彼は、悲しみの極みにあった。", "Having lost his family, he was in the depths of grief."),
+        ("これは職人の技の極みと言える。", "This can be called the pinnacle of craftsmanship."),
+    ],
+    "shimatsu_da": [
+        ("彼は遊んでばかりで、ついには大学を辞める始末だ。", "He did nothing but play, and in the end he even dropped out of university."),
+        ("何度注意しても直らず、最後には逆に怒り出す始末だ。", "No matter how often I warn him, he doesn't change, and in the end he even gets angry."),
+        ("お金を使いすぎて、友達に借りる始末だ。", "I spent too much and ended up borrowing from friends."),
+        ("道に迷って、最後には警察に助けを求める始末だった。", "I got lost and ended up having to ask the police for help."),
+        ("寝坊して、結局試験を受けられない始末だ。", "I overslept and ended up not being able to take the exam."),
+    ],
+    "sobakara": [
+        ("片付けたそばから、子供が部屋を散らかす。", "As soon as I tidy up, the kids make a mess again."),
+        ("聞いたそばから忘れてしまう。", "I forget things as soon as I hear them."),
+        ("作ったそばから売れていく。", "They sell as soon as they're made."),
+        ("注意したそばから、また同じ間違いをする。", "As soon as I point it out, he makes the same mistake again."),
+    ],
+    "tada_de_sae": [
+        ("ただでさえ狭い部屋に、大きな机を置いた。", "I put a big desk in a room that was already small."),
+        ("ただでさえ寒いのに、雪まで降ってきた。", "It's cold enough as it is, and now it's started snowing."),
+        ("ただでさえ時間がないのに、会議が増えた。", "We're short of time as it is, and now there are more meetings."),
+        ("ただでさえ混む道が、事故でさらに混んだ。", "The road, which is busy at the best of times, got even busier because of the accident."),
+    ],
+    "tada_nomi": [
+        ("今はただ、無事を祈るのみだ。", "All we can do now is pray that they're safe."),
+        ("あとはただ、本番を待つのみです。", "All that's left is to wait for the real thing."),
+    ],
+    "te_shikaru_beki": [
+        ("これだけ働いたのだから、評価されてしかるべきだ。", "After working this hard, I ought to be recognized."),
+        ("子供の意見も尊重されてしかるべきだ。", "Children's opinions should also be respected."),
+    ],
+    "te_wa_kanawanai": [
+        ("毎日こう暑くてはかなわない。", "This heat every day is too much to bear."),
+        ("こんなに忙しくてはかなわない。", "Being this busy is more than I can take."),
+        ("隣の工事がうるさくてはかなわない。", "The construction noise next door is unbearable."),
+        ("毎晩電話されてはかなわない。", "I can't stand being called every night."),
+        ("こう雨が続いてはかなわない。", "I can't take all this endless rain."),
+    ],
+    "te_yamanai": [
+        ("皆様のご活躍を願ってやみません。", "I sincerely wish you all success."),
+        ("あなたの幸せを祈ってやまない。", "I never stop praying for your happiness."),
+    ],
+    "to_aimatte": [
+        ("天気の良さと相まって、会場は大勢の人でにぎわった。", "Combined with the good weather, the venue was bustling with people."),
+        ("彼の努力が運と相まって、成功につながった。", "His effort, combined with luck, led to success."),
+        ("美しい音楽と相まって、映画は大ヒットした。", "Together with its beautiful music, the film was a big hit."),
+    ],
+    "to_areba": [
+        ("家族のためとあれば、どんな仕事でもする。", "If it's for my family, I'll do any kind of work."),
+    ],
+    "to_atte": [
+        ("週末とあって、店は大勢の客で混んでいた。", "Since it was the weekend, the shop was packed with customers."),
+        ("有名な歌手が来るとあって、会場は満員だった。", "Since a famous singer was coming, the venue was full."),
+        ("年末とあって、道路が混んでいる。", "It's the end of the year, so the roads are congested."),
+        ("初めての海外旅行とあって、彼女は緊張していた。", "It being her first trip abroad, she was nervous."),
+    ],
+    "to_iedomo": [
+        ("専門家といえども、間違えることはある。", "Even experts make mistakes sometimes."),
+    ],
+    "to_ii_to_ii": [
+        ("色といい形といい、このかばんは気に入った。", "I love this bag, both its color and its shape."),
+        ("顔といい性格といい、彼は父親にそっくりだ。", "Both in looks and in personality, he's just like his father."),
+        ("味といい量といい、この店は文句なしだ。", "Both in taste and in portion size, this restaurant is perfect."),
+        ("景色といい空気といい、この村は最高だ。", "Both the scenery and the air in this village are wonderful."),
+        ("値段といい品質といい、満足している。", "I'm satisfied with both the price and the quality."),
+    ],
+    "to_ittara_nai": [
+        ("あの映画の怖さといったらない。", "That film is indescribably scary."),
+        ("満員電車の不快さといったらない。", "Packed trains are unbearably unpleasant."),
+        ("試験に合格した時の嬉しさといったらなかった。", "My joy when I passed the exam was beyond words."),
+        ("彼の部屋の汚さといったらない。", "His room is unbelievably dirty."),
+        ("一人で過ごす夜の寂しさといったらない。", "The loneliness of nights spent alone is indescribable."),
+    ],
+    "to_wa_surprise": [
+        ("あの二人が結婚するとは。", "Who would have thought those two would get married!"),
+    ],
+    "tomo_arou": [
+        ("社長ともあろう人が、そんな約束を破るとは。", "To think that a company president would break such a promise!"),
+        ("警察官ともあろう者が、法律を守らないなんて。", "A police officer of all people not obeying the law!"),
+        ("先生ともあろう人が、生徒の前で嘘をついた。", "A teacher of all people lied in front of the students."),
+    ],
+    "tomo_naru_to": [
+        ("社長ともなると、自由な時間はほとんどない。", "Once you're a company president, you have almost no free time."),
+        ("年末ともなると、どこの店も混雑する。", "When it gets to the end of the year, every shop is crowded."),
+        ("プロともなれば、練習の量が違う。", "When it comes to professionals, the amount of practice is on another level."),
+    ],
+    "wo_fumaete": [
+        ("前回の反省を踏まえて、新しい計画を立てた。", "Taking into account what we learned last time, we made a new plan."),
+        ("皆さんの意見を踏まえて、結論を出します。", "We'll reach a conclusion based on everyone's opinions."),
+        ("現状を踏まえて、目標を見直すべきだ。", "We should review our goals in light of the current situation."),
+        ("この経験を踏まえ、今後に生かしたい。", "I want to build on this experience in the future."),
+    ],
+    "wo_kagiri_ni": [
+        ("今日を限りに、お酒はやめることにした。", "As of today, I've decided to give up alcohol."),
+        ("今月を限りに、この店は閉店します。", "This shop will close at the end of this month."),
+    ],
+    "wo_kawakiri_ni": [
+        ("大阪公演を皮切りに、全国ツアーが始まった。", "The nationwide tour began with a show in Osaka."),
+        ("彼の発言を皮切りに、次々と反対意見が出た。", "Starting with his remark, objections came one after another."),
+        ("この店を皮切りに、海外にも店を出す予定だ。", "Starting with this shop, we plan to open shops overseas too."),
+        ("一曲目を皮切りに、会場は盛り上がった。", "From the first song on, the venue was buzzing."),
+        ("新商品の発売を皮切りに、会社は急成長した。", "Starting with the launch of a new product, the company grew rapidly."),
+    ],
+    "wo_kinjienai": [
+        ("その悲しい話に、涙を禁じ得なかった。", "I couldn't hold back my tears at that sad story."),
+        ("彼の無責任な発言には、怒りを禁じ得ない。", "I can't help feeling angry at his irresponsible remarks."),
+        ("被害者の家族には、同情を禁じ得ない。", "I can't help but feel sympathy for the victims' families."),
+        ("あまりの変わりように、驚きを禁じ得なかった。", "I couldn't help being astonished at how much it had changed."),
+        ("彼の努力には、尊敬の念を禁じ得ない。", "I can't help admiring his efforts."),
+    ],
+    "wo_yoso_ni": [
+        ("周囲の反対をよそに、二人は結婚した。", "The two got married despite opposition from those around them."),
+        ("親の心配をよそに、息子は危険な山に登った。", "Ignoring his parents' worries, the son climbed a dangerous mountain."),
+        ("住民の不安をよそに、工事は進められた。", "The construction went ahead regardless of the residents' anxiety."),
+        ("試験をよそに、彼は毎日遊んでいる。", "Paying no attention to the exams, he plays every day."),
+        ("忙しい私をよそに、夫はテレビを見ていた。", "My husband watched TV, oblivious to how busy I was."),
+    ],
+    "zu_ni_wa_okanai": [
+        ("彼の演技は、観客を泣かせずにはおかない。", "His acting is bound to move the audience to tears."),
+        ("この事件は、社会に大きな影響を与えずにはおかないだろう。", "This incident is bound to have a big effect on society."),
+        ("彼女の言葉は、人の心を動かさずにはおかない。", "Her words cannot fail to move people's hearts."),
+        ("この不正は、必ず明らかにせずにはおかない。", "We will not rest until this wrongdoing is brought to light."),
+    ],
+    "zu_ni_wa_sumanai": [
+        ("先生の大切な本を汚してしまったので、謝らずにはすまない。", "I got my teacher's precious book dirty, so I'll have to apologize."),
+        ("これだけ迷惑をかけたら、弁償せずにはすまないだろう。", "After causing this much trouble, we'll have to pay for it."),
+        ("部長に知られたら、説明せずにはすまない。", "If the manager finds out, I'll have to explain."),
+        ("約束を破ったのだから、謝罪せずにはすまない。", "Since I broke the promise, an apology is unavoidable."),
+        ("この問題は、会議で取り上げずにはすまない。", "This issue can't avoid being raised at the meeting."),
+    ],
+    "zu_tomo": [
+        ("説明されずとも、事情は分かっている。", "I understand the situation without being told."),
+        ("急がずとも、まだ間に合う。", "There's no need to hurry; we'll still make it."),
+        ("言われずとも、自分でやります。", "I'll do it myself without being told."),
+    ],
+    "zukume": [
+        ("今年は結婚や昇進など、いいことずくめだった。", "This year was full of good things, like getting married and a promotion."),
+        ("規則ずくめの生活に疲れた。", "I'm tired of a life full of rules."),
+    ],
+}

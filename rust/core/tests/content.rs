@@ -15,17 +15,18 @@ fn is_hiragana_reading(s: &str) -> bool {
 #[test]
 fn points_are_well_formed() {
     let c = Content::bundled();
-    assert!(c.points.len() >= 70, "{} points", c.points.len());
+    assert!(c.points.len() >= 400, "{} points", c.points.len());
     let mut ids = HashSet::new();
     let mut titles = HashSet::new();
     for (i, p) in c.points.iter().enumerate() {
         assert!(ids.insert(&p.id), "duplicate id {}", p.id);
         assert!(titles.insert(&p.title), "duplicate title {}", p.title);
         assert_eq!(p.order, i, "orders are contiguous");
-        assert_eq!(p.level, "N5");
+        assert!(["N5", "N4", "N3", "N2", "N1"].contains(&p.level.as_str()));
         assert!(!p.meaning.is_empty() && !p.structure.is_empty());
         assert!(p.explanation.len() > 60, "explanation too short for {}", p.id);
-        assert!(p.sentences.len() >= 8, "{} has only {} sentences", p.id, p.sentences.len());
+        let min = if p.level == "N5" { 8 } else { 3 };
+        assert!(p.sentences.len() >= min, "{} has only {} sentences", p.id, p.sentences.len());
         assert!(c.get(&p.id).is_some());
     }
 }
