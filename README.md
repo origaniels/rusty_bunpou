@@ -44,3 +44,13 @@ Copy the APK to the phone and open it, or `adb install -r rust/android/app/build
 - `enableOnBackInvokedCallback="false"`: with predictive back (Android 16) a NativeActivity never gets the Back key.
 - Reminders use AlarmManager with a 10-minute window (no exact-alarm permission). Force-stopping the app in
   Android settings cancels them until the app is opened again (Android behaviour).
+
+## License
+- **Code** (everything in this repository except the content described below): GNU General Public License v3.0
+  or later — see [LICENSE](LICENSE).
+- **Slint** (UI toolkit) is used under its GPL-3.0 option; `rust/third_party/i-slint-core` is a modified copy of
+  Slint's core crate (see `rust/third_party/i-slint-core-cancel.patch`) and keeps its original licensing.
+- **Example sentences from Tatoeba** (<https://tatoeba.org>) are licensed CC-BY 2.0 FR by their contributors;
+  the app shows each sentence's Tatoeba number and contributor.
+- **Grammar explanations and the example sentences in `pipeline/extra_examples.py`** were written for this
+  project; all rights reserved for now.
