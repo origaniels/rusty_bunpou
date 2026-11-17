@@ -5,11 +5,13 @@ pipeline/.venv/
 __pycache__/
 
 # Android / Gradle
-android/.gradle/
+.gradle/
+.kotlin/
 android/build/
 android/app/build/
-android/local.properties
-android/.kotlin/
+rust/android/build/
+rust/android/app/build/
+local.properties
 *.apk
 *.aab
 
@@ -20,3 +22,4 @@ target/
 .idea/
 *.iml
 .DS_Store
+rust/android/app/src/main/jniLibs/

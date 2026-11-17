@@ -1,0 +1,16 @@
+[package]
+name = "bunpo-app"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "bunpo_app"
+crate-type = ["cdylib"]
+
+[dependencies]
+bunpo-core = { path = "../core" }
+fastrand = "2.5.0"
+slint = { version = "1.19", default-features = false, features = ["compat-1-2", "std", "backend-android-activity-06", "renderer-femtovg"] }
+
+[build-dependencies]
+slint-build = "1.19"

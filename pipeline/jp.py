@@ -14,6 +14,7 @@ READING_OVERRIDES = {
     ("日本", "ニッポン"): "ニホン",
     ("明日", "アス"): "アシタ",
     ("今日", "コンニチ"): "キョウ",
+    ("何時", "イツ"): "ナンジ",  # in modern writing いつ is kana; 何時 is "what time"
 }
 
 KANJI_RE = re.compile(r"[㐀-鿿々]")
@@ -77,6 +78,12 @@ def tokenize(text: str) -> list[Tok]:
             bk = READING_OVERRIDES[(base, bk)]
         out.append(Tok(s, f.pos1 or "", f.pos2 or "", f.cType or "*", f.cForm or "*",
                        lemma, base, kata2hira(kana), kata2hira(bk), start, end))
+    # 何 is なに before most particles (何か, 何を, 何が, 何も...), なん before で/と/の/だ/です/counters
+    for i, t in enumerate(out):
+        if t.s == "何" and t.kana == "なん" and i + 1 < len(out):
+            n = out[i + 1]
+            if n.p1 == "助詞" and n.s in ("か", "を", "が", "も", "に", "へ", "や", "から", "まで", "より", "しか", "でも"):
+                t.kana = "なに"
     return out
 
 
