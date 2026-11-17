@@ -1,0 +1,22 @@
+# raw downloads (re-fetch from tatoeba.org) and pipeline caches
+data/raw/
+data/build/tokens.pkl
+pipeline/.venv/
+__pycache__/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.kotlin/
+*.apk
+*.aab
+
+# Rust
+target/
+
+# misc
+.idea/
+*.iml
+.DS_Store
