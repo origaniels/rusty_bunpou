@@ -1,8 +1,14 @@
 [workspace]
 resolver = "3"
 members = ["core", "app"]
+exclude = ["third_party"]
 
 [profile.release]
 opt-level = "s"
 lto = true
 strip = true
+
+# Local fix: cancelled touches must not produce a release/click (Android back gesture).
+# See third_party/i-slint-core-cancel.patch
+[patch.crates-io]
+i-slint-core = { path = "third_party/i-slint-core" }

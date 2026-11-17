@@ -77,6 +77,12 @@ pub fn romaji_to_hiragana(input: &str, final_: bool) -> String {
             i += 1;
             continue;
         }
+        // "tch" (matcha) → っち
+        if c == 't' && s.get(i + 1) == Some(&'c') && s.get(i + 2) == Some(&'h') {
+            out.push('っ');
+            i += 1;
+            continue;
+        }
         if i + 1 < s.len() && s[i + 1] == c && is_consonant(c) {
             out.push('っ');
             i += 1;

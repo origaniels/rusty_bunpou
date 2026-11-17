@@ -5,12 +5,19 @@ edition = "2024"
 
 [lib]
 name = "bunpo_app"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 bunpo-core = { path = "../core" }
 fastrand = "2.5.0"
 slint = { version = "1.19", default-features = false, features = ["compat-1-2", "std", "backend-android-activity-06", "renderer-femtovg"] }
 
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21.1"
+
 [build-dependencies]
 slint-build = "1.19"
+
+[dev-dependencies]
+i-slint-backend-testing = "=1.19.0"
+i-slint-core = "=1.19.0"

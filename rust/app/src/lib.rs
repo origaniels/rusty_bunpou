@@ -1,7 +1,10 @@
-//! Slint front-end for the grammar SRS. All logic lives in `bunpo-core`.
+//! Slint front-end for the grammar SRS. All logic lives in `bunpo-core`; this file wires it
+//! to the UI. Platform specifics (reminders, keyboard) go through [`Platform`] so the whole
+//! UI can be driven headlessly in tests (see `tests/ui.rs`).
 
 use bunpo_core::content::Content;
 use bunpo_core::layout::{self, ClozeMode, Metrics};
+use bunpo_core::reminder::next_reminder;
 use bunpo_core::session::{find_sentence, now_ms, Session, Verdict};
 use bunpo_core::store::Progress;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
@@ -9,31 +12,85 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+#[cfg(target_os = "android")]
+mod android;
+
 slint::include_modules!();
 
-const SCREEN_HOME: i32 = 0;
-const SCREEN_LESSON: i32 = 1;
-const SCREEN_QUIZ: i32 = 2;
-const SCREEN_LIST: i32 = 3;
-const SCREEN_DETAIL: i32 = 4;
-const SCREEN_SETTINGS: i32 = 5;
+pub const SCREEN_HOME: i32 = 0;
+pub const SCREEN_LESSON: i32 = 1;
+pub const SCREEN_QUIZ: i32 = 2;
+pub const SCREEN_LIST: i32 = 3;
+pub const SCREEN_DETAIL: i32 = 4;
+pub const SCREEN_SETTINGS: i32 = 5;
 const RETENTIONS: [f64; 3] = [0.85, 0.9, 0.95];
 const LEVELS: [&str; 5] = ["Beginner", "Adept", "Seasoned", "Expert", "Mastered"];
 
-struct State {
-    progress: Progress,
+/// Things only the host OS can do.
+pub trait Platform {
+    /// Arm (or replace) the review reminder.
+    fn schedule_reminder(&self, at_ms: i64, count: usize);
+    fn cancel_reminder(&self);
+    /// Remove a reminder notification that is currently shown.
+    fn dismiss_reminder(&self) {}
+    fn request_notification_permission(&self) {}
+    /// Called shortly after start-up.
+    fn on_started(&self) {}
+}
+
+/// Desktop/test platform: does nothing.
+pub struct NoPlatform;
+impl Platform for NoPlatform {
+    fn schedule_reminder(&self, _: i64, _: usize) {}
+    fn cancel_reminder(&self) {}
+}
+
+/// Structured event log (logcat on Android, stderr elsewhere) used by the emulator e2e tests.
+pub fn event(msg: &str) {
+    #[cfg(target_os = "android")]
+    android::log(msg);
+    #[cfg(not(target_os = "android"))]
+    if std::env::var_os("BUNPO_EVENTS").is_some() {
+        eprintln!("bunpo-event {msg}");
+    }
+}
+
+thread_local! {
+    /// Called when the app comes back to the foreground (Android resume).
+    static RESUME_HOOK: RefCell<Option<Box<dyn Fn()>>> = const { RefCell::new(None) };
+}
+
+/// Refresh time-dependent data (due counts) after the app was in the background.
+pub fn on_resume() {
+    RESUME_HOOK.with(|h| {
+        if let Some(f) = &*h.borrow() {
+            f()
+        }
+    });
+}
+
+pub struct State {
+    pub progress: Progress,
     stack: Vec<i32>,
     lesson_ids: Vec<String>,
     lesson_idx: usize,
-    session: Option<Session>,
+    pub session: Option<Session>,
     detail: Option<String>,
+}
+
+/// The running app: UI + state. Keep it alive while the UI runs.
+pub struct App {
+    pub ui: AppWindow,
+    pub state: Rc<RefCell<State>>,
+    pub content: Rc<Content>,
+    _timer: slint::Timer,
 }
 
 fn model<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
     ModelRc::new(VecModel::from(v))
 }
 
-fn rel_time(due: i64, now: i64) -> String {
+pub fn rel_time(due: i64, now: i64) -> String {
     let d = due - now;
     if d <= 0 {
         return "now".into();
@@ -82,24 +139,24 @@ fn point_data(content: &Content, st: &State, id: &str) -> PointData {
     }
 }
 
-fn due_ids(content: &Content, st: &State, now: i64) -> Vec<String> {
+pub fn due_ids(content: &Content, progress: &Progress, now: i64) -> Vec<String> {
     let mut v: Vec<(i64, String)> = content
         .points
         .iter()
-        .filter_map(|p| st.progress.cards.get(&p.id).filter(|c| c.state > 0 && c.due <= now).map(|c| (c.due, p.id.clone())))
+        .filter_map(|p| progress.cards.get(&p.id).filter(|c| c.state > 0 && c.due <= now).map(|c| (c.due, p.id.clone())))
         .collect();
     v.sort();
     v.into_iter().map(|(_, id)| id).collect()
 }
 
-fn new_ids(content: &Content, st: &State) -> Vec<String> {
-    content.points.iter().filter(|p| st.progress.card(&p.id).is_new()).map(|p| p.id.clone()).collect()
+fn new_ids(content: &Content, progress: &Progress) -> Vec<String> {
+    content.points.iter().filter(|p| progress.card(&p.id).is_new()).map(|p| p.id.clone()).collect()
 }
 
 fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
     let now = now_ms();
-    let due = due_ids(content, st, now).len() as i32;
-    let new = new_ids(content, st);
+    let due = due_ids(content, &st.progress, now).len() as i32;
+    let new = new_ids(content, &st.progress);
     let batch = st.progress.settings.batch_size as usize;
     let next_due = st.progress.cards.values().filter(|c| c.state > 0).map(|c| c.due).min();
     let mut levels = [0i32; 5];
@@ -110,6 +167,7 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
     }
     let next_titles: Vec<&str> =
         new.iter().take(batch).filter_map(|id| content.get(id)).map(|p| p.title.as_str()).collect();
+    event(&format!("home due={due} learned={}", content.points.len() - new.len()));
     ui.set_home(HomeData {
         due,
         new_count: new.len() as i32,
@@ -124,11 +182,28 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
     });
 }
 
+fn refresh_list(ui: &AppWindow, content: &Content, st: &State) {
+    ui.set_grammar_list(model(
+        content
+            .points
+            .iter()
+            .map(|p| ListItem {
+                id: p.id.as_str().into(),
+                num: (p.order + 1).to_string().into(),
+                title: p.title.as_str().into(),
+                meaning: p.meaning.as_str().into(),
+                level: st.progress.card(&p.id).level_name().into(),
+            })
+            .collect(),
+    ));
+}
+
 fn refresh_settings(ui: &AppWindow, st: &State) {
     let s = &st.progress.settings;
     ui.set_furigana(s.furigana);
     ui.set_english(s.english);
     ui.set_romaji(s.romaji);
+    ui.set_notifications(s.notifications);
     ui.set_batch_size(s.batch_size as i32);
     let ri = RETENTIONS.iter().position(|r| (r - s.retention).abs() < 1e-6).unwrap_or(1);
     ui.set_retention_index(ri as i32);
@@ -146,6 +221,9 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         ..Default::default()
     };
     if let Some((p, s)) = sess.current(content) {
+        if sess.verdict.is_none() && sess.raw.is_empty() {
+            event(&format!("item point={} sentence={}", p.id, s.id));
+        }
         q.key = sentence_key(&p.id, s.id);
         q.en = s.en.as_str().into();
         q.hint = s.hint.clone().unwrap_or_else(|| p.meaning.clone()).into();
@@ -181,6 +259,22 @@ fn show(ui: &AppWindow, st: &mut State, screen: i32) {
     }
     ui.set_show_notes(false);
     ui.set_screen(screen);
+    event(&format!("screen={screen}"));
+}
+
+/// Re-arm (or cancel) the review reminder after any change to progress or settings.
+fn sync_reminder(platform: &dyn Platform, progress: &Progress) {
+    if !progress.settings.notifications {
+        platform.cancel_reminder();
+        return;
+    }
+    match next_reminder(progress.cards.values(), now_ms()) {
+        Some((at, count)) => {
+            event(&format!("reminder at={at} count={count}"));
+            platform.schedule_reminder(at, count)
+        }
+        None => platform.cancel_reminder(),
+    }
 }
 
 fn layout_for(content: &Content, key: &str, mode: i32, typed: &str, furigana: bool, width: f32, font: f32) -> SentenceData {
@@ -198,7 +292,16 @@ fn layout_for(content: &Content, key: &str, mode: i32, typed: &str, furigana: bo
         glyphs: model(
             l.glyphs
                 .into_iter()
-                .map(|g| Glyph { x: g.x, y: g.y, w: g.w, text: g.text.into(), ruby: g.ruby.into(), cloze: g.in_cloze })
+                .map(|g| Glyph {
+                    x: g.x,
+                    y: g.y,
+                    w: g.w,
+                    text: g.text.into(),
+                    ruby: g.ruby.into(),
+                    ruby_x: g.ruby_x,
+                    ruby_w: g.ruby_w,
+                    cloze: g.in_cloze,
+                })
                 .collect(),
         ),
         cloze_x: l.cloze.x,
@@ -211,15 +314,9 @@ fn layout_for(content: &Content, key: &str, mode: i32, typed: &str, furigana: bo
     }
 }
 
-/// Called once the window is up; used on Android to hide a keyboard restored from a previous session.
-pub type StartupHook = Box<dyn FnOnce()>;
-
-pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> Result<(), slint::PlatformError> {
+/// Create the UI and wire every callback. Does not start the event loop.
+pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slint::PlatformError> {
     let content = Rc::new(Content::bundled());
-    let progress = match &progress_path {
-        Some(p) => Progress::load(p),
-        None => Progress::in_memory(),
-    };
     let st = Rc::new(RefCell::new(State {
         progress,
         stack: vec![],
@@ -237,28 +334,15 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
         });
     }
 
-    ui.set_grammar_list(model(
-        content
-            .points
-            .iter()
-            .map(|p| ListItem {
-                id: p.id.as_str().into(),
-                num: (p.order + 1).to_string().into(),
-                title: p.title.as_str().into(),
-                meaning: p.meaning.as_str().into(),
-                level: "New".into(),
-            })
-            .collect(),
-    ));
-
-    // helper macro: clone handles into a callback
+    // clone the handles a callback needs: `cb!(|ui, c, st| body)`; add `p` for the platform
     macro_rules! cb {
-        ($ui:ident, $c:ident, $st:ident, $body:expr) => {{
-            let w = $ui.as_weak();
+        (|$ui:ident, $c:ident, $st:ident $(, $p:ident)?| $body:expr) => {{
+            let w = ui.as_weak();
             let $c = content.clone();
             let $st = st.clone();
+            $( let $p = platform.clone(); )?
             move || {
-                let $ui = w.unwrap();
+                let Some($ui) = w.upgrade() else { return };
                 #[allow(unused_mut)]
                 let mut $st = $st.borrow_mut();
                 let _ = &$c;
@@ -267,27 +351,9 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
         }};
     }
 
-    let refresh_list = {
-        let content = content.clone();
-        move |ui: &AppWindow, st: &State| {
-            ui.set_grammar_list(model(
-                content
-                    .points
-                    .iter()
-                    .map(|p| ListItem {
-                        id: p.id.as_str().into(),
-                        num: (p.order + 1).to_string().into(),
-                        title: p.title.as_str().into(),
-                        meaning: p.meaning.as_str().into(),
-                        level: st.progress.card(&p.id).level_name().into(),
-                    })
-                    .collect(),
-            ));
-        }
-    };
-
-    ui.on_start_learn(cb!(ui, c, st, {
-        let ids: Vec<String> = new_ids(&c, &st).into_iter().take(st.progress.settings.batch_size as usize).collect();
+    ui.on_start_learn(cb!(|ui, c, st| {
+        let ids: Vec<String> =
+            new_ids(&c, &st.progress).into_iter().take(st.progress.settings.batch_size as usize).collect();
         if ids.is_empty() {
             return;
         }
@@ -299,7 +365,7 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
         show(&ui, &mut st, SCREEN_LESSON);
     }));
 
-    ui.on_lesson_prev(cb!(ui, c, st, {
+    ui.on_lesson_prev(cb!(|ui, c, st| {
         if st.lesson_idx > 0 {
             st.lesson_idx -= 1;
             ui.set_lesson_index(st.lesson_idx as i32);
@@ -307,7 +373,7 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
         }
     }));
 
-    ui.on_lesson_next(cb!(ui, c, st, {
+    ui.on_lesson_next(cb!(|ui, c, st| {
         if st.lesson_idx + 1 < st.lesson_ids.len() {
             st.lesson_idx += 1;
             ui.set_lesson_index(st.lesson_idx as i32);
@@ -318,13 +384,14 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
             st.stack.clear();
             st.stack.push(SCREEN_HOME);
             ui.set_screen(SCREEN_QUIZ);
+            event("screen=2 lesson");
             refresh_quiz(&ui, &c, &st);
             ui.set_focus_tick(ui.get_focus_tick() + 1);
         }
     }));
 
-    ui.on_start_reviews(cb!(ui, c, st, {
-        let mut ids = due_ids(&c, &st, now_ms());
+    ui.on_start_reviews(cb!(|ui, c, st| {
+        let mut ids = due_ids(&c, &st.progress, now_ms());
         if ids.is_empty() {
             return;
         }
@@ -338,7 +405,6 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
     {
         let w = ui.as_weak();
         let st = st.clone();
-        let c = content.clone();
         ui.on_quiz_edited(move |text| {
             let mut st = st.borrow_mut();
             let romaji = st.progress.settings.romaji;
@@ -348,7 +414,6 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
                 return sess.raw.as_str().into();
             }
             sess.on_input(&text, romaji);
-            let _ = &c;
             if let Some(ui) = w.upgrade() {
                 ui.set_quiz_preview(sess.input.as_str().into());
             }
@@ -356,57 +421,65 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
         });
     }
 
-    ui.on_quiz_submit(cb!(ui, c, st, {
+    ui.on_quiz_submit(cb!(|ui, c, st, p| {
         let st = &mut *st;
         let Some(sess) = st.session.as_mut() else { return };
         if sess.verdict.is_none() {
             // pick up the final text (e.g. typed with an IME, no `edited` for the last commit)
             let raw = ui.get_quiz_input();
             sess.on_input(&raw, st.progress.settings.romaji);
-            sess.submit(&c);
+            if sess.submit(&c) {
+                event(&format!(
+                    "verdict={:?} point={} raw={:?} kana={:?}",
+                    sess.verdict.unwrap(),
+                    sess.point.as_deref().unwrap_or(""),
+                    sess.raw,
+                    sess.input
+                ));
+            }
         } else {
             sess.next(&c, &mut st.progress);
+            sync_reminder(&*p, &st.progress);
+            if sess.finished() {
+                event(&format!("session-finished correct_first_try={} total={}", sess.correct_first_try, sess.total));
+            }
             ui.set_focus_tick(ui.get_focus_tick() + 1);
         }
         refresh_quiz(&ui, &c, st);
     }));
 
-    ui.on_quiz_typo(cb!(ui, c, st, {
+    ui.on_quiz_typo(cb!(|ui, c, st| {
         if let Some(s) = st.session.as_mut() {
             s.override_correct();
         }
         refresh_quiz(&ui, &c, &st);
     }));
 
-    ui.on_quiz_retry(cb!(ui, c, st, {
+    ui.on_quiz_retry(cb!(|ui, c, st| {
         if let Some(s) = st.session.as_mut() {
             s.retry();
         }
         refresh_quiz(&ui, &c, &st);
     }));
 
-    ui.on_open_notes(cb!(ui, c, st, {
+    ui.on_open_notes(cb!(|ui, c, st| {
         let _ = &st;
         ui.set_show_notes(true);
     }));
 
-    {
-        let rl = refresh_list.clone();
-        ui.on_go_home(cb!(ui, c, st, {
-            st.session = None;
-            show(&ui, &mut st, SCREEN_HOME);
-            refresh_home(&ui, &c, &st);
-            rl(&ui, &st);
-        }));
-    }
+    ui.on_go_home(cb!(|ui, c, st| {
+        st.session = None;
+        show(&ui, &mut st, SCREEN_HOME);
+        refresh_home(&ui, &c, &st);
+        refresh_list(&ui, &c, &st);
+    }));
 
     {
-        let rl = refresh_list.clone();
         let w = ui.as_weak();
         let st = st.clone();
         let c = content.clone();
         ui.on_go_back(move || {
-            let ui = w.unwrap();
+            let Some(ui) = w.upgrade() else { return false };
             let mut st = st.borrow_mut();
             let cur = ui.get_screen();
             if cur == SCREEN_HOME {
@@ -419,8 +492,9 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
             }
             ui.set_show_notes(false);
             ui.set_screen(prev);
+            event(&format!("screen={prev} back"));
             refresh_home(&ui, &c, &st);
-            rl(&ui, &st);
+            refresh_list(&ui, &c, &st);
             if prev == SCREEN_DETAIL {
                 if let Some(id) = st.detail.clone() {
                     ui.set_notes(point_data(&c, &st, &id));
@@ -430,20 +504,17 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
         });
     }
 
-    {
-        let rl = refresh_list.clone();
-        ui.on_open_list(cb!(ui, c, st, {
-            rl(&ui, &st);
-            show(&ui, &mut st, SCREEN_LIST);
-        }));
-    }
+    ui.on_open_list(cb!(|ui, c, st| {
+        refresh_list(&ui, &c, &st);
+        show(&ui, &mut st, SCREEN_LIST);
+    }));
 
     {
         let w = ui.as_weak();
         let st = st.clone();
         let c = content.clone();
         ui.on_open_detail(move |id| {
-            let ui = w.unwrap();
+            let Some(ui) = w.upgrade() else { return };
             let mut st = st.borrow_mut();
             st.detail = Some(id.to_string());
             ui.set_notes(point_data(&c, &st, &id));
@@ -451,7 +522,7 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
         });
     }
 
-    ui.on_open_settings(cb!(ui, c, st, {
+    ui.on_open_settings(cb!(|ui, c, st| {
         refresh_settings(&ui, &st);
         show(&ui, &mut st, SCREEN_SETTINGS);
     }));
@@ -461,8 +532,9 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
             let w = ui.as_weak();
             let st = st.clone();
             let c = content.clone();
+            let p = platform.clone();
             ui.$on(move |$v: $ty| {
-                let ui = w.unwrap();
+                let Some(ui) = w.upgrade() else { return };
                 let mut st = st.borrow_mut();
                 {
                     let $s = &mut st.progress.settings;
@@ -471,6 +543,7 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
                 st.progress.save();
                 refresh_settings(&ui, &st);
                 refresh_home(&ui, &c, &st);
+                sync_reminder(&*p, &st.progress);
             });
         }};
     }
@@ -479,32 +552,42 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
     setting!(on_set_romaji, bool, |s, v| s.romaji = v);
     setting!(on_set_batch, i32, |s, v| s.batch_size = v.clamp(1, 20) as u32);
     setting!(on_set_retention, i32, |s, v| s.retention = RETENTIONS[(v as usize).min(2)]);
-
     {
-        let rl = refresh_list.clone();
-        ui.on_reset_point(cb!(ui, c, st, {
-            if let Some(id) = st.detail.clone() {
-                st.progress.reset_point(&id);
-                ui.set_notes(point_data(&c, &st, &id));
-                rl(&ui, &st);
+        let p = platform.clone();
+        setting!(on_set_notifications, bool, |s, v| {
+            s.notifications = v;
+            if v {
+                p.request_notification_permission();
             }
-        }));
+        });
     }
 
-    {
-        let rl = refresh_list.clone();
-        ui.on_reset_all(cb!(ui, c, st, {
-            st.progress.reset_all();
-            refresh_home(&ui, &c, &st);
-            rl(&ui, &st);
-        }));
-    }
+    ui.on_reset_point(cb!(|ui, c, st, p| {
+        if let Some(id) = st.detail.clone() {
+            st.progress.reset_point(&id);
+            ui.set_notes(point_data(&c, &st, &id));
+            refresh_list(&ui, &c, &st);
+            sync_reminder(&*p, &st.progress);
+        }
+    }));
+
+    ui.on_reset_all(cb!(|ui, c, st, p| {
+        st.progress.reset_all();
+        refresh_home(&ui, &c, &st);
+        refresh_list(&ui, &c, &st);
+        sync_reminder(&*p, &st.progress);
+    }));
 
     {
         let s = st.borrow();
         refresh_settings(&ui, &s);
         refresh_home(&ui, &content, &s);
-        refresh_list(&ui, &s);
+        refresh_list(&ui, &content, &s);
+        sync_reminder(&*platform, &s.progress);
+    }
+    platform.dismiss_reminder();
+    if st.borrow().progress.settings.notifications {
+        platform.request_notification_permission();
     }
 
     // keep "due" counts fresh
@@ -519,23 +602,41 @@ pub fn run(progress_path: Option<PathBuf>, on_started: Option<StartupHook>) -> R
             }
         });
     }
-
-    if let Some(hook) = on_started {
-        slint::Timer::single_shot(std::time::Duration::from_millis(300), hook);
+    {
+        let p = platform.clone();
+        slint::Timer::single_shot(std::time::Duration::from_millis(300), move || p.on_started());
     }
+    {
+        let w = ui.as_weak();
+        let st = st.clone();
+        let c = content.clone();
+        let p = platform.clone();
+        RESUME_HOOK.with(|h| {
+            *h.borrow_mut() = Some(Box::new(move || {
+                let (Some(ui), Ok(st)) = (w.upgrade(), st.try_borrow()) else { return };
+                event("resumed");
+                p.dismiss_reminder();
+                refresh_home(&ui, &c, &st);
+                refresh_list(&ui, &c, &st);
+                sync_reminder(&*p, &st.progress);
+            }))
+        });
+    }
+    event("started");
+    Ok(App { ui, state: st, content, _timer: timer })
+}
 
-    ui.run()
+pub fn run(progress_path: Option<PathBuf>, platform: Rc<dyn Platform>) -> Result<(), slint::PlatformError> {
+    let progress = match &progress_path {
+        Some(p) => Progress::load(p),
+        None => Progress::in_memory(),
+    };
+    let app = build(progress, platform)?;
+    app.ui.run()
 }
 
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
 fn android_main(app: slint::android::AndroidApp) {
-    let data = app.internal_data_path();
-    let app2 = app.clone();
-    slint::android::init(app).expect("slint android init");
-    let path = data.map(|d| d.join("progress.json"));
-    // Android may restore the keyboard if the app was killed while it was open (e.g. mid-quiz)
-    let hide: StartupHook = Box::new(move || app2.hide_soft_input(false));
-    run(path, Some(hide)).expect("app runs");
+    android::main(app);
 }
-

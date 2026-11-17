@@ -124,7 +124,7 @@ For い-adjectives, the past is carried by the adjective itself (暑かったで
 """)
 def m_deshita(toks):
     return [(i, i + 2, None) for i, t in enumerate(toks)
-            if t.s == "でし" and t.lemma == "です" and lemma_is(at(toks, i + 1), "た")
+            if t.s == "でし" and t.lemma == "です" and at(toks, i + 1) is not None and toks[i + 1].s == "た"
             and nounish(at(toks, i - 1))]
 
 
@@ -135,7 +135,7 @@ nouns and な-adjectives, never to い-adjectives.
 """)
 def m_datta(toks):
     return [(i, i + 2, None) for i, t in enumerate(toks)
-            if t.s == "だっ" and t.lemma == "だ" and lemma_is(at(toks, i + 1), "た")
+            if t.s == "だっ" and t.lemma == "だ" and at(toks, i + 1) is not None and toks[i + 1].s == "た"
             and nounish(at(toks, i - 1))]
 
 
@@ -256,7 +256,7 @@ def m_ni(toks):
         if t.s == "に" and t.p2 == "格助詞":
             p = at(toks, i - 1)
             n = at(toks, i + 1)
-            if p is None or p.p1 not in ("名詞", "代名詞"):
+            if p is None or p.p1 not in ("名詞", "代名詞", "接尾辞"):
                 continue
             if p.lemma in ("前", "為"):
                 continue
@@ -289,7 +289,7 @@ def m_de(toks):
             if n is not None and n.s in ("は", "も"):
                 continue
             p = at(toks, i - 1)
-            if p is None or p.p1 not in ("名詞", "代名詞") or p.lemma == "後":
+            if p is None or p.p1 not in ("名詞", "代名詞", "接尾辞") or p.lemma == "後":
                 continue
             out.append((i, i + 1, None))
     return out
@@ -308,7 +308,7 @@ def m_to(toks):
     for i, t in enumerate(toks):
         if t.s == "と" and t.p2 == "格助詞":
             p, n = at(toks, i - 1), at(toks, i + 1)
-            if p is None or p.p1 not in ("名詞", "代名詞") or p.s in ("なん", "何", "ちょっと", "もっ"):
+            if p is None or p.p1 not in ("名詞", "代名詞", "接尾辞") or p.s in ("なん", "何", "ちょっと", "もっ"):
                 continue
             if n is None or n.p1 == "補助記号" or n.lemma in QUOTE_VERBS or n.p1 == "動詞":
                 if not (n is not None and n.p1 == "動詞" and n.lemma not in QUOTE_VERBS
@@ -325,7 +325,7 @@ so on). Compare と, which gives a complete list. It is often paired with など
 """)
 def m_ya(toks):
     return [(i, i + 1, None) for i, t in enumerate(toks)
-            if t.s == "や" and t.p1 == "助詞" and at(toks, i - 1) and toks[i - 1].p1 in ("名詞", "代名詞")]
+            if t.s == "や" and t.p1 == "助詞" and at(toks, i - 1) and toks[i - 1].p1 in ("名詞", "代名詞", "接尾辞")]
 
 
 @point("kara_from", "から (from)", "from (starting point)", "Noun + から",
@@ -336,7 +336,7 @@ def m_ya(toks):
 def m_kara_from(toks):
     return [(i, i + 1, None) for i, t in enumerate(toks)
             if t.s == "から" and t.p2 == "格助詞"
-            and at(toks, i - 1) and toks[i - 1].p1 in ("名詞", "代名詞")]
+            and at(toks, i - 1) and toks[i - 1].p1 in ("名詞", "代名詞", "接尾辞")]
 
 
 @point("made", "まで", "until, as far as", "Noun + まで",
@@ -346,7 +346,7 @@ It is often combined with から: 九時から五時まで (from nine to five).
 """)
 def m_made(toks):
     return [(i, i + 1, None) for i, t in enumerate(toks)
-            if t.s == "まで" and t.p1 == "助詞" and at(toks, i - 1) and toks[i - 1].p1 in ("名詞", "代名詞")]
+            if t.s == "まで" and t.p1 == "助詞" and at(toks, i - 1) and toks[i - 1].p1 in ("名詞", "代名詞", "接尾辞")]
 
 
 @point("ka", "か (question)", "question marker", "Sentence + か",
@@ -530,7 +530,8 @@ def m_masen(toks):
 
 @point("mashita", "ました", "(polite past verb)", "Verb stem + ました",
        """
-ました is the polite past: 食べました (ate), 行きました (went).
+ました is the polite past: 食べました (ate), 行きました (went). Like ます, it attaches to the
+verb stem, so whatever stem you use for ます works here too: 見ます → 見ました, します → しました.
 """)
 def m_mashita(toks):
     out = []
@@ -936,7 +937,7 @@ def m_adj_past(toks):
     out = []
     for i, t in enumerate(toks):
         n = at(toks, i + 1)
-        if t.is_adj and t.lemma not in ("無い",) and t.s.endswith("かっ") and n is not None and n.lemma == "た":
+        if t.is_adj and t.lemma not in ("無い",) and t.s.endswith("かっ") and n is not None and n.s == "た":
             if at(toks, i - 1) and at(toks, i - 1).is_adj and at(toks, i - 1).s.endswith("く"):
                 continue
             out.append((i, ext_adj(toks, i + 2), i))

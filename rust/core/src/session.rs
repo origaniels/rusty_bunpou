@@ -14,12 +14,7 @@ pub enum Verdict {
     Wrong,
 }
 
-pub fn now_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
-}
+pub use crate::clock::now_ms;
 
 pub struct Session {
     pub lesson: bool,

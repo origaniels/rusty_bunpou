@@ -2,7 +2,7 @@ import { LineEdit, Switch, ScrollView, ListView } from "std-widgets.slint";
 
 // ------------------------------------------------------------------ data from Rust
 
-export struct Glyph { x: length, y: length, w: length, text: string, ruby: string, cloze: bool }
+export struct Glyph { x: length, y: length, w: length, text: string, ruby: string, ruby-x: length, ruby-w: length, cloze: bool }
 
 export struct SentenceData {
     glyphs: [Glyph],
@@ -68,7 +68,8 @@ component SentenceView {
     for g in d.glyphs: Rectangle {
         x: g.x; y: g.y - d.ruby-h; width: g.w; height: d.ruby-h + d.main-h;
         if furigana && g.ruby != "": Text {
-            y: 0; width: parent.width; height: d.ruby-h;
+            // the reading may be wider than the character and overhang its neighbours
+            x: g.ruby-x; y: 0; width: g.ruby-w; height: d.ruby-h;
             text: g.ruby; font-size: root.font-size * 0.45;
             color: (g.cloze && mode != 0 ? root.frame-color : Theme.fg).with-alpha(0.75);
             horizontal-alignment: center; vertical-alignment: bottom;
@@ -113,6 +114,10 @@ component Btn inherits Rectangle {
         color: !root.enabled ? #77748a : root.primary ? #2a0f0b : Theme.fg;
     }
     ta := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled) { root.clicked(); } }
 }
 
 component ToggleRow {
@@ -232,6 +237,7 @@ export component AppWindow inherits Window {
     in property <bool> furigana: true;
     in property <bool> english: true;
     in property <bool> romaji: true;
+    in property <bool> notifications: true;
     in property <int> batch-size: 5;
     in property <int> retention-index: 1;
     in-out property <bool> confirm-reset;
@@ -254,6 +260,7 @@ export component AppWindow inherits Window {
     callback set-furigana(bool);
     callback set-english(bool);
     callback set-romaji(bool);
+    callback set-notifications(bool);
     callback set-batch(int);
     callback set-retention(int);
     callback reset-point();
@@ -424,6 +431,9 @@ export component AppWindow inherits Window {
                     for item in root.grammar-list: TouchArea {
                         height: row.preferred-height;
                         clicked => { root.open-detail(item.id); }
+                        accessible-role: list-item;
+                        accessible-label: item.title;
+                        accessible-action-default => { root.open-detail(item.id); }
                         row := HorizontalLayout {
                             padding: 12px; padding-left: 16px; spacing: 12px;
                             Text { text: item.num; width: 28px; color: Theme.muted; vertical-alignment: center; }
@@ -463,6 +473,7 @@ export component AppWindow inherits Window {
                     ToggleRow { text: "Furigana (readings above kanji)"; checked: root.furigana; toggled(v) => { root.set-furigana(v); } }
                     ToggleRow { text: "Show English before answering"; checked: root.english; toggled(v) => { root.set-english(v); } }
                     ToggleRow { text: "Convert romaji to kana"; checked: root.romaji; toggled(v) => { root.set-romaji(v); } }
+                    ToggleRow { text: "Remind me when reviews are due"; checked: root.notifications; toggled(v) => { root.set-notifications(v); } }
                     Text { text: "New points per lesson"; font-size: 17px; color: Theme.fg; }
                     HorizontalLayout {
                         spacing: 8px; alignment: start;

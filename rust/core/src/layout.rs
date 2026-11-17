@@ -21,6 +21,10 @@ pub struct Glyph {
     pub w: f32,
     pub text: String,
     pub ruby: String,
+    /// Width of the reading; may exceed `w` (it overhangs neighbouring kana).
+    pub ruby_w: f32,
+    /// Left edge of the reading relative to `x` (negative when it overhangs to the left).
+    pub ruby_x: f32,
     pub in_cloze: bool,
 }
 
@@ -79,9 +83,14 @@ pub fn text_width(s: &str, font: f32) -> f32 {
 
 const NO_LINE_START: &str = "。、！？!?」』）)・ー…ゃゅょっぁぃぅぇぉャュョッァィゥェォ";
 
-enum Piece {
-    Ch { text: String, ruby: String, cloze: bool },
+struct Piece {
+    text: String,
+    ruby: String,
+    cloze: bool,
 }
+
+/// How far a reading may stick out over a neighbour without furigana (per side, in em).
+const OVERHANG_EM: f32 = 0.3;
 
 /// Per-character pieces (ruby segments stay whole), each tagged with whether it's in the blank.
 fn pieces(s: &Sentence) -> Vec<Piece> {
@@ -93,11 +102,11 @@ fn pieces(s: &Sentence) -> Vec<Piece> {
         let n = seg.0.chars().count();
         pos += n;
         if !seg.1.is_empty() {
-            out.push(Piece::Ch { text: seg.0.clone(), ruby: seg.1.clone(), cloze: start >= cs && start < ce });
+            out.push(Piece { text: seg.0.clone(), ruby: seg.1.clone(), cloze: start >= cs && start < ce });
         } else {
             for (k, ch) in seg.0.chars().enumerate() {
                 let i = start + k;
-                out.push(Piece::Ch { text: ch.to_string(), ruby: String::new(), cloze: i >= cs && i < ce });
+                out.push(Piece { text: ch.to_string(), ruby: String::new(), cloze: i >= cs && i < ce });
             }
         }
     }
@@ -105,7 +114,7 @@ fn pieces(s: &Sentence) -> Vec<Piece> {
 }
 
 struct Unit {
-    items: Vec<(String, String, bool, f32)>, // text, ruby, in_cloze, width
+    items: Vec<(String, String, bool, f32, f32, f32)>, // text, ruby, in_cloze, width, ruby width, ruby x
     width: f32,
     is_blank: bool,
     /// width of the blank box itself (excluding attached punctuation)
@@ -122,7 +131,10 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
     // 1) group into unbreakable units
     let mut units: Vec<Unit> = Vec::new();
     let mut blank_added = false;
-    for Piece::Ch { text, ruby, cloze } in pieces(s) {
+    let ps = pieces(s);
+    let has_ruby = |i: usize| m.furigana && ps.get(i).is_some_and(|p| !p.ruby.is_empty());
+    for (i, Piece { text, ruby, cloze }) in ps.iter().enumerate() {
+        let (text, ruby, cloze) = (text.clone(), ruby.clone(), *cloze);
         if cloze && mode == ClozeMode::Blank {
             if !blank_added {
                 let w = (text_width(typed, m.font) + 2.0 * pad).max(m.font * 3.0);
@@ -131,7 +143,21 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
             }
             continue;
         }
-        let w = text_width(&text, m.font).max(if m.furigana { text_width(&ruby, m.ruby_font) } else { 0.0 });
+        let text_w = text_width(&text, m.font);
+        let ruby_w = if m.furigana { text_width(&ruby, m.ruby_font) } else { 0.0 };
+        // a long reading may overhang neighbours that have no reading of their own
+        let room = |j: Option<usize>| match j {
+            Some(j) if j < ps.len() && !has_ruby(j) => OVERHANG_EM * m.font,
+            _ => 0.0,
+        };
+        let (left_room, right_room) = (room(i.checked_sub(1)), room(Some(i + 1)));
+        let w = text_w.max(ruby_w - left_room - right_room);
+        // spread the overhang over both sides, shifting toward the side that has room
+        let over = (ruby_w - w).max(0.0);
+        let mut left = (over / 2.0).min(left_room);
+        let right = (over - left).min(right_room);
+        left = over - right;
+        let ruby_x = if ruby_w > w { -left } else { (w - ruby_w) / 2.0 };
         let first = text.chars().next().unwrap_or(' ');
         let attach = NO_LINE_START.contains(first) && !units.is_empty();
         // cloze characters in Highlight/Revealed stay together as one unit
@@ -139,10 +165,10 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
             && units.last().is_some_and(|u| !u.is_blank && u.items.last().is_some_and(|it| it.2));
         if attach || join_cloze {
             let u = units.last_mut().unwrap();
-            u.items.push((text, ruby, cloze, w));
+            u.items.push((text, ruby, cloze, w, ruby_w, ruby_x));
             u.width += w;
         } else {
-            units.push(Unit { items: vec![(text, ruby, cloze, w)], width: w, is_blank: false, blank_w: 0.0 });
+            units.push(Unit { items: vec![(text, ruby, cloze, w, ruby_w, ruby_x)], width: w, is_blank: false, blank_w: 0.0 });
         }
     }
 
@@ -165,7 +191,7 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
             out.cloze = Rect { x, y: y + ruby_h, w: u.blank_w, h: main_h };
             x += u.blank_w;
         }
-        for (text, ruby, in_cloze, w) in u.items {
+        for (text, ruby, in_cloze, w, ruby_w, ruby_x) in u.items {
             if in_cloze && frame == 0 {
                 frame = 1;
                 x += p;
@@ -175,7 +201,7 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
                 frame = 2;
                 x += p;
             }
-            out.glyphs.push(Glyph { x, y: y + ruby_h, w, text, ruby, in_cloze });
+            out.glyphs.push(Glyph { x, y: y + ruby_h, w, text, ruby, ruby_w, ruby_x, in_cloze });
             x += w;
             if in_cloze {
                 cmax = x;
@@ -193,6 +219,51 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
 mod tests {
     use super::*;
     use crate::content::Content;
+
+    #[test]
+    fn readings_never_overlap_and_glyphs_dont_collide() {
+        let c = Content::bundled();
+        let m = Metrics::new(24.0, true);
+        for s in c.points.iter().flat_map(|p| &p.sentences) {
+            for mode in [ClozeMode::Highlight, ClozeMode::Revealed, ClozeMode::Blank] {
+                let l = layout(s, 330.0, m, mode, "");
+                let line = |g: &Glyph| (g.y * 10.0) as i64;
+                for (a, b) in l.glyphs.iter().zip(l.glyphs.iter().skip(1)) {
+                    if line(a) != line(b) {
+                        continue;
+                    }
+                    assert!(a.x + a.w <= b.x + 0.01, "glyphs overlap in {}", s.ja);
+                }
+                let rubies: Vec<(f32, f32, i64)> = l
+                    .glyphs
+                    .iter()
+                    .filter(|g| !g.ruby.is_empty())
+                    .map(|g| (g.x + g.ruby_x, g.x + g.ruby_x + g.ruby_w, line(g)))
+                    .collect();
+                for w in rubies.windows(2) {
+                    if w[0].2 == w[1].2 {
+                        assert!(w[0].1 <= w[1].0 + 0.01, "readings overlap in {}", s.ja);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn short_kanji_with_long_reading_overhangs_kana() {
+        let c = Content::bundled();
+        // 私 (わたし) between kana: no extra gap, the reading overhangs
+        let s = c
+            .points
+            .iter()
+            .flat_map(|p| &p.sentences)
+            .find(|s| s.ja.contains("は私の") || s.ja.contains("が私の"))
+            .unwrap();
+        let l = layout(s, 2000.0, Metrics::new(24.0, true), ClozeMode::Highlight, "");
+        let g = l.glyphs.iter().find(|g| g.text == "私").unwrap();
+        assert_eq!(g.w, 24.0);
+        assert!(g.ruby_w > g.w);
+    }
 
     #[test]
     fn layout_all_sentences() {

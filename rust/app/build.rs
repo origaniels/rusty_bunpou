@@ -1,4 +1,9 @@
 fn main() {
-    let config = slint_build::CompilerConfiguration::new().with_style("material-dark".into());
+    let mut config = slint_build::CompilerConfiguration::new().with_style("material-dark".into());
+    // element debug info lets the headless UI tests (tests/ui.rs) find elements; not needed on device
+    let target = std::env::var("TARGET").unwrap_or_default();
+    if !target.contains("android") {
+        config = config.with_debug_info(true);
+    }
     slint_build::compile_with_config("ui/app.slint", config).expect("slint build failed");
 }

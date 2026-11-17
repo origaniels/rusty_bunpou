@@ -24,14 +24,20 @@ impl Card {
         self.state == 0
     }
 
-    /// SRS-style level name derived from FSRS stability.
+    /// Current scheduled interval in days.
+    pub fn interval_days(&self) -> f64 {
+        (self.due - self.last_review) as f64 / DAY_MS as f64
+    }
+
+    /// SRS-style level name derived from the current interval.
     pub fn level_name(&self) -> &'static str {
+        let iv = self.interval_days();
         match () {
             _ if self.state == 0 => "New",
-            _ if self.state == 1 || self.stability < 1.0 => "Beginner",
-            _ if self.stability < 7.0 => "Adept",
-            _ if self.stability < 30.0 => "Seasoned",
-            _ if self.stability < 120.0 => "Expert",
+            _ if iv < 0.99 => "Beginner",
+            _ if iv < 7.0 => "Adept",
+            _ if iv < 30.0 => "Seasoned",
+            _ if iv < 120.0 => "Expert",
             _ => "Mastered",
         }
     }
@@ -45,11 +51,13 @@ pub struct Settings {
     pub romaji: bool,
     pub batch_size: u32,
     pub retention: f64,
+    /// Remind (Android notification) when reviews become due.
+    pub notifications: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9 }
+        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true }
     }
 }
 
@@ -121,8 +129,14 @@ impl Progress {
 pub mod scheduler {
     use super::*;
     const HOUR: i64 = 3_600_000;
-    pub const LEARNING_STEPS: [i64; 2] = [4 * HOUR, 8 * HOUR];
+    /// Fixed steps before FSRS takes over (SRS-like early levels).
+    pub const LEARNING_STEPS: [i64; 4] = [4 * HOUR, 8 * HOUR, 24 * HOUR, 72 * HOUR];
+    /// First retry after a mistake.
     pub const RELEARN_DELAY: i64 = HOUR;
+    /// After a lapse (mistake on a graduated point), relearning resumes at this learning step.
+    pub const RELEARN_FROM_STEP: u32 = 2;
+    /// An FSRS interval may be at most this many times the previous interval.
+    pub const MAX_GROWTH: f64 = 3.0;
 
     pub fn grade(card: &Card, correct: bool, now: i64, retention: f64, sentence: u64) -> Card {
         let g = if correct { 3 } else { 1 };
@@ -140,9 +154,11 @@ pub mod scheduler {
         if !correct {
             if card.state == 2 {
                 c.lapses += 1;
+                c.step = RELEARN_FROM_STEP;
+            } else {
+                c.step = 0;
             }
             c.state = 1;
-            c.step = 0;
             c.due = now + RELEARN_DELAY;
         } else if card.state <= 1 && (card.step as usize) < LEARNING_STEPS.len() {
             c.state = 1;
@@ -150,8 +166,11 @@ pub mod scheduler {
             c.step = card.step + 1;
         } else {
             let fuzz = 1.0 + (fastrand::f64() - 0.5) * 0.1;
+            let days = fsrs::interval_days(mem.stability, retention, 365.0);
+            let previous = if card.last_review == 0 { 1.0 } else { elapsed.max(1.0) };
+            let days = days.min(previous * MAX_GROWTH).max(1.0);
             c.state = 2;
-            c.due = now + (fsrs::interval_days(mem.stability, retention, 365.0) * fuzz * DAY_MS as f64) as i64;
+            c.due = now + (days * fuzz * DAY_MS as f64) as i64;
         }
         c
     }
@@ -171,6 +190,10 @@ mod tests {
         t = card.due;
         card = grade(&card, true, t, 0.9, 1);
         assert_eq!(card.due, t + LEARNING_STEPS[1]);
+        for _ in 2..LEARNING_STEPS.len() {
+            t = card.due;
+            card = grade(&card, true, t, 0.9, 1);
+        }
         t = card.due;
         card = grade(&card, true, t, 0.9, 1);
         assert_eq!(card.state, 2);

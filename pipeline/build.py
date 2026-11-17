@@ -232,9 +232,6 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     content = dict(version=1, source="Tatoeba (https://tatoeba.org), CC-BY 2.0 FR", points=points_out)
     (OUT / "content.json").write_text(json.dumps(content, ensure_ascii=False, separators=(",", ":")), encoding="utf8")
-    assets = HERE.parent / "android" / "app" / "src" / "main" / "assets"
-    assets.mkdir(parents=True, exist_ok=True)
-    (assets / "content.json").write_text((OUT / "content.json").read_text(encoding="utf8"), encoding="utf8")
     for pid, pool, n in report:
         flag = "  <-- low" if n < 8 else ""
         print(f"{pid:16s} pool={pool:6d} chosen={n:3d}{flag}")

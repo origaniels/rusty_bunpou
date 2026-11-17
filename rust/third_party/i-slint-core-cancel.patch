@@ -1,0 +1,25 @@
+--- a/input.rs
++++ b/input.rs
+@@ -2636,7 +2636,12 @@
+ 
+         match self.gesture_state {
+             GestureRecognitionState::Idle => {
+-                if self.primary_touch_id == Some(id) {
++                if self.primary_touch_id == Some(id) && is_cancelled {
++                    // bunpo patch: a cancelled touch (e.g. the Android back gesture taking over the
++                    // pointer) must not be reported as a release, or TouchAreas emit `clicked`.
++                    self.primary_touch_id = None;
++                    events.push(MouseEvent::Exit);
++                } else if self.primary_touch_id == Some(id) {
+                     self.primary_touch_id = None;
+                     events.push(MouseEvent::Released {
+                         position,
+@@ -2921,7 +2926,7 @@
+ 
+         let evs =
+             state.process(1, pt(100.0, 200.0), TouchPhase::Cancelled, None, Default::default());
+-        assert_eq!(classify(&evs), vec![Ev::Released(100.0, 200.0), Ev::Exit]);
++        assert_eq!(classify(&evs), vec![Ev::Exit]);
+     }
+ 
+     #[test]
