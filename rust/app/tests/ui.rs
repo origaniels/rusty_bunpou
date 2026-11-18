@@ -136,7 +136,11 @@ impl T {
     fn levels(&self) -> Vec<String> {
         use slint::Model;
         let l = self.app.ui.get_grammar_list();
-        (0..l.row_count()).map(|i| l.row_data(i).unwrap().level.to_string()).collect()
+        (0..l.row_count())
+            .map(|i| l.row_data(i).unwrap())
+            .filter(|r| r.header.is_empty())
+            .map(|r| r.level.to_string())
+            .collect()
     }
 
     fn touch(&self, pos: LogicalPoint, phase: TouchPhase) {
@@ -409,9 +413,11 @@ fn progress_per_level_and_list_headers() {
         .filter(|h| !h.is_empty())
         .collect();
     assert_eq!(headers, ["JLPT N5", "JLPT N4", "JLPT N3", "JLPT N2", "JLPT N1"]);
-    // numbering restarts per level
-    let first_n4 = (0..list.row_count()).map(|i| list.row_data(i).unwrap()).find(|r| r.header == "JLPT N4").unwrap();
-    assert_eq!(first_n4.num, "1");
+    // headers are their own rows with "learned / total"; numbering restarts per level
+    let rows: Vec<_> = (0..list.row_count()).map(|i| list.row_data(i).unwrap()).collect();
+    assert_eq!(rows[0].num, "5 / 74", "N5 header counts learned points");
+    let n4 = rows.iter().position(|r| r.header == "JLPT N4").unwrap();
+    assert_eq!(rows[n4 + 1].num, "1");
 }
 
 #[test]
@@ -516,7 +522,7 @@ fn switching_to_french_translates_the_ui_and_is_remembered() {
     t.press("Grammaire");
     let list = t.app.ui.get_grammar_list();
     use slint::Model;
-    assert_eq!(list.row_data(0).unwrap().level, "Nouveau");
+    assert_eq!(list.row_data(1).unwrap().level, "Nouveau"); // row 0 is the JLPT N5 header
 
     // the setting survives a restart
     let progress = std::mem::replace(&mut t.app.state.borrow_mut().progress, Progress::in_memory());
@@ -594,3 +600,25 @@ fn menu_bar_switches_tabs_and_back_goes_home() {
     assert_eq!(t.screen(), SCREEN_HOME);
 }
 
+#[test]
+fn grammar_levels_fold_and_unfold() {
+    use slint::Model;
+    let t = setup();
+    t.press("Grammar list");
+    let count = |t: &T| t.app.ui.get_grammar_list().row_count();
+    let all = count(&t);
+    assert_eq!(all, 456 + 5, "every point plus one header per level");
+    // fold N5: its points disappear, its header stays (and can still be tapped)
+    t.press("JLPT N5");
+    assert_eq!(count(&t), all - 74);
+    assert!(t.app.ui.get_grammar_list().row_data(0).unwrap().collapsed);
+    assert!(!t.exists("だ"));
+    // folding survives leaving the tab
+    t.press("Home");
+    t.press("Grammar list");
+    assert_eq!(count(&t), all - 74);
+    t.press("JLPT N5");
+    assert_eq!(count(&t), all);
+    t.press("だ");
+    assert_eq!(t.screen(), SCREEN_DETAIL);
+}

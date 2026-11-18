@@ -118,6 +118,8 @@ pub struct State {
     lesson_idx: usize,
     pub session: Option<Session>,
     detail: Option<String>,
+    /// JLPT levels folded in the grammar list (for this run of the app)
+    collapsed: std::collections::HashSet<String>,
 }
 
 /// The running app: UI + state. Keep it alive while the UI runs.
@@ -280,26 +282,31 @@ pub fn level_rows(content: &Content, progress: &Progress) -> Vec<LevelRow> {
 
 fn refresh_list(ui: &AppWindow, content: &Content, st: &State) {
     let mut items = vec![];
-    let mut level = "";
-    let mut n = 0;
     let lang = st.progress.settings.lang();
-    for p in &content.points {
-        let header = if p.level != level {
-            level = &p.level;
-            n = 0;
-            format!("JLPT {}", p.level)
-        } else {
-            String::new()
-        };
-        n += 1;
+    // one header row per JLPT level (tap to fold it), then its points unless folded
+    for row in level_rows(content, &st.progress) {
+        let level = row.name.to_string();
+        let collapsed = st.collapsed.contains(&level);
         items.push(ListItem {
-            id: p.id.as_str().into(),
-            num: n.to_string().into(),
-            title: p.title_in(lang).into(),
-            meaning: p.meaning_in(lang).into(),
-            level: tr(lang, st.progress.card(&p.id).level_name()).into(),
-            header: header.into(),
+            id: level.as_str().into(),
+            header: format!("JLPT {level}").into(),
+            num: format!("{} / {}", row.learned, row.total).into(),
+            collapsed,
+            ..Default::default()
         });
+        if collapsed {
+            continue;
+        }
+        for (n, p) in content.points.iter().filter(|p| p.level == level).enumerate() {
+            items.push(ListItem {
+                id: p.id.as_str().into(),
+                num: (n + 1).to_string().into(),
+                title: p.title_in(lang).into(),
+                meaning: p.meaning_in(lang).into(),
+                level: tr(lang, st.progress.card(&p.id).level_name()).into(),
+                ..Default::default()
+            });
+        }
     }
     ui.set_grammar_list(model(items));
 }
@@ -452,6 +459,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         lesson_idx: 0,
         session: None,
         detail: None,
+        collapsed: Default::default(),
     }));
     let ui = AppWindow::new()?;
     ui.set_stage_colors(model((0..6).map(stage_color).collect()));
@@ -637,6 +645,21 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         refresh_list(&ui, &c, &st);
         show(&ui, &mut st, SCREEN_LIST);
     }));
+
+    {
+        let w = ui.as_weak();
+        let st = st.clone();
+        let c = content.clone();
+        ui.on_toggle_level(move |level| {
+            let Some(ui) = w.upgrade() else { return };
+            let mut st = st.borrow_mut();
+            let level = level.to_string();
+            if !st.collapsed.remove(&level) {
+                st.collapsed.insert(level);
+            }
+            refresh_list(&ui, &c, &st);
+        });
+    }
 
     {
         let w = ui.as_weak();

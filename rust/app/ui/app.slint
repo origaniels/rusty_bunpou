@@ -20,7 +20,8 @@ export struct PointData {
     explanation: string, status: string, can-reset: bool, examples: [Example],
 }
 
-export struct ListItem { id: string, num: string, title: string, meaning: string, level: string, header: string }
+/// a row of the grammar list: a level header (header != "", num = "learned / total") or a point
+export struct ListItem { id: string, num: string, title: string, meaning: string, level: string, header: string, collapsed: bool }
 
 export struct LevelRow { name: string, learned: int, total: int }
 
@@ -376,6 +377,7 @@ export component AppWindow inherits Window {
     callback go-home();
     callback go-back() -> bool;
     callback open-list();
+    callback toggle-level(string);
     callback open-detail(string);
     callback open-settings();
     callback open-stats();
@@ -550,18 +552,30 @@ export component AppWindow inherits Window {
                     vertical-stretch: 1;
                     for item in root.grammar-list: TouchArea {
                         height: col.preferred-height;
-                        clicked => { root.open-detail(item.id); }
+                        clicked => { if (item.header != "") { root.toggle-level(item.id); } else { root.open-detail(item.id); } }
                         accessible-role: list-item;
-                        accessible-label: item.title;
-                        accessible-action-default => { root.open-detail(item.id); }
+                        accessible-label: item.header != "" ? item.header : item.title;
+                        accessible-action-default => { if (item.header != "") { root.toggle-level(item.id); } else { root.open-detail(item.id); } }
                         col := VerticalLayout {
-                        // section header at the first point of each JLPT level
+                        // level header: tap to fold / unfold the level
                         if item.header != "": Rectangle {
-                            height: 44px;
+                            height: 56px;
                             background: Theme.card;
-                            Text { x: 16px; text: item.header; font-size: 17px; font-weight: 700; color: Theme.accent; vertical-alignment: center; }
+                            HorizontalLayout {
+                                padding-left: 12px; padding-right: 16px; spacing: 8px;
+                                VerticalLayout {
+                                    alignment: center;
+                                    // chevron: down when open, right when folded
+                                    Icon {
+                                        d: item.collapsed ? "M 9 5 L 16 12 L 9 19" : "M 5 9 L 12 16 L 19 9";
+                                        stroke: Theme.accent;
+                                    }
+                                }
+                                Text { text: item.header; font-size: 17px; font-weight: 700; color: Theme.accent; vertical-alignment: center; horizontal-stretch: 1; }
+                                Text { text: item.num; font-size: 14px; color: Theme.muted; vertical-alignment: center; }
+                            }
                         }
-                        HorizontalLayout {
+                        if item.header == "": HorizontalLayout {
                             padding: 12px; padding-left: 16px; spacing: 12px;
                             Text { text: item.num; width: 28px; color: Theme.muted; vertical-alignment: center; }
                             VerticalLayout {
