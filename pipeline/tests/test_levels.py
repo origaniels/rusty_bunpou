@@ -73,6 +73,13 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("ni_sotte", "本当にそう思います。"),
+    ("ni_kuwaete", "僕もゲームに加えて下さい。"),
+    ("ni_oujite", "我々は彼らの要求に応じなければならなかった。"),
+    ("ni_kakawarazu", "私が来るなと言ったのにかかわらず、彼はやってきた。"),
+    ("bakari_da", "あの少年たちは若さがあふれんばかりだ。"),
+    ("bakari_ni", "絶好の機会とばかりに飛びついた。"),
+    ("bakari_ni", "骨と皮ばかりにやせこけたねこでした。"),
     ("bakari_ni", "彼は同意すると言わんばかりにうなずいた。"),  # N1 んばかり
     ("mono_no", "彼は甘いものの量を減らした。"),
     ("mono_no", "トムは食べたものの何かでアレルギー反応を起こしている。"),

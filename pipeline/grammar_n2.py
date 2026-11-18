@@ -191,12 +191,15 @@ P("bakari_ka", "〜ばかりか", "not only ... but even", "Noun / plain form + 
 P("bakari_ni", "〜ばかりに", "simply because (bad result)", "Plain form + ばかりに",
   """ばかりに gives a cause that led to a bad result: 嘘をついたばかりに、信用を失った (just because I lied, I
   lost their trust).""",
-  r"(?<!ん)ばかりに(?!なっ)", "嘘をついたばかりに、信用を失った。", after="any")
+  r"(?<!ん)ばかりに(?!なっ)", "嘘をついたばかりに、信用を失った。", after="any",
+  # after a verb / adjective (嘘をついたばかりに), not とばかりに or 骨と皮ばかりに
+  check=lambda t, i, k: i > 0 and (t[i - 1].p1 in ("動詞", "形容詞") or t[i - 1].lemma in ("た", "だ", "ない")))
 P("bakari_da", "〜一方だ / 〜ばかりだ", "keep (getting worse)", "Verb (dictionary) + 一方だ",
   """一方だ / ばかりだ describe a change continuing in one direction: 物価は上がる一方だ (prices just keep
   rising).""",
   r"(?:一方|ばかり)(?:だ|です)", "物価は上がる一方だ。", after="v",
-  check=lambda t, i, k: i > 0 and t[i - 1].cf.startswith(("終止形", "連体形")) and t[i - 1].lemma != "た")
+  check=lambda t, i, k: i > 0 and t[i - 1].cf.startswith(("終止形", "連体形")) and t[i - 1].lemma != "た"
+  and t[i - 1].s != "ん")  # あふれんばかりだ is N1 んばかり
 P("mo_kamawazu", "〜もかまわず", "without caring about", "Noun + もかまわず",
   """もかまわず means "without minding": 人目もかまわず泣いた (cried without caring who saw).""",
   r"も(?:かまわ|構わ)ず", "彼女は人目もかまわず泣いた。", after="any")
@@ -210,15 +213,16 @@ P("wa_motoyori", "〜はもとより", "not to mention", "Noun + はもとより
 # ---------------------------------------------------------------- relations (formal)
 P("ni_kakawarazu", "〜にかかわらず", "regardless of", "Noun + にかかわらず",
   """にかかわらず means "regardless of": 年齢にかかわらず参加できる (anyone can join, regardless of age).""",
-  r"に(?:かかわ|関わ|拘)らず", "年齢にかかわらず、誰でも参加できます。", after="any")
+  r"(?<!の)に(?:かかわ|関わ|拘)らず", "年齢にかかわらず、誰でも参加できます。", after="any")  # のにかかわらず (misused にも〜)
 P("wo_towazu", "〜を問わず", "regardless of", "Noun + を問わず",
   """を問わず (とわず) means "regardless of": 男女を問わず (regardless of gender).""",
   r"を(?:問|と)わず", "経験を問わず、誰でも応募できます。", after="n")
 P("ni_kagirazu", "〜に限らず", "not only", "Noun + に限らず",
   """に限らず (かぎらず) means "not limited to": 若者に限らず、お年寄りにも人気がある (it is popular not only with young people but with the elderly too). The second half widens the scope, typically with も.""",
   r"に(?:限|かぎ)らず", "若者に限らず、お年寄りにも人気があります。", after="n")
-P("ni_kagiru", "〜に限る", "nothing beats", "Noun / Verb + に限る",
-  """に限る means "X is the best": 夏はビールに限る (nothing beats beer in summer).""",
+P("ni_kagiru", "〜に限る", "nothing beats; limited to", "Noun / Verb + に限る",
+  """に限る means "X is the best": 夏はビールに限る (nothing beats beer in summer). It also simply means "limited to": 参加者は学生に限る (participants must be
+  students).""",
   r"に(?:限|かぎ)る", "暑い日は冷たいビールに限る。", after="nv")
 P("ni_kagitte", "〜に限って", "of all (times/people); only", "Noun + に限って",
   """に限って means "of all times / only (unexpectedly)": 急いでいる時に限って、バスが来ない.""",
@@ -228,16 +232,21 @@ P("ni_sugi_nai", "〜に過ぎない", "merely, no more than", "Noun / plain for
   r"に(?:過|す)ぎ(?:ない|ません)", "それはただの噂に過ぎない。", after="any")
 P("ni_kuwaete", "〜に加えて", "in addition to", "Noun + に加えて",
   """に加えて (くわえて) means "in addition to": 雨に加えて風も強くなった (on top of the rain, the wind got stronger too). It is written or formal; casual speech would use それに or だけじゃなく.""",
-  r"に(?:加|くわ)え(?:て)?", "雨に加えて、風も強くなってきた。", after="n")
+  # not the verb 加える itself: リストに加えてくれる, ゲームに加えて下さい (add / let me join)
+  r"に(?:加|くわ)え(?!て?(?:くれ|下さ|くださ|もら|ほし|欲し|いただ|頂|やっ|あげ))(?:て)?", "雨に加えて、風も強くなってきた。",
+  after="n")
 P("ni_tomonatte", "〜に伴って", "along with, as", "Noun / Verb + に伴って",
   """に伴って (ともなって) describes things changing together: 人口の増加に伴って、問題も増えた.""",
   r"に(?:伴|ともな)(?:って|い|う)", "人口の増加に伴って、問題も増えた。", after="nv")
 P("ni_oujite", "〜に応じて", "according to, in response to", "Noun + に応じて",
   """に応じて (おうじて) means "depending on / in response to": 能力に応じて給料を払う.""",
-  r"に(?:応|おう)じ(?:て|た)?", "能力に応じて給料が決まります。", after="n")
+  # not the verb 応じる itself (要求に応じた, comply): に応じて, or に応じた + noun
+  r"に(?:応|おう)じ(?:て|た)?", "能力に応じて給料が決まります。", after="n",
+  check=lambda t, i, k: t[k - 1].s == "て" or (t[k - 1].s == "た" and k < len(t) and t[k].p1 == "名詞"))
 P("ni_sotte", "〜に沿って", "along; in line with", "Noun + に沿って",
   """に沿って (そって) means "along" (川に沿って歩く) or "in line with" (計画に沿って進める).""",
-  r"に(?:沿|そ)(?:って|った|う)", "川に沿って歩きました。", after="n")
+  # in kana only にそって / にそった: にそう is usually に + そう (本当にそう思う)
+  r"に(?:沿(?:って|った|う)|そ(?:って|った))", "川に沿って歩きました。", after="n")
 P("ni_motozuite", "〜に基づいて", "based on", "Noun + に基づいて",
   """に基づいて (もとづいて) means "based on": 事実に基づいた映画 (a film based on facts).""",
   r"に(?:基|もと)づ(?:いて|いた|く|き)", "これは事実に基づいた話です。", after="n")

@@ -244,10 +244,11 @@ FR = {
         aussi chez les personnes âgées). La seconde partie élargit le champ, souvent avec も.""",
     ),
     "ni_kagiru": dict(
-        meaning="rien de tel que",
+        meaning="rien de tel que ; réservé à",
         structure="Nom / Verbe + に限る",
         explanation="""に限る signifie « X, il n'y a rien de mieux » : 夏はビールに限る (en été, rien ne
-        vaut une bière).""",
+        vaut une bière). Il signifie aussi simplement « réservé à » : 参加者は学生に限る (participation
+        réservée aux étudiants).""",
     ),
     "ni_kagitte": dict(
         meaning="justement quand ; seulement",
