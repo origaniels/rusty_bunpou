@@ -1,4 +1,6 @@
 """N4 grammar points (original explanations; examples in `ex` are used by the tests only)."""
+import re
+
 from patterns import (ARU, IKU, KURU, NARU, SURU, _tail, all_of, first_lemma, first_pos, point, prev_cf,
                       prev_is, prev_not)
 
@@ -295,11 +297,30 @@ P("koto_ni_naru", "〜ことになる", "it's been decided that", "Verb (diction
   """ことになる says something was decided (by others or circumstances): 来月転勤することになった
   (it's been decided I'll be transferred next month).""",
   r"ことに" + NARU, "来月、大阪に転勤することになりました。", after="v", tail=True)
+def _koto_is_thing(t, i, k):
+    """こと as "a thing (to do / to ask)" rather than "there are times when": 何もすることがない,
+    お願いしたいことがある, 分からないことがあったら, 調べてることがある."""
+    text = "".join(x.s for x in t)
+    if re.search(r"何|なに|なん|他に|ほかに|たくさん|特に|いっぱい|[1１一]つ|いくつ|もっと"
+                 r"|ならない|いけない|なきゃ|べき", text):
+        return True
+    prev = t[i - 1]
+    # やること / すること (things to do), 変なこと (a strange thing)
+    if prev.lemma in ("遣る", "為る") or prev.s == "な" or prev.p1 == "形状詞":
+        return True
+    if prev.lemma == "たい" or (prev.lemma in ("いる", "居る") and i > 1 and t[i - 2].s in ("て", "で")):
+        return True
+    if prev.s == "てる" or prev.s == "でる":
+        return True
+    rest = "".join(x.s for x in t[k - 1:])
+    return bool(re.match(r"あ(?:ったら|ったの|れば|りまして|りましたら)", rest))
+
+
 P("koto_ga_aru_some", "〜ことがある (sometimes)", "there are times when", "Verb (dictionary / ない) + ことがある",
   """Dictionary form + ことがある means "sometimes": 朝ご飯を食べないことがある (sometimes I don't eat
   breakfast). With the た-form it means past experience instead.""",
   r"ことが" + ARU, "時々、朝ご飯を食べないことがあります。", after="v", tail=True,
-  check=lambda t, i, k: i > 0 and t[i - 1].lemma != "た")
+  check=lambda t, i, k: i > 0 and t[i - 1].lemma != "た" and not _koto_is_thing(t, i, k))
 P("ku_suru", "〜くする / 〜にする", "make (something) ...", "い-adj (く) / な-adj (に) + する",
   """With する, adjectives describe making a change: 部屋を暖かくする (warm up the room),
   静かにする (be quiet). With なる they describe things changing by themselves.""",
@@ -311,15 +332,25 @@ P("ga_suru", "〜がする", "(I) sense, there's a smell/sound/taste", "Noun + �
   r"(?:匂い|におい|臭い|音|声|味|感じ)が" + SURU, "台所からいい匂いがします。", tail=True)
 
 # ---------------------------------------------------------------- reason / purpose / contrast
+_PURPOSE_TAIL = r"、[^。]*?(?:かか(?!わら)|要る|要り|いくら|十分|遅すぎ|必要|便利)"
+
+
+def _purpose_after_comma(t, k):
+    """直すのに、どのくらい時間がかかりますか: のに + comma, then what it takes → purpose, not "although"."""
+    return bool(re.match(_PURPOSE_TAIL, "".join(x.s for x in t[k:])))
+
+
 P("noni", "〜のに (although)", "even though, despite", "Plain form + のに",
   """のに expresses surprise or frustration at an unexpected result: 薬を飲んだのに治らない
   (I took the medicine, but I'm not better).""",
   r"のに(?!便利|必要|使|役|十分|時間|かか|お金)", "薬を飲んだのに、まだ熱があります。", after="nva",
-  check=lambda t, i, k: t[i].p2 == "接続助詞" or (t[i].p2 == "準体助詞" and k < len(t) and t[k].s == "、"))
+  check=lambda t, i, k: (t[i].p2 == "接続助詞" or (t[i].p2 == "準体助詞" and k < len(t) and t[k].s == "、"))
+  and not _purpose_after_comma(t, k))
 P("noni_purpose", "〜のに (for)", "for, in order to", "Verb (dictionary) + のに",
   """のに after a dictionary form means "for (the purpose of)": この箱は本を入れるのに便利だ
   (this box is handy for putting books in). It's usually followed by 便利, 必要, 使う, かかる.""",
-  r"のに(?=便利|必要|使|役|いい|十分|時間|かか|お金)", "この箱は本を入れるのに便利です。", after="v")
+  r"のに(?=便利|必要|使|役|いい|十分|時間|かか(?!わら)|お金|" + _PURPOSE_TAIL + ")",
+  "この箱は本を入れるのに便利です。", after="v")
 P("tame_ni", "〜ために", "for, in order to; because of", "Verb (dictionary) / Noun + の + ために",
   """ために gives a purpose you control (日本へ行くために貯金する, save money to go to Japan) or a
   cause (事故のために遅れた, late because of an accident).""",

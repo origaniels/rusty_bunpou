@@ -56,6 +56,8 @@ def test_extra_examples_refer_to_known_points():
 
 # (point, sentence, expected blank)
 POSITIVE = [
+    ("noni_purpose", "直すのに、どのくらい時間がかかりますか。", "のに"),
+    ("koto_ga_aru_some", "一人になると、時々泣きたくなることがあります。", "ことがあります"),
     ("tara", "家に帰ったら電話します。", "帰ったら"),
     ("sou_look", "このケーキはおいしそうですね。", "おいしそう"),
     ("sou_hear", "明日は雨が降るそうです。", "そうです"),
@@ -71,6 +73,15 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("koto_ga_aru_some", "明日は特に何もすることがありません。"),  # こと = thing to do
+    ("koto_ga_aru_some", "実はお願いしたいことがありまして。"),
+    ("koto_ga_aru_some", "なにか私にできることがありましたらお知らせ下さい。"),
+    ("koto_ga_aru_some", "1つ分からないことがあります。"),
+    ("koto_ga_aru_some", "やることがあるんだ。"),
+    ("koto_ga_aru_some", "変なことがあったんだ。"),
+    ("koto_ga_aru_some", "分からないことがあったら、いつでも私に聞きなさい。"),
+    ("noni", "直すのに、どのくらい時間がかかりますか。"),  # purpose のに
+    ("noni_purpose", "私が来るなと言ったのにかかわらず、彼はやってきた。"),
     ("tara_dou", "明日雨が降ったらどうしようか。"),  # what shall we do if
     ("tara_dou", "失敗したらどうなるんですか。"),  # what happens if
     ("tara_dou", "それ自分がされたらどう思う？"),  # how would you feel if
