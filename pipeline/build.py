@@ -18,6 +18,7 @@ sys.path.insert(0, str(HERE))
 
 import zlib  # noqa: E402
 
+import fr as french  # noqa: E402
 from extra_examples import EXTRA  # noqa: E402
 from jp import KANJI_RE, furigana, has_kanji, tokenize  # noqa: E402
 
@@ -331,6 +332,8 @@ def main():
     ap.add_argument("--levels", default=",".join(LEVELS))
     ap.add_argument("--show", default="", help="comma separated point ids: print their sentences")
     ap.add_argument("--thin", action="store_true", help="list points with fewer than 5 sentences")
+    ap.add_argument("--missing-fr", default="", help="write sentences still needing a French translation "
+                    "(id, Japanese, English, point) to this TSV file")
     args = ap.parse_args()
     levels = args.levels.split(",")
 
@@ -342,6 +345,8 @@ def main():
     scorer = Scorer(cands, toks)
 
     points = [p for p in all_points() if p["level"] in levels]
+    fr_points, fr_sents = french.point_texts(), french.sentence_translations()
+    missing_fr, stale_fr, used_fr = [], [], set()
     used_global = collections.Counter()
     points_out, report, dropped, thin, bad_extra = [], [], [], [], []
     order = 0
@@ -358,13 +363,29 @@ def main():
         for c in chosen:
             used_global[c[0]] += 1
         sents = [to_sentence(sid, a, b, h, cands, toks) for sid, a, b, h, _ in chosen]
+        for s in sents:
+            if "fr" in s:
+                continue
+            tr = fr_sents.get(s["id"])
+            if tr and tr[0] == s["ja"]:
+                s["fr"], s["fr_src"] = tr[1], "app"
+                used_fr.add(s["id"])
+            else:
+                if tr:
+                    stale_fr.append(s["id"])
+                missing_fr.append((p["level"], s["id"], s["ja"], s["en"], p["id"]))
         report.append((p["level"], p["id"], pool, len(sents)))
         if len(sents) < 5:
             thin.append((p["level"], p["id"], len(sents)))
-        points_out.append(dict(
+        po = dict(
             id=p["id"], level=p["level"], order=order, title=p["title"], meaning=p["meaning"],
             structure=p["structure"], explanation=" ".join(p["explanation"].split()), sentences=sents,
-        ))
+        )
+        if p["id"] in fr_points:
+            f = fr_points[p["id"]]
+            po["fr"] = dict(title=f.get("title", p["title"]), meaning=f["meaning"], structure=f["structure"],
+                            explanation=" ".join(f["explanation"].split()))
+        points_out.append(po)
         order += 1
         if p["id"] in args.show.split(","):
             print(f"== {p['id']} {p['title']}")
@@ -373,7 +394,9 @@ def main():
                 print("  ", s["ja"][:a] + "[" + s["ja"][a:b] + "]" + s["ja"][b:], "|", s["en"], "|", s["hint"])
 
     OUT.mkdir(parents=True, exist_ok=True)
-    content = dict(version=2, source="Tatoeba (https://tatoeba.org), CC-BY 2.0 FR; some examples written for this app", points=points_out)
+    content = dict(version=3, source="Tatoeba (https://tatoeba.org), CC-BY 2.0 FR; some examples written for this app",
+                   source_fr="Tatoeba (https://tatoeba.org), CC-BY 2.0 FR ; quelques exemples et traductions écrits pour cette appli",
+                   points=points_out)
     (OUT / "content.json").write_text(json.dumps(content, ensure_ascii=False, separators=(",", ":")), encoding="utf8")
 
     print(f"\n{'level':6} {'points':>7} {'dropped':>8} {'sentences':>10} {'avg/pt':>7} {'median':>7} {'<8':>4}")
@@ -393,6 +416,18 @@ def main():
         print("\nextra examples without exactly one match (skipped):")
         for pid, ja, n in bad_extra:
             print(f"  {pid}: {ja} ({n} matches)")
+    no_fr = [p["id"] for p in points_out if "fr" not in p]
+    print(f"\nFrench: {len(points_out) - len(no_fr)}/{len(points_out)} points with French text, "
+          f"{len(missing_fr)} sentences without a French translation, {len(used_fr)} translated for this app")
+    if stale_fr:
+        print("  translations whose Japanese no longer matches (re-check):", stale_fr)
+    unused = sorted(set(fr_sents) - used_fr - set(stale_fr))
+    if unused:
+        print(f"  {len(unused)} translations not used by any selected sentence:", unused[:20])
+    if args.missing_fr:
+        with open(args.missing_fr, "w", encoding="utf8") as f:
+            for row in missing_fr:
+                f.write("\t".join(str(x) for x in row) + "\n")
     if args.thin:
         for l, i, n in dropped:
             thin.append((l, i, n))
