@@ -72,8 +72,7 @@ launch
 [ "$(due_now)" = 0 ] || fail "fresh install has due reviews"; ok "fresh start, nothing due"
 
 echo "== settings: 3 points per lesson (だ, です, でした: one possible answer each)"
-$A shell input swipe 540 2000 540 300 300; sleep 1   # scroll home to the bottom
-tap 790 2097; wait_ev '^screen=5'              # Settings
+tap 853 1458; wait_ev '^screen=5'              # Settings (fresh home: no "next review" line)
 tap 112 964                                    # "3"
 $A shell input keyevent 4; wait_ev '^screen=0 back'
 echo "== lesson"
@@ -84,6 +83,9 @@ wait_ev '^screen=2 lesson'
 answer_session
 ok "$(last_ev '^session-finished')"
 tap 540 490; wait_ev '^screen=0'               # Home
+tap 568 1534; wait_ev '^screen=6'              # Stats (home now shows "next review", buttons lower)
+ok "stats screen opens"
+$A shell input keyevent 4; wait_ev '^screen=0 back'
 rem=$(last_ev '^reminder'); [[ "$rem" == *"count=3"* ]] || fail "reminder not scheduled: $rem"; ok "$rem"
 $A shell dumpsys alarm | grep -q "$PKG" || fail "no alarm registered"; ok "alarm registered with AlarmManager"
 
