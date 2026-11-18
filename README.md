@@ -3,15 +3,22 @@
 SRS-style grammar drills (cloze sentences, typed answers, spaced repetition), fully offline,
 written in Rust (logic + Slint UI). The only Java is a small notification receiver.
 
+The whole app can be used in **English or French** (Settings → Language): interface, grammar explanations
+and sentence translations. Lessons can start at any JLPT level (Settings → Start lessons at).
+
 ## Layout
 - `pipeline/` — Python: picks example sentences from Tatoeba and builds `data/build/content.json`
   - `grammar_n5.py` — grammar points: explanations + token matchers (where the blank goes)
-  - `build.py` — filters/scores Tatoeba sentences, writes the content file (embedded into the app at compile time)
+  - `build.py` — filters/scores Tatoeba sentences (preferring ones with a French translation), writes the
+    content file (embedded into the app at compile time)
+  - `fr/` — French: grammar point texts (`points_n*.py`) and translations of the sentences Tatoeba has no
+    French for (`sentences_n*.tsv`, each tied to the Japanese it translates)
   - `tests/` — pytest suite for matchers, readings, furigana, answers
 - `rust/core/` — platform-independent logic: content, romaji→kana, FSRS + learning steps, progress (JSON),
   quiz sessions, review reminders, furigana line layout. `tests/` has integration tests incl. SRS simulations.
 - `rust/app/` — Slint UI (`ui/app.slint`) + glue (`src/lib.rs`, `src/android.rs`); `tests/ui.rs` drives the
-  real UI headlessly through Slint's testing backend
+  real UI headlessly through Slint's testing backend. Interface strings are marked `@tr` and translated in
+  `lang/fr/LC_MESSAGES/bunpo-app.po`
 - `rust/android/` — Gradle project packaging `libbunpo_app.so` + `ReviewReminder.java` into an APK
 - `rust/e2e/run.sh` — end-to-end test on the emulator (time travel via the emulator clock)
 - `rust/third_party/i-slint-core/` — Slint core with one fix (`../i-slint-core-cancel.patch`):
@@ -50,7 +57,10 @@ Copy the APK to the phone and open it, or `adb install -r rust/android/app/build
   or later — see [LICENSE](LICENSE).
 - **Slint** (UI toolkit) is used under its GPL-3.0 option; `rust/third_party/i-slint-core` is a modified copy of
   Slint's core crate (see `rust/third_party/i-slint-core-cancel.patch`) and keeps its original licensing.
-- **Example sentences from Tatoeba** (<https://tatoeba.org>) are licensed CC-BY 2.0 FR by their contributors;
-  the app shows each sentence's Tatoeba number and contributor.
-- **Grammar explanations and the example sentences in `pipeline/extra_examples.py`** were written for this
-  project; all rights reserved for now.
+- **Example sentences from Tatoeba** (<https://tatoeba.org>) and their English and French translations are
+  licensed CC-BY 2.0 FR by their contributors; the app shows each sentence's Tatoeba number and contributor
+  and, in French, the number and contributor of the French translation.
+- **Grammar explanations (English and French), the example sentences in `pipeline/extra_examples.py` and the
+  French translations in `pipeline/fr/sentences_*.tsv`** were written for this project; all rights reserved
+  for now. Translations of Tatoeba sentences are marked as written for this app and still credit the original
+  Japanese sentence.
