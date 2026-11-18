@@ -72,8 +72,8 @@ launch
 [ "$(due_now)" = 0 ] || fail "fresh install has due reviews"; ok "fresh start, nothing due"
 
 echo "== settings: 3 points per lesson (だ, です, でした: one possible answer each)"
-tap 853 1458; wait_ev '^screen=5'              # Settings (fresh home: no "next review" line)
-tap 112 1248                                    # "3"
+tap 929 2250; wait_ev '^screen=5'              # Settings (menu bar)
+tap 207 1217                                   # "3" (points per lesson)
 $A shell input keyevent 4; wait_ev '^screen=0 back'
 echo "== lesson"
 tap 524 1217                                   # Learn 3 new
@@ -83,7 +83,7 @@ wait_ev '^screen=2 lesson'
 answer_session
 ok "$(last_ev '^session-finished')"
 tap 540 490; wait_ev '^screen=0'               # Home
-tap 568 1534; wait_ev '^screen=6'              # Stats (home now shows "next review", buttons lower)
+tap 669 2250; wait_ev '^screen=6'              # Stats (menu bar)
 ok "stats screen opens"
 $A shell input keyevent 4; wait_ev '^screen=0 back'
 rem=$(last_ev '^reminder'); [[ "$rem" == *"count=3"* ]] || fail "reminder not scheduled: $rem"; ok "$rem"
