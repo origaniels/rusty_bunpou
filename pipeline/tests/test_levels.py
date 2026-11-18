@@ -73,6 +73,7 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("bakari_ni", "彼は同意すると言わんばかりにうなずいた。"),  # N1 んばかり
     ("mono_no", "彼は甘いものの量を減らした。"),
     ("mono_no", "トムは食べたものの何かでアレルギー反応を起こしている。"),
     ("ni_shiro", "お前なぁ、わがままも大概にしろよ。"),

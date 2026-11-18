@@ -191,7 +191,7 @@ P("bakari_ka", "〜ばかりか", "not only ... but even", "Noun / plain form + 
 P("bakari_ni", "〜ばかりに", "simply because (bad result)", "Plain form + ばかりに",
   """ばかりに gives a cause that led to a bad result: 嘘をついたばかりに、信用を失った (just because I lied, I
   lost their trust).""",
-  r"ばかりに", "嘘をついたばかりに、信用を失った。", after="any")
+  r"(?<!ん)ばかりに(?!なっ)", "嘘をついたばかりに、信用を失った。", after="any")
 P("bakari_da", "〜一方だ / 〜ばかりだ", "keep (getting worse)", "Verb (dictionary) + 一方だ",
   """一方だ / ばかりだ describe a change continuing in one direction: 物価は上がる一方だ (prices just keep
   rising).""",
