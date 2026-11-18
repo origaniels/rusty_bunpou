@@ -42,6 +42,7 @@ FILTERS = {
     "N2": (20000, 6000, 2200, 1400, 34, 55),
     "N1": (10 ** 9, 10000, 10 ** 9, 2000, 38, 60),
 }
+FR_BONUS = 1.5  # quality bonus for sentences with a Tatoeba French translation (bilingual content)
 MIN_SENTENCES = 3  # points with fewer sentences (Tatoeba + extra_examples.py) are left out (and reported)
 
 
@@ -88,12 +89,39 @@ def load_candidates():
         sid = int(p[0])
         if sid in need:
             eng[sid] = p[2]
+    fra = load_french(jpn)
     out = {}
     for sid, (text, owner, nat) in jpn.items():
         ens = sorted((e for e in links.get(sid, []) if e in eng and len(eng[e]) <= 140))
         if not ens:
             continue
         out[sid] = dict(ja=text, owner=owner, native=nat, en=eng[ens[0]])
+        if sid in fra:
+            out[sid]["fr"], out[sid]["fr_id"], out[sid]["fr_owner"] = fra[sid]
+    return out
+
+
+def load_french(jpn):
+    """Tatoeba French translation of each Japanese sentence: (text, French sentence id, its contributor).
+    The lowest-numbered (oldest) short translation is used, like for English."""
+    links = collections.defaultdict(list)
+    for line in open(RAW / "jpn-fra_links.tsv", encoding="utf8"):
+        a, b = map(int, line.split()[:2])
+        if a in jpn:
+            links[a].append(b)
+    need = {b for v in links.values() for b in v}
+    fra = {}
+    for line in open(RAW / "fra_sentences_detailed.tsv", encoding="utf8"):
+        p = line.rstrip("\n").split("\t")
+        sid = int(p[0])
+        if sid in need and len(p[2]) <= 140:
+            fra[sid] = (p[2], p[3] if p[3] != "\\N" else "")
+    out = {}
+    for sid, fs in links.items():
+        fs = sorted(f for f in fs if f in fra)
+        if fs:
+            text, owner = fra[fs[0]]
+            out[sid] = (text, fs[0], owner)
     return out
 
 
@@ -201,7 +229,7 @@ class Scorer:
                         kp += 1
             if ok:
                 len_pen = max(0, 9 - n) + max(0, n - ideal_len)
-                q = (2.0 if c["native"] else 0.0) - 1.5 * hard - 1.0 * kp - 0.25 * len_pen - 0.8 * proper
+                q = (2.0 if c["native"] else 0.0) + (FR_BONUS if "fr" in c else 0.0) - 1.5 * hard - 1.0 * kp - 0.25 * len_pen - 0.8 * proper
         self.cache[key] = q
         return q
 
@@ -292,6 +320,8 @@ def to_sentence(sid, a, b, h, cands, toks):
     )
     if c.get("src"):
         d["src"] = c["src"]
+    if c.get("fr"):
+        d["fr"], d["fr_id"], d["fr_owner"] = c["fr"], c["fr_id"], c["fr_owner"]
     return d
 
 
