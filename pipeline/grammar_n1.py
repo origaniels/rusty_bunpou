@@ -33,7 +33,8 @@ P("ni_itaru", "〜に至る / 〜に至って", "reach, come to; only when", "No
   """に至る (いたる) means "reach (a serious point)": 事故は大事件に至った. に至って means "only when it came to".
   に至っては = as for (an extreme case).""",
   # in kana, にいたら / にいたって are usually に + いる (そこにいたら, if I were there): only 至 or いたる / いたり
-  r"に(?:至(?:る|り|ら|って|った|っては)|いた(?:る|り))", "話し合いは結論に至らなかった。", after="nv", tail=True)
+  r"に(?:至(?:る|り|ら|って|った|っては)|いた(?:る|り))(?!ところ|所)", "話し合いは結論に至らなかった。", after="nv",
+  tail=True)  # いたるところ = everywhere
 P("ni_itaru_made", "〜に至るまで", "even, down to", "Noun + に至るまで",
   """に至るまで means "all the way to (even the smallest)": 子供からお年寄りに至るまで.""",
   r"に(?:至|いた)るまで", "子供からお年寄りに至るまで、みんな参加した。", after="n")
