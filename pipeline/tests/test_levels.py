@@ -73,6 +73,12 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("wo_tooshite", "道を開けて子どもを通してください。"),
+    ("wo_hajime", "それから、彼は、ケンブリッジで研究を始め、宇宙の本質について考えた。"),
+    ("ni_kakete", "彼は礼儀にかけている。"),
+    ("ni_kakete", "数学にかけては彼はクラスの誰にも引けを取らない。"),
+    ("sue_ni", "今月の末で１０年間ここに住んでいることになります。"),
+    ("sue_ni", "彼は末永く記憶に残るだろう。"),
     ("wo_moto_ni", "椅子を元に戻したいのですが。"),
     ("wo_tooshite", "この報告書にざっと目を通していただけませんか。"),
     ("wo_megutte", "お城を巡るのが趣味です。"),

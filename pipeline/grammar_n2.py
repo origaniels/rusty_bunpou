@@ -255,8 +255,9 @@ P("wo_moto_ni", "〜をもとに", "based on (using as material)", "Noun + を�
   r"を(?:もと|基|元)に(?!戻|もど)(?:して)?", "自分の経験をもとに小説を書いた。", after="n")  # 元に戻す = put back
 P("wo_tooshite", "〜を通して / 〜を通じて", "through, via; throughout", "Noun + を通して",
   """を通して (とおして) / を通じて (つうじて) mean "through (a means)" or "throughout (a period)".""",
-  r"を(?:通|とお|つう)(?:して|じて|じ)(?!させ)", "友人を通して彼と知り合いました。", after="n",
-  check=lambda t, i, k: not (i > 0 and t[i - 1].s in ("目", "手", "袖", "糸", "針", "声")))  # 目を通す (look over)
+  r"を(?:通|とお|つう)(?:して|じて|じ)(?!させ|くださ|下さ|あげ|やっ)", "友人を通して彼と知り合いました。", after="n",
+  # 目を通す (look over), 主義を通す (stick to), 子どもを通してください (let through)
+  check=lambda t, i, k: not (i > 0 and t[i - 1].s in ("目", "手", "袖", "糸", "針", "声", "主義", "意地", "筋", "我")))
 P("wo_megutte", "〜をめぐって", "concerning (a dispute)", "Noun + をめぐって",
   """をめぐって means "over / around (an issue people argue about)": 遺産をめぐって争う.""",
   r"を(?:めぐ|巡)(?:って|る)", "遺産をめぐって、兄弟が争っている。", after="n",
@@ -266,7 +267,8 @@ P("wo_megutte", "〜をめぐって", "concerning (a dispute)", "Noun + をめ�
 P("wo_hajime", "〜をはじめ", "starting with, including", "Noun + をはじめ",
   """をはじめ means "beginning with (as the main example)": 社長をはじめ、社員全員が集まった.""",
   # "starting with X" is followed by a comma / として / とする; otherwise it's the verb 始める
-  r"を(?:はじめ|始め)(?:として|とする|(?=、))", "社長をはじめ、社員全員が集まった。", after="n")
+  # kanji 始め + comma is usually the verb (研究を始め、…); only はじめ, or 始めとして / とする
+  r"を(?:はじめ(?:として|とする|(?=、))|始め(?:として|とする))", "社長をはじめ、社員全員が集まった。", after="n")
 P("ni_hanshite", "〜に反して", "contrary to", "Noun + に反して",
   """に反して (はんして) means "contrary to, against": 予想に反して、試合に負けた (contrary to expectations, we lost the game). It is used with expectations, wishes or rules; before a noun it becomes に反する.""",
   r"に(?:反|はん)(?:して|し|する)", "予想に反して、試合に負けた。", after="n")
@@ -279,7 +281,8 @@ P("ni_watatte", "〜にわたって", "over, throughout (a range)", "Noun + に�
 P("ni_kakete", "〜にかけて", "through, over (from ... to)", "Noun + にかけて",
   """から〜にかけて means "from ... through ..." for a stretch of time or space with fuzzy edges: 夜から朝にかけて雨が降る (it will rain from night into the morning). Compare から〜まで, which has clear end points.""",
   # から〜にかけて; not 気にかける (care), 鼻にかける (boast), 死にかける (be dying)
-  r"にかけて(?:は)?", "夜から朝にかけて雨が降るでしょう。", after="n",
+  # から〜にかけて only: にかけては (when it comes to), 礼儀にかけている (欠ける), 神にかけて (swear)
+  r"にかけて(?!は)", "夜から朝にかけて雨が降るでしょう。", after="n", req=r"から[^。]*にかけて",
   check=lambda t, i, k: not (i > 0 and t[i - 1].s in ("気", "鼻", "死", "心", "手", "遅く", "電話", "秤", "天秤")))
 P("ni_oite", "〜において", "in, at (formal)", "Noun + において",
   """において is a formal で: 会議は大阪において行われる (the conference will be held in Osaka).""",
@@ -298,14 +301,16 @@ P("wo_nozoite", "〜を除いて", "except for", "Noun + を除いて",
   r"を(?:除|のぞ)(?:いて|き|く)", "日曜日を除いて、毎日営業しています。", after="n")
 P("nuki", "〜抜きで / 〜を抜きにして", "without, leaving out", "Noun + 抜きで",
   """抜き (ぬき) means "without": 朝ご飯抜きで出かけた (went out without breakfast).""",
-  r"(?:抜|ぬ)き(?:で|に|の|には)", "朝ご飯抜きで出かけました。", after="n")
+  r"(?<!人)(?:抜|ぬ)き(?:で|に|の|には)", "朝ご飯抜きで出かけました。", after="n")  # ４人抜き (beat four in a row)
 P("irai", "〜以来", "since", "Verb (て) / Noun + 以来",
   """以来 (いらい) means "ever since": 卒業して以来、彼に会っていない (I haven't seen him since we graduated). After a verb it takes the て-form; after a noun it attaches directly: 先月以来.""",
   r"以来", "卒業して以来、彼に会っていません。", after="any")
 P("sue_ni", "〜末(に)", "after (a long process), finally", "Verb (た) / Noun + の + 末に",
   """末に (すえに) means "at the end of (a long process)": よく考えた末に、会社を辞めた (after thinking it over carefully, I quit my job). It attaches to a past verb or to Noun + の, and the result can be good or bad.""",
-  r"(?:末|すえ)(?:に|の)?", "よく考えた末に、会社を辞めることにした。", after="any",
-  check=lambda t, i, k: t[i].kana == "すえ")
+  # after a long process (考えた末に, 闘病生活の末); not 月の末で (end of the month), 世も末, 末永く
+  r"(?:末|すえ)(?:に|の|(?=、))", "よく考えた末に、会社を辞めることにした。", after="any",
+  check=lambda t, i, k: t[i].kana == "すえ" and i > 0 and t[i - 1].s != "も"
+  and not (i > 1 and t[i - 1].s == "の" and t[i - 2].lemma in ("月", "年", "週", "今月", "来月", "先月", "今年", "学期")))
 P("ageku", "〜あげく", "in the end (after much trouble)", "Verb (た) / Noun + の + あげく",
   """あげく means "after all that (unfortunately)": さんざん迷ったあげく、何も買わなかった.""",
   r"(?:あげく|挙句|挙げ句)(?:に|の果て)?", "さんざん迷ったあげく、何も買わなかった。", after="any")
