@@ -73,6 +73,11 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("mono_no", "彼は甘いものの量を減らした。"),
+    ("mono_no", "トムは食べたものの何かでアレルギー反応を起こしている。"),
+    ("ni_shiro", "お前なぁ、わがままも大概にしろよ。"),
+    ("ta_tokoro_de", "次の信号を渡ったところで、止めてください。"),
+    ("wari_ni", "この仕事は割に合わないな。"),
     ("ni_atatte", "トムは流れ弾に当たって死んだ。"),
     ("ni_atatte", "お金のことはジェーンにあたってみるよ。"),
     ("kara_suru_to", "飛行機から見ると、その島は巨大なクモのように見える。"),

@@ -145,7 +145,11 @@ P("hanmen", "〜反面", "on the other hand", "Plain form + 反面",
 P("mono_no", "〜ものの", "although", "Plain form + ものの",
   """ものの means "although (but in reality...)": 買ったものの、一度も使っていない (I bought it, but haven't used
   it once).""",
-  r"ものの", "買ったものの、一度も使っていません。", after="va")
+  r"ものの", "買ったものの、一度も使っていません。", after="va",
+  # もの + の (必要なものの大半, 甘いものの量): the concessive ものの is followed by a clause, not a noun
+  check=lambda t, i, k: k < len(t) and (t[k].s == "、" or t[k].p1 not in ("名詞", "接尾辞", "代名詞", "助詞"))
+  and not (i > 0 and (t[i - 1].s == "な" or t[i - 1].lemma == "言う"))  # 率直なものの, というものの
+  and t[k].lemma not in ("有る", "言う", "良い") and not t[k].s.startswith(("言い方", "見方", "考え方", "よさ")))
 P("ni_mo_kakawarazu", "〜にもかかわらず", "despite, in spite of", "Noun / plain form + にもかかわらず",
   """にもかかわらず means "despite": 雨にもかかわらず、たくさんの人が来た (despite the rain, many people came).""",
   r"にも(?:かかわ|関わ|拘)らず", "雨にもかかわらず、たくさんの人が来ました。", after="any")
@@ -163,14 +167,17 @@ P("tsutsu_aru", "〜つつある", "be in the process of", "Verb stem + つつ�
   r"つつ" + ARU, "地球の気温は上がりつつある。", pre="v", tail=True)
 P("wari_ni", "〜わりに(は)", "considering, for", "Plain form / Noun + の + わりに",
   """わりに means "considering": 値段のわりにおいしい (tasty, considering the price).""",
-  r"(?:わり|割)に(?:は)?", "この店は値段のわりにおいしい。", after="any")
+  r"(?:わり|割)に(?:は)?(?!合)", "この店は値段のわりにおいしい。", after="any")  # 割に合わない
 P("ni_shiro", "〜にしろ / 〜にせよ", "even if; whether ... or", "Plain form / Noun + にしろ",
   """にしろ / にせよ mean "even if" or, repeated, "whether A or B": 行くにしろ行かないにしろ連絡して.""",
   r"(?:にしろ|にせよ)(?![^。]*(?:にしろ|にせよ))", "行くにしろ行かないにしろ、連絡してください。", after="any",
-  check=lambda t, i, k: i > 0 and t[i - 1].lemma != "様" and (k >= len(t) or t[k].p1 != "補助記号" or t[k].s == "、"))
+  check=lambda t, i, k: i > 0 and t[i - 1].lemma != "様" and (k >= len(t) or t[k].p1 != "補助記号" or t[k].s == "、")
+  and not (k < len(t) and t[k].s in ("よ", "と", "って", "とか")))  # 大概にしろよ: imperative of する
 P("ta_tokoro_de", "〜たところで", "even if (it's no use)", "Verb (た) + ところで",
   """たところで means "even if you do (it won't help)": 今から急いだところで間に合わない.""",
-  r"ところで(?=、)", "今から急いだところで、間に合わないだろう。", pre="v", check=prev_is("た", "だ"))
+  r"ところで(?=、)", "今から急いだところで、間に合わないだろう。", pre="v", check=prev_is("た", "だ"),
+  # "even if you do, it's no use": the rest is negative or futile (not 信号を渡ったところで、止めて)
+  req=r"ところで、[^。]*(?:ない|無駄|むだ|駄目|だめ|ダメ|ならな|ません|しょうがな|仕方)")
 P("dokoro_ka", "〜どころか", "far from; let alone", "Noun / plain form + どころか",
   """どころか means "far from (the opposite is true)": 休むどころか、ますます忙しくなった.""",
   r"どころか", "休むどころか、ますます忙しくなった。", after="any")
