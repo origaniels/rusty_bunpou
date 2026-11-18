@@ -73,6 +73,7 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("ni_shitagatte", "父は私を医者にしたがっている。"),  # したがる, not 従う
     ("uchi_ni", "私はたいてい７時頃うちに帰ります。"),  # うち = home
     ("toka", "僕はなんとか時間までにそこに着いた。"),  # なんとか = somehow
     ("toka", "なんで出発前に買っとかなかったの？"),  # っとく = ておく

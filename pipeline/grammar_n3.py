@@ -145,7 +145,9 @@ P("ni_kurabete", "〜に比べて", "compared to", "Noun + に比べて",
 P("ni_shitagatte", "〜に従って", "as (A changes, B changes); following", "Noun / Verb + に従って",
   """に従って means "in accordance with" or "as ... so ...": 年をとるに従って体が弱くなる (as you age, your
   body weakens).""",
-  r"に(?:従|したが)(?:って|い)", "年をとるに従って、体が弱くなる。", after="nv")
+  # in kana, にしたがっている is almost always に + したがる (医者にしたがっている, wants to make him a
+  # doctor), which the tagger also reads as 従う; 従っている in kanji is fine
+  r"に(?:従(?:って|い)|したが(?:って(?!い)|い))", "年をとるに従って、体が弱くなる。", after="nv")
 P("ni_tsurete", "〜につれて", "as (gradually)", "Verb (dictionary) / Noun + につれて",
   """につれて describes two things changing together: 時間がたつにつれて、悲しみも薄れた (as time passed,
   the sadness faded too).""",
