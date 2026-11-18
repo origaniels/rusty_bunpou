@@ -67,3 +67,16 @@ fn resets() {
     assert!(q.cards.is_empty());
     assert!(!q.settings.furigana, "reset keeps settings");
 }
+
+#[test]
+fn start_level_defaults_to_n5_and_round_trips() {
+    let path = tmp("start_level");
+    // files written before the setting existed load with the default
+    std::fs::write(&path, r#"{"settings":{"furigana":false}}"#).unwrap();
+    let mut p = Progress::load(&path);
+    assert_eq!(p.settings.start_level, "N5");
+    assert!(!p.settings.furigana);
+    p.settings.start_level = "N2".into();
+    p.save();
+    assert_eq!(Progress::load(&path).settings.start_level, "N2");
+}

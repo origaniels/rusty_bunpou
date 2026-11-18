@@ -53,11 +53,13 @@ pub struct Settings {
     pub retention: f64,
     /// Remind (Android notification) when reviews become due.
     pub notifications: bool,
+    /// JLPT level new lessons start at ("N5" … "N1"); lower levels are skipped, not marked known.
+    pub start_level: String,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true }
+        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into() }
     }
 }
 
