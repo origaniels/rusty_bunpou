@@ -384,7 +384,7 @@ def main():
         if p["id"] in fr_points:
             f = fr_points[p["id"]]
             po["fr"] = dict(title=f.get("title", p["title"]), meaning=f["meaning"], structure=f["structure"],
-                            explanation=" ".join(f["explanation"].split()))
+                            explanation=f["explanation"])
         points_out.append(po)
         order += 1
         if p["id"] in args.show.split(","):
@@ -417,6 +417,13 @@ def main():
         for pid, ja, n in bad_extra:
             print(f"  {pid}: {ja} ({n} matches)")
     no_fr = [p["id"] for p in points_out if "fr" not in p]
+    unknown = sorted(set(fr_points) - {p["id"] for p in points_out})
+    if unknown:
+        print("  French texts for unknown point ids:", unknown)
+    for lv in levels:
+        miss = [p["id"] for p in points_out if p["level"] == lv and "fr" not in p]
+        if miss and len(miss) < 20:
+            print(f"  {lv} points without French text:", " ".join(miss))
     print(f"\nFrench: {len(points_out) - len(no_fr)}/{len(points_out)} points with French text, "
           f"{len(missing_fr)} sentences without a French translation, {len(used_fr)} translated for this app")
     if stale_fr:
