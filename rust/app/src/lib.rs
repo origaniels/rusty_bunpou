@@ -4,6 +4,7 @@
 
 use bunpo_core::content::Content;
 use bunpo_core::layout::{self, ClozeMode, Metrics};
+use bunpo_core::lessons::{lesson_queue, LEVELS as JLPT_LEVELS};
 use bunpo_core::reminder::next_reminder;
 use bunpo_core::session::{find_sentence, now_ms, Session, Verdict};
 use bunpo_core::store::Progress;
@@ -196,6 +197,7 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
     let now = now_ms();
     let due = due_ids(content, &st.progress, now).len() as i32;
     let new = new_ids(content, &st.progress);
+    let queue = lesson_queue(content, &st.progress);
     let batch = st.progress.settings.batch_size as usize;
     let next_due = st.progress.cards.values().filter(|c| c.state > 0).map(|c| c.due).min();
     let mut levels = [0i32; 5];
@@ -205,16 +207,17 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
         }
     }
     let next_titles: Vec<&str> =
-        new.iter().take(batch).filter_map(|id| content.get(id)).map(|p| p.title.as_str()).collect();
+        queue.iter().take(batch).filter_map(|id| content.get(id)).map(|p| p.title.as_str()).collect();
     event(&format!("home due={due} learned={}", content.points.len() - new.len()));
     ui.set_home(HomeData {
         due,
-        new_count: new.len() as i32,
+        new_count: queue.len() as i32,
+        start_level: st.progress.settings.start_level.as_str().into(),
         learned: (content.points.len() - new.len()) as i32,
         total: content.points.len() as i32,
         next_due: next_due.map(|d| rel_time(d, now)).unwrap_or_default().into(),
         next_titles: next_titles.join("  ·  ").into(),
-        learn_label: format!("Learn {} new", batch.min(new.len())).into(),
+        learn_label: format!("Learn {} new", batch.min(queue.len())).into(),
         levels: model(levels.to_vec()),
         reviews_24h: st.progress.reviews_since(now - 86_400_000) as i32,
         source: content.source.as_str().into(),
@@ -271,6 +274,8 @@ fn refresh_settings(ui: &AppWindow, st: &State) {
     ui.set_romaji(s.romaji);
     ui.set_notifications(s.notifications);
     ui.set_batch_size(s.batch_size as i32);
+    let li = JLPT_LEVELS.iter().position(|l| *l == s.start_level).unwrap_or(0);
+    ui.set_start_level_index(li as i32);
     let ri = RETENTIONS.iter().position(|r| (r - s.retention).abs() < 1e-6).unwrap_or(1);
     ui.set_retention_index(ri as i32);
 }
@@ -416,7 +421,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
 
     ui.on_start_learn(cb!(|ui, c, st| {
         let ids: Vec<String> =
-            new_ids(&c, &st.progress).into_iter().take(st.progress.settings.batch_size as usize).collect();
+            lesson_queue(&c, &st.progress).into_iter().take(st.progress.settings.batch_size as usize).collect();
         if ids.is_empty() {
             return;
         }
@@ -620,6 +625,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
     setting!(on_set_romaji, bool, |s, v| s.romaji = v);
     setting!(on_set_batch, i32, |s, v| s.batch_size = v.clamp(1, 20) as u32);
     setting!(on_set_retention, i32, |s, v| s.retention = RETENTIONS[(v as usize).min(2)]);
+    setting!(on_set_start_level, i32, |s, v| s.start_level = JLPT_LEVELS[(v.max(0) as usize).min(4)].into());
     {
         let p = platform.clone();
         setting!(on_set_notifications, bool, |s, v| {

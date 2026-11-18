@@ -453,3 +453,47 @@ fn stats_screen_pies_and_per_level_counts() {
     assert!(t.app.ui.invoke_go_back());
     assert_eq!(t.screen(), SCREEN_HOME);
 }
+
+#[test]
+fn start_level_choice_skips_lower_levels() {
+    let t = setup();
+    let total_new = t.app.ui.get_home().new_count;
+    t.press("Settings");
+    t.press("N2");
+    assert_eq!(t.app.ui.get_start_level_index(), 3);
+    assert_eq!(t.app.state.borrow().progress.settings.start_level, "N2");
+    t.app.ui.invoke_go_home();
+    let h = t.app.ui.get_home();
+    assert_eq!(h.start_level, "N2");
+    assert!(h.new_count < total_new && h.new_count == 105 + 95, "only N2 + N1 are offered: {}", h.new_count);
+    // the first lesson is an N2 point, and skipped levels stay untouched
+    t.press("Learn 5 new");
+    let first = t.app.ui.get_lesson_point();
+    assert_eq!(first.level, "N2");
+    t.app.ui.invoke_go_home();
+    t.learn_lesson();
+    let st = t.app.state.borrow();
+    assert_eq!(st.progress.cards.len(), 5);
+    assert!(st.progress.cards.keys().all(|id| t.app.content.get(id).unwrap().level == "N2"));
+    drop(st);
+    let h = t.app.ui.get_home();
+    assert_eq!(h.learned, 5);
+    // switching back to N5 offers N5 again
+    t.app.ui.invoke_set_start_level(0);
+    t.app.ui.invoke_go_home();
+    assert_eq!(t.app.ui.get_home().new_count, total_new - 5);
+}
+
+#[test]
+fn nothing_left_from_chosen_level_shows_hint() {
+    let mut p = Progress::in_memory();
+    p.settings.start_level = "N1".into();
+    let c = bunpo_core::content::Content::bundled();
+    for pt in c.points.iter().filter(|x| x.level == "N1") {
+        p.cards.insert(pt.id.clone(), bunpo_core::store::Card { state: 2, due: i64::MAX / 2, ..Default::default() });
+    }
+    let t = setup_with(p);
+    let h = t.app.ui.get_home();
+    assert_eq!(h.new_count, 0, "no wrap-around to lower levels");
+    assert!(!t.find("Learn 0 new").accessible_enabled().unwrap());
+}

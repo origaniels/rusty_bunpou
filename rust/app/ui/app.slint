@@ -37,6 +37,7 @@ export struct QuizData {
 export struct HomeData {
     due: int, new-count: int, learned: int, total: int, next-due: string, next-titles: string,
     learn-label: string, levels: [int], reviews-24h: int, source: string, level-rows: [LevelRow],
+    start-level: string,
 }
 
 export global Logic {
@@ -257,6 +258,7 @@ export component AppWindow inherits Window {
     in property <bool> notifications: true;
     in property <int> batch-size: 5;
     in property <int> retention-index: 1;
+    in property <int> start-level-index: 0;
     in-out property <bool> confirm-reset;
 
     callback start-learn();
@@ -281,6 +283,7 @@ export component AppWindow inherits Window {
     callback set-notifications(bool);
     callback set-batch(int);
     callback set-retention(int);
+    callback set-start-level(int);
     callback reset-point();
     callback reset-all();
 
@@ -328,7 +331,16 @@ export component AppWindow inherits Window {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
                         Text { text: "Learn"; font-size: 17px; color: Theme.fg; }
-                        Text { text: root.home.new-count + " new grammar points available"; color: Theme.fg; wrap: word-wrap; }
+                        Text {
+                            text: root.home.start-level == "N5"
+                                ? root.home.new-count + " new grammar points available"
+                                : root.home.new-count + " new grammar points from " + root.home.start-level + " up";
+                            color: Theme.fg; wrap: word-wrap;
+                        }
+                        if root.home.new-count == 0 && root.home.start-level != "N5": Text {
+                            text: "Lower levels can still be learned: choose a lower start level in Settings.";
+                            font-size: 14px; color: Theme.muted; wrap: word-wrap;
+                        }
                         if root.home.next-titles != "": Text { text: "Next: " + root.home.next-titles; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
                         Btn { text: root.home.learn-label; primary: true; enabled: root.home.new-count > 0; clicked => { root.start-learn(); } }
                     }
@@ -560,6 +572,15 @@ export component AppWindow inherits Window {
                         spacing: 8px; alignment: start;
                         for n in [3, 5, 10]: Btn { text: n; primary: root.batch-size == n; clicked => { root.set-batch(n); } }
                     }
+                    Text { text: "Start lessons at"; font-size: 17px; color: Theme.fg; }
+                    HorizontalLayout {
+                        spacing: 8px; alignment: start;
+                        for name[i] in ["N5", "N4", "N3", "N2", "N1"]: Btn { text: name; primary: root.start-level-index == i; clicked => { root.set-start-level(i); } }
+                    }
+                    Text {
+                        text: "Lessons teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again.";
+                        font-size: 13px; color: Theme.muted; wrap: word-wrap;
+                    }
                     Text { text: "Target retention (FSRS)"; font-size: 17px; color: Theme.fg; }
                     HorizontalLayout {
                         spacing: 8px; alignment: start;
@@ -568,7 +589,7 @@ export component AppWindow inherits Window {
                     Text { text: "Higher retention = more frequent reviews. 90% is a good default."; font-size: 13px; color: Theme.muted; wrap: word-wrap; }
                     HorizontalLayout { alignment: start; Btn { text: "Reset all progress"; clicked => { root.confirm-reset = true; } } }
                     Text {
-                        text: "Example sentences come from Tatoeba (tatoeba.org), licensed CC-BY 2.0 FR. Each sentence shows its Tatoeba number and contributor.";
+                        text: "Most example sentences come from Tatoeba (tatoeba.org), licensed CC-BY 2.0 FR, and show their Tatoeba number and contributor. A few were written for this app and are marked as such.";
                         font-size: 13px; color: Theme.muted; wrap: word-wrap;
                     }
                 }
