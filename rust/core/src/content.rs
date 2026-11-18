@@ -34,6 +34,9 @@ pub struct Sentence {
     /// "app" when the French translation was written for this app.
     #[serde(default)]
     pub fr_src: String,
+    /// Dictionary forms of the sentence's content words (for dictionary lookups).
+    #[serde(default)]
+    pub words: Vec<String>,
 }
 
 impl Sentence {

@@ -136,3 +136,16 @@ fn everything_has_french() {
         }
     }
 }
+
+#[test]
+fn sentences_list_their_words_for_lookups() {
+    let c = Content::bundled();
+    let all: Vec<_> = c.points.iter().flat_map(|p| &p.sentences).collect();
+    let without = all.iter().filter(|s| s.words.is_empty()).count();
+    assert!(without * 100 < all.len(), "{without} of {} sentences have no words", all.len());
+    for s in &all {
+        for w in &s.words {
+            assert!(!w.is_empty() && !w.contains(' '), "{:?} in {}", w, s.ja);
+        }
+    }
+}
