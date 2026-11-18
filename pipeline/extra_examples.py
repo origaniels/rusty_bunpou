@@ -22,6 +22,14 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("歩いて行けないことはないが、遠いですよ。", "You could walk there, but it's far."),
     ],
     # ------------------------------------------------------------------ N2
+    "bakari_ni": [
+        ("嘘をついたばかりに、友達を失ってしまった。", "Just because I told a lie, I lost a friend."),
+        ("一言多かったばかりに、彼女を怒らせてしまった。", "All because I said one word too many, I made her angry."),
+        ("傘を忘れたばかりに、びしょ濡れになった。", "Just because I forgot my umbrella, I got soaked."),
+        ("寝坊したばかりに、大事な試験を受けられなかった。", "Simply because I overslept, I couldn't take an important exam."),
+        ("安いと思って買ったばかりに、すぐ壊れて損をした。", "Just because I bought it thinking it was cheap, it broke right away and I lost out."),
+        ("彼の言葉を信じたばかりに、ひどい目にあった。", "Just because I believed what he said, I had a terrible time."),
+    ],
     "ni_shitara": [
         ("親にしたら、子供はいつまでも子供だ。", "To parents, a child is always a child."),
         ("子供にしたら、毎日塾に通うのはつらいだろう。", "For a child, going to cram school every day must be hard."),

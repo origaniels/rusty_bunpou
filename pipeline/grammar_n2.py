@@ -233,7 +233,7 @@ P("ni_sugi_nai", "〜に過ぎない", "merely, no more than", "Noun / plain for
 P("ni_kuwaete", "〜に加えて", "in addition to", "Noun + に加えて",
   """に加えて (くわえて) means "in addition to": 雨に加えて風も強くなった (on top of the rain, the wind got stronger too). It is written or formal; casual speech would use それに or だけじゃなく.""",
   # not the verb 加える itself: リストに加えてくれる, ゲームに加えて下さい (add / let me join)
-  r"に(?:加|くわ)え(?!て?(?:くれ|下さ|くださ|もら|ほし|欲し|いただ|頂|やっ|あげ))(?:て)?", "雨に加えて、風も強くなってきた。",
+  r"に(?:加|くわ)え(?:て(?!くれ|下さ|くださ|もら|ほし|欲し|いただ|頂|やっ|あげ)|(?=、))", "雨に加えて、風も強くなってきた。",
   after="n")
 P("ni_tomonatte", "〜に伴って", "along with, as", "Noun / Verb + に伴って",
   """に伴って (ともなって) describes things changing together: 人口の増加に伴って、問題も増えた.""",
