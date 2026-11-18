@@ -34,6 +34,9 @@ impl Platform for Recorder {
     fn pick_import(&self) {
         self.0.borrow_mut().push("pick-import".into());
     }
+    fn lookup_word(&self, word: &str) {
+        self.0.borrow_mut().push(format!("lookup {word}"));
+    }
 }
 impl Recorder {
     fn last(&self) -> String {
@@ -938,4 +941,45 @@ fn no_leech_section_without_leeches() {
     t.press("Stats");
     assert_eq!(t.app.ui.get_leeches().row_count(), 0);
     assert!(!t.exists("Leeches"));
+}
+
+// ------------------------------------------------------------------ dictionary lookups
+
+#[test]
+fn word_chips_after_answering_open_the_dictionary() {
+    let t = setup();
+    t.press("Learn 5 new");
+    for _ in 0..4 {
+        t.press("Next");
+    }
+    t.press("Start quiz");
+    let words = {
+        let st = t.app.state.borrow();
+        st.session.as_ref().unwrap().current(&t.app.content).unwrap().1.words.clone()
+    };
+    assert!(!words.is_empty());
+    assert!(!t.exists("Look up a word in Takoboto:"), "no chips before answering (they would give hints)");
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    assert!(t.exists("Look up a word in Takoboto:"));
+    // the word may also be a text in the sentence: press the chip (a button)
+    ElementHandle::find_by_accessible_label(&t.app.ui, &words[0])
+        .find(|e| e.accessible_role() == Some(i_slint_core::items::AccessibleRole::Button))
+        .expect("a chip for the first word")
+        .invoke_accessible_default_action();
+    assert_eq!(t.rec.last(), format!("lookup {}", words[0]));
+}
+
+#[test]
+fn chip_rows_fit_the_width_and_keep_the_order() {
+    let words: Vec<String> = ["私", "お金", "返す", "頼む", "彼", "聞こえる", "ふり", "タクシー", "ストレス"].iter().map(|s| s.to_string()).collect();
+    for width in [120.0, 200.0, 330.0, 1000.0] {
+        let rows = chip_rows(&words, width, 16.0);
+        assert_eq!(rows.concat(), words);
+        for r in &rows {
+            let w: f32 = r.iter().map(|w| w.chars().count() as f32 * 16.0 + 24.0).sum::<f32>() + 8.0 * (r.len() as f32 - 1.0);
+            assert!(r.len() == 1 || w <= width, "{r:?} is {w} wide, more than {width}");
+        }
+    }
+    assert_eq!(chip_rows(&words, 1000.0, 16.0).len(), 1);
 }

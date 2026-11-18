@@ -10,7 +10,7 @@ use bunpo_core::clock::date_string;
 use bunpo_core::reminder::next_reminder;
 use bunpo_core::session::{find_sentence, now_ms, Session, Verdict};
 use bunpo_core::store::{Progress, Report, REPORT_REASONS};
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -83,6 +83,8 @@ pub trait Platform {
     /// Let the user pick an exported file; it is copied next to the progress as
     /// `progress.import.json` and imported when the app comes back (see [`check_backup_files`]).
     fn pick_import(&self) {}
+    /// Show `word` in the Takoboto dictionary (the app if installed, else its website).
+    fn lookup_word(&self, _word: &str) {}
     /// Called shortly after start-up.
     fn on_started(&self) {}
 }
@@ -239,6 +241,24 @@ pub fn reports_json(content: &Content, progress: &Progress) -> String {
         })
         .collect();
     serde_json::to_string_pretty(&serde_json::json!({ "reports": items })).unwrap()
+}
+
+/// Split chips into rows no wider than `width`: each chip is its text (CJK characters about
+/// one font size wide, others about half) plus 24 of padding, with 8 between chips.
+pub fn chip_rows(words: &[String], width: f32, font: f32) -> Vec<Vec<String>> {
+    let chip = |w: &str| w.chars().map(|c| if (c as u32) < 0x2E80 { font * 0.6 } else { font }).sum::<f32>() + 24.0;
+    let mut rows: Vec<Vec<String>> = vec![];
+    let mut used = f32::INFINITY;
+    for w in words {
+        let need = chip(w);
+        if used + 8.0 + need > width {
+            rows.push(vec![]);
+            used = -8.0;
+        }
+        used += 8.0 + need;
+        rows.last_mut().unwrap().push(w.clone());
+    }
+    rows
 }
 
 /// Switch the Slint UI strings (@tr) to `lang`; "" is the untranslated (English) source.
@@ -555,6 +575,7 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         }
         .into();
         q.attribution = s.attribution(lang).into();
+        q.words = model(s.words.iter().map(|w| SharedString::from(w.as_str())).collect());
         q.reported = st.progress.reports.iter().any(|r| r.point == p.id && r.sentence == s.id);
         ui.set_notes(point_data(content, st, &p.id));
     }
@@ -656,6 +677,10 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         let c = content.clone();
         ui.global::<Logic>().on_layout(move |key, mode, typed, furi, width, font| {
             layout_for(&c, &key, mode, &typed, furi, width, font)
+        });
+        ui.global::<Logic>().on_chip_rows(|words, width, font| {
+            let words: Vec<String> = words.iter().map(|w| w.to_string()).collect();
+            model(chip_rows(&words, width, font).into_iter().map(|r| ChipRow { words: model(r.into_iter().map(SharedString::from).collect()) }).collect())
         });
     }
 
@@ -944,6 +969,14 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         st.exporting = "reports";
         p.export_progress(&file.to_string_lossy(), &format!("bunpo-reports-{}.json", date_string(now_ms())));
     }));
+
+    ui.on_lookup({
+        let p = platform.clone();
+        move |word| {
+            event(&format!("lookup {word}"));
+            p.lookup_word(&word);
+        }
+    });
 
     ui.on_open_report(cb!(|ui, c, st| {
         let Some(sess) = &st.session else { return };

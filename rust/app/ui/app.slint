@@ -28,6 +28,7 @@ export struct LevelRow { name: string, learned: int, total: int }
 export struct PieSlice { path: string, fill: color }
 export struct LevelPie { name: string, learned: int, total: int, slices: [PieSlice], counts: [int] }
 
+export struct ChipRow { words: [string] }
 export struct DayCell { level: int, label: string } // level -1 = after today (not drawn)
 export struct ForecastBar { label: string, count: int }
 export struct Leech { id: string, title: string, meaning: string, mistakes: string }
@@ -38,6 +39,7 @@ export struct QuizData {
     last-answer: string, answer: string, grammar-line: string, attribution: string,
     finished: bool, summary: string, lesson: bool,
     reported: bool, // this sentence was already reported
+    words: [string], // dictionary forms, shown as lookup chips after answering
 }
 
 export struct HomeData {
@@ -47,6 +49,8 @@ export struct HomeData {
 }
 
 export global Logic {
+    /// split words into rows of chips that fit `width` (Slint has no wrapping layout)
+    pure callback chip-rows(words: [string], width: float, font: float) -> [ChipRow];
     /// mode: 0 = highlight, 1 = blank, 2 = revealed
     pure callback layout(key: string, mode: int, typed: string, furigana: bool, width: float, font: float) -> SentenceData;
 }
@@ -113,6 +117,23 @@ component SentenceView {
         text: typed; font-size: root.font-size; color: Theme.accent;
         horizontal-alignment: center; vertical-alignment: center; wrap: no-wrap; overflow: elide;
     }
+}
+
+// a word to look up in the dictionary
+component Chip inherits Rectangle {
+    in property <string> text;
+    callback clicked();
+    height: 36px;
+    width: label.preferred-width + 24px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: #5c596c;
+    background: ta.pressed ? #ffffff1c : transparent;
+    label := Text { text: root.text; font-size: 16px; color: Theme.fg; }
+    ta := TouchArea { clicked => { root.clicked(); } }
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
 }
 
 component Btn inherits Rectangle {
@@ -416,6 +437,7 @@ export component AppWindow inherits Window {
     callback open-report();
     callback save-report(int, string);
     callback export-reports();
+    callback lookup(string);
 
     /// Rust bumps this to move keyboard focus into the answer field.
     in property <int> focus-tick;
@@ -549,6 +571,15 @@ export component AppWindow inherits Window {
                                 text: root.quiz.reported ? @tr("Reported") : @tr("Report");
                                 enabled: !root.quiz.reported;
                                 clicked => { answer.clear-focus(); root.open-report(); }
+                            }
+                        }
+                        if root.quiz.words.length > 0: VerticalLayout {
+                            spacing: 8px;
+                            Text { text: @tr("Look up a word in Takoboto:"); font-size: 13px; color: Theme.muted; wrap: word-wrap; }
+                            // the scroller's content is the window width minus its padding
+                            for row in Logic.chip-rows(root.quiz.words, (root.width - 48px) / 1px, 16): HorizontalLayout {
+                                spacing: 8px; alignment: start;
+                                for w in row.words: Chip { text: w; clicked => { answer.clear-focus(); root.lookup(w); } }
                             }
                         }
                         Text { text: root.quiz.attribution; font-size: 12px; color: Theme.muted; wrap: word-wrap; }

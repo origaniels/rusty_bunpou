@@ -260,3 +260,6 @@ msgstr "Points ratés 3 fois lors de vos 5 dernières révisions. Ouvrez-en un p
 
 msgid "{} wrong"
 msgstr "{} ratées"
+
+msgid "Look up a word in Takoboto:"
+msgstr "Chercher un mot dans Takoboto :"
