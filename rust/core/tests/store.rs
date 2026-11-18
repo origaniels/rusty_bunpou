@@ -101,3 +101,36 @@ fn unreadable_progress_is_kept_aside_not_overwritten() {
     b.push(".bad");
     assert!(!std::path::Path::new(&b).exists());
 }
+
+#[test]
+fn import_replaces_progress_and_keeps_the_old_one() {
+    let path = tmp("import");
+    let mut p = Progress::load(&path);
+    p.settings.batch_size = 3;
+    p.save();
+    // an export from another phone: one learned point, French
+    let mut other = Progress::in_memory();
+    other.settings.language = "fr".into();
+    other.cards.insert("da".into(), bunpo_core::store::Card { state: 2, ..Default::default() });
+    let exported = serde_json::to_string(&other).unwrap();
+
+    assert_eq!(p.import(&exported), Ok(1));
+    assert_eq!(p.settings.language, "fr");
+    assert!(p.cards.contains_key("da"));
+    // saved to disk, and the previous progress kept aside
+    assert_eq!(Progress::load(&path).settings.language, "fr");
+    let mut keep = path.as_os_str().to_owned();
+    keep.push(".before-import");
+    let before: Progress = serde_json::from_str(&std::fs::read_to_string(&keep).unwrap()).unwrap();
+    assert_eq!(before.settings.batch_size, 3);
+}
+
+#[test]
+fn import_rejects_files_that_are_not_progress() {
+    let mut p = Progress::in_memory();
+    p.settings.batch_size = 10;
+    for bad in ["", "hello", "{}", "[1,2]", r#"{"cards": 3}"#] {
+        assert!(p.import(bad).is_err(), "accepted {bad:?}");
+    }
+    assert_eq!(p.settings.batch_size, 10, "nothing changed");
+}

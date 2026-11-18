@@ -125,6 +125,33 @@ impl Progress {
         }
     }
 
+    /// Where this progress is saved (None in memory).
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+
+    /// Replace everything with an exported progress file (JSON text). The current progress is kept
+    /// next to the file as `<file>.before-import`, so an import can be undone by hand.
+    /// Returns the number of learned points in the imported file.
+    pub fn import(&mut self, json: &str) -> Result<usize, String> {
+        let value: serde_json::Value = serde_json::from_str(json).map_err(|e| format!("not a progress file: {e}"))?;
+        if !value.get("cards").is_some_and(|c| c.is_object()) {
+            return Err("not a progress file (no \"cards\")".into());
+        }
+        let new: Progress = serde_json::from_value(value).map_err(|e| format!("not a progress file: {e}"))?;
+        if let Some(path) = &self.path {
+            let mut keep = path.as_os_str().to_owned();
+            keep.push(".before-import");
+            let current = serde_json::to_string(self).map_err(|e| e.to_string())?;
+            std::fs::write(&keep, current).map_err(|e| format!("could not keep the current progress: {e}"))?;
+        }
+        self.cards = new.cards;
+        self.settings = new.settings;
+        self.log = new.log;
+        self.save();
+        Ok(self.cards.values().filter(|c| !c.is_new()).count())
+    }
+
     pub fn card(&self, id: &str) -> Card {
         self.cards.get(id).cloned().unwrap_or_default()
     }
