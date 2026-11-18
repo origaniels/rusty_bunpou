@@ -139,7 +139,7 @@ def test_points_metadata():
 
 @pytest.mark.parametrize("sentence,word,reading", [
     ("私は学生です。", "私", "わたし"), ("日本に行く。", "日本", "にほん"), ("明日は休みだ。", "明日", "あした"),
-    ("夕食は何時か。", "何時", "なんじ"), ("何時ですか。", "何時", "なんじ"),
+    ("夕食は何時か。", "何時", "なんじ"), ("何時ですか。", "何時", "なんじ"), ("今何時でしょうか。", "何時", "なんじ"),
 ])
 def test_readings(sentence, word, reading):
     """The reading of `word` (possibly split over several tokens) is what a learner expects."""
