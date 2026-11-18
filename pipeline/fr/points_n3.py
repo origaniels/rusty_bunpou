@@ -22,10 +22,11 @@ FR = {
         ここでは靴を脱ぐことになっている (ici, la règle est d'enlever ses chaussures).""",
     ),
     "koto_wa_nai": dict(
-        meaning="pas besoin de",
+        meaning="pas besoin de ; ne jamais arriver",
         structure="Verbe (forme du dictionnaire) + ことはない",
         explanation="""ことはない signifie « il n'y a pas besoin de » : 心配することはない (il n'y a
-        pas de quoi s'inquiéter).""",
+        pas de quoi s'inquiéter). Il peut aussi dire qu'une chose n'arrive jamais :
+        二度と会うことはないだろう (nous ne nous reverrons sans doute jamais).""",
     ),
     "koto_da": dict(
         title="〜ことだ (conseil)",

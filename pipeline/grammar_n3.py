@@ -47,17 +47,27 @@ P("koto_ni_natte_iru", "〜ことになっている", "it's arranged / the rule 
   # 困ったことになっている = be in trouble
   r"(?<!困った)(?<!面倒な)(?<!大変な)(?<!厄介な)ことになって(?:いる|い|おり)", "会議は三時に始まることになっています。",
   after="v", tail=True)
-P("koto_wa_nai", "〜ことはない", "there's no need to", "Verb (dictionary) + ことはない",
-  """ことはない means "there's no need to": 心配することはない (there's nothing to worry about).""",
+P("koto_wa_nai", "〜ことはない", "there's no need to; never happens", "Verb (dictionary) + ことはない",
+  """ことはない means "there's no need to": 心配することはない (there's nothing to worry about). It can
+  also say that something never happens: 二度と会うことはないだろう (we'll probably never meet again).""",
   r"ことは(?:ない|ありません)", "そんなに心配することはありません。", after="v",
-  check=lambda t, i, k: i > 0 and t[i - 1].lemma != "た")  # たことはない = have never
+  # たことはない = have never; 不可能なことはない / そういうことはない / 過ぎることはない = there is no ...
+  check=lambda t, i, k: i > 0 and t[i - 1].lemma not in ("た", "だ", "言う", "過ぎる", "出来る")
+  and t[i - 1].s not in ("な", "いう"))
 P("koto_da", "〜ことだ (advice)", "should, the best thing is", "Verb (dictionary / ない) + ことだ",
   """ことだ gives advice, often from someone with experience: 上手になりたければ、毎日練習することだ
   (if you want to improve, practise every day).""",
   r"ことだ(?=[。！])", "合格したければ、毎日勉強することだ。", after="v",
   # advice, not "X is (a) thing that ...": 盗むのはいけないことだ, ということだ, たことだ
-  check=lambda t, i, k: i > 0 and t[i - 1].lemma not in ("た", "だ", "言う", "いう")
-  and not re.search(r"のは|という|と言う", "".join(x.s for x in t)))
+  check=lambda t, i, k: i > 0 and t[i - 1].lemma not in ("た", "だ", "言う", "いう", "有る", "得る", "べし")
+  and not (t[i - 1].lemma == "無い" and t[i - 1].p1 == "形容詞")  # わけないこと (adjective), not 〜ないこと
+  and not re.search(r"のは|という|と言う", "".join(x.s for x in t))
+  # advice comes with a condition (〜ければ / なら / たら / ためには), or stands alone without a topic
+  # ("私の夢は医者になることだ" defines something instead)
+  and not (t[i - 1].lemma == "ない" and i > 1
+           and (t[i - 2].lemma in ("成る", "出来る", "訳", "いける") or t[i - 2].s == "わけ"))
+  and (bool(re.search(r"(?:ければ|なら|たら|ためには|には)、", "".join(x.s for x in t[:i])))
+       or not any(x.s == "は" and x.p1 == "助詞" for x in t[:i])))
 P("beki", "〜べき", "should, ought to", "Verb (dictionary) + べきだ",
   """べき expresses what is right or expected: 約束は守るべきだ (you should keep your promises).
   する becomes するべき or すべき. べきではない = shouldn't.""",

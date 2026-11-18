@@ -7,6 +7,14 @@ exactly one blank is skipped (and reported by the build). Shown in the app as
 
 EXTRA: dict[str, list[tuple[str, str]]] = {
     # ------------------------------------------------------------------ N3
+    "koto_da": [
+        ("早く元気になりたければ、よく寝ることだ。", "If you want to get better quickly, get plenty of sleep."),
+        ("痩せたいなら、甘いものを控えることだ。", "If you want to lose weight, cut down on sweets."),
+        ("試験に合格したければ、毎日少しずつ勉強することだ。", "If you want to pass the exam, study a little every day."),
+        ("迷ったら、まず先生に相談することだ。", "If you're not sure, talk to your teacher first."),
+        ("日本語が上手になりたいなら、日本人の友達を作ることだ。", "If you want to get good at Japanese, make Japanese friends."),
+        ("失敗を恐れずに、何度でも挑戦することだ。", "Don't be afraid of failing: keep trying, again and again."),
+    ],
     "nai_koto_wa_nai": [
         ("辛い料理は食べられないことはないです。", "It's not that I can't eat spicy food."),
         ("急げば間に合わないことはない。", "If we hurry, it's not impossible to make it."),
