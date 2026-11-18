@@ -73,6 +73,11 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("koto_ni_natte_iru", "あなた、困ったことになっているんでしょう？"),  # be in trouble
+    ("koto_wa_nai", "私はこんなに早く目覚めたことはない。"),  # have never
+    ("koto_da", "盗むのはいけないことだ。"),  # not advice
+    ("koto_da", "問題は誰が決定を下すかということだ。"),
+    ("shika_nai", "この世界に存在するものはすべて、夢でしかない。"),  # でしかない
     ("ni_shitagatte", "父は私を医者にしたがっている。"),  # したがる, not 従う
     ("uchi_ni", "私はたいてい７時頃うちに帰ります。"),  # うち = home
     ("toka", "僕はなんとか時間までにそこに着いた。"),  # なんとか = somehow

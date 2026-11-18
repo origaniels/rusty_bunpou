@@ -1,4 +1,6 @@
 """N3 grammar points (original explanations; `ex` sentences are only used by the tests)."""
+import re
+
 from grammar_n4 import _volitional
 from patterns import ARU, NARU, SURU, _tail, first_lemma, first_pos, point, prev_is, prev_not
 
@@ -42,14 +44,20 @@ P("koto_ni_shite_iru", "〜ことにしている", "make it a rule to", "Verb (d
 P("koto_ni_natte_iru", "〜ことになっている", "it's arranged / the rule is that", "Verb + ことになっている",
   """ことになっている describes an arrangement or rule set by others: ここでは靴を脱ぐことになっている
   (the rule is that you take your shoes off here).""",
-  r"ことになって(?:いる|い|おり)", "会議は三時に始まることになっています。", after="v", tail=True)
+  # 困ったことになっている = be in trouble
+  r"(?<!困った)(?<!面倒な)(?<!大変な)(?<!厄介な)ことになって(?:いる|い|おり)", "会議は三時に始まることになっています。",
+  after="v", tail=True)
 P("koto_wa_nai", "〜ことはない", "there's no need to", "Verb (dictionary) + ことはない",
   """ことはない means "there's no need to": 心配することはない (there's nothing to worry about).""",
-  r"ことは(?:ない|ありません)", "そんなに心配することはありません。", after="v")
+  r"ことは(?:ない|ありません)", "そんなに心配することはありません。", after="v",
+  check=lambda t, i, k: i > 0 and t[i - 1].lemma != "た")  # たことはない = have never
 P("koto_da", "〜ことだ (advice)", "should, the best thing is", "Verb (dictionary / ない) + ことだ",
   """ことだ gives advice, often from someone with experience: 上手になりたければ、毎日練習することだ
   (if you want to improve, practise every day).""",
-  r"ことだ(?=[。！])", "合格したければ、毎日勉強することだ。", after="v")
+  r"ことだ(?=[。！])", "合格したければ、毎日勉強することだ。", after="v",
+  # advice, not "X is (a) thing that ...": 盗むのはいけないことだ, ということだ, たことだ
+  check=lambda t, i, k: i > 0 and t[i - 1].lemma not in ("た", "だ", "言う", "いう")
+  and not re.search(r"のは|という|と言う", "".join(x.s for x in t)))
 P("beki", "〜べき", "should, ought to", "Verb (dictionary) + べきだ",
   """べき expresses what is right or expected: 約束は守るべきだ (you should keep your promises).
   する becomes するべき or すべき. べきではない = shouldn't.""",
@@ -57,7 +65,7 @@ P("beki", "〜べき", "should, ought to", "Verb (dictionary) + べきだ",
 P("shika_nai", "〜しかない", "have no choice but to", "Verb (dictionary) + しかない",
   """Dictionary form + しかない means there's only one option left: 歩いて帰るしかない (there's nothing for
   it but to walk home).""",
-  r"しか(?:ない|ありません)", "終電がないので、歩いて帰るしかない。", after="v")
+  r"(?<!で)しか(?:ない|ありません)", "終電がないので、歩いて帰るしかない。", after="v")  # でしかない = is merely
 P("you_ga_nai", "〜ようがない", "there's no way to", "Verb stem + ようがない",
   """Verb stem + ようがない means it's impossible to do because there's no means: 連絡先が分からないので、
   連絡しようがない (I don't know his address, so there's no way to contact him).""",
