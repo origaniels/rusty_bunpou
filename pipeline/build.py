@@ -297,6 +297,48 @@ def extra_sentences(p, need, report_bad):
     return out
 
 
+# word classes worth a dictionary lookup, and grammatical words that are not
+WORD_POS = {"名詞", "代名詞", "動詞", "形容詞", "形状詞", "副詞"}
+# one-kanji nouns UniDic splits off compounds: 日本 + 語, 日本 + 人
+NOUN_TAILS = {"語", "人", "者", "製"}
+NOT_WORDS = {
+    "こと", "事", "もの", "物", "の", "よう", "様", "ところ", "所", "ため", "為", "わけ", "訳", "はず", "筈",
+    "する", "為る", "いる", "居る", "ある", "有る", "在る", "なる", "成る", "くる", "来る", "いく", "おる", "居る",
+    "れる", "られる", "せる", "させる", "ない", "無い", "そう", "みたい", "らしい", "ほう", "方", "まま", "ん",
+    "すぎる", "過ぎる",
+}
+
+
+def dictionary_words(ts):
+    """Dictionary forms of the sentence's content words, in order, without repeats.
+    お/ご + noun and noun + suffix (日本 + 語) stay one word; verbs right after て/で are
+    auxiliaries (〜てもらう, 〜ている), i.e. grammar, not words to look up."""
+    out = []
+    for i, t in enumerate(ts):
+        if t.p1 not in WORD_POS or t.p2 == "数詞":
+            continue
+        prev = ts[i - 1] if i > 0 else None
+        if t.p1 == "動詞" and t.p2 == "非自立可能" and prev and prev.p2 == "接続助詞" and prev.s in ("て", "で"):
+            continue
+        if t.p1 == "名詞" and t.s in NOUN_TAILS and prev and prev.p1 == "名詞":
+            continue  # already attached to the noun before
+        base = t.base
+        if base.endswith("ずる") and t.s.endswith("じ"):  # 信ずる → 信じる (as for hints)
+            base = base[:-2] + "じる"
+        if t.p1 in ("名詞", "代名詞"):
+            if prev and prev.p1 == "接頭辞" and prev.s in ("お", "ご", "御"):
+                base = prev.s + t.s
+            j = i + 1
+            while j < len(ts) and ((ts[j].p1 == "接尾辞" and ts[j].p2.startswith("名詞"))
+                                   or (ts[j].p1 == "名詞" and ts[j].s in NOUN_TAILS)):
+                base += ts[j].s
+                j += 1
+        if base in NOT_WORDS or (not has_kanji(base) and len(base) < 2) or base in out:
+            continue
+        out.append(base)
+    return out
+
+
 def to_sentence(sid, a, b, h, cands, toks):
     ts = toks[sid]
     span = ts[a:b]
@@ -317,7 +359,7 @@ def to_sentence(sid, a, b, h, cands, toks):
     d = dict(
         id=sid, ja=c["ja"], en=c["en"], owner=c["owner"],
         furi=furigana(ts), cloze=[span[0].start, span[-1].end],
-        answers=answers_for(span), hint=hint,
+        answers=answers_for(span), hint=hint, words=dictionary_words(ts),
     )
     if c.get("src"):
         d["src"] = c["src"]

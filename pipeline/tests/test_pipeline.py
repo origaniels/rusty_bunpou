@@ -192,3 +192,15 @@ def test_span_tags():
     toks = tokenize("昨日映画を見ませんでした。")
     a, b, _ = BY_ID["masendeshita"]["match"](toks)[0]
     assert span_tags(toks[a:b]) == ["polite", "past", "negative"]
+
+
+def test_dictionary_words_for_lookups():
+    from build import dictionary_words
+    cases = {
+        "タクシーを呼んでもらえませんか。": ["タクシー", "呼ぶ"],            # てもらう is grammar
+        "日本語を勉強して、公園で遊んでいる。": ["日本語", "勉強", "公園", "遊ぶ"],  # 公園で ≠ て-form
+        "私がお金を返すように頼むと、彼は聞こえないふりをします。": ["私", "お金", "返す", "頼む", "彼", "聞こえる", "ふり"],
+        "この問題は複雑すぎる。": ["問題", "複雑"],
+    }
+    for ja, words in cases.items():
+        assert dictionary_words(tokenize(ja)) == words, ja
