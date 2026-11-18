@@ -1,12 +1,27 @@
 """N1 grammar points (original explanations; `ex` sentences are only used by the tests)."""
+import re
+
 from grammar_n3 import compound
 from grammar_n4 import _volitional
 from patterns import ARU, NARU, SURU, first_lemma, first_pos, point, prev_is
 
 
+_NO_MATTER = re.compile(r"どんな|何|なに|誰|だれ|どこ|いくら|いつ|どう|たとえ|まいと|まいが|関係|気にし|構わ|かまわ")
+
+
 def m_you_ga(toks):
-    return [(a, b + 1, h) for a, b, h in _volitional(toks)
-            if b + 1 < len(toks) and toks[b].s in ("が", "と") and toks[b + 1].s == "、"]
+    """ようが / ようと, "no matter". ようと also means "trying to / (invite) to" (減らそうと, 行こうと誘われた),
+    so it needs a no-matter context: a question word, たとえ, 〜まいと, or a second 〜ようと."""
+    text = "".join(t.s for t in toks)
+    out = []
+    for a, b, h in _volitional(toks):
+        if not (b + 1 < len(toks) and toks[b].s in ("が", "と") and toks[b + 1].s == "、"):
+            continue
+        before = "".join(t.s for t in toks[:a]).split("、")[-1]  # same clause, before the verb
+        if toks[b].s == "と" and not (_NO_MATTER.search(before) or "まい" in text or text.count("うと") > 1):
+            continue
+        out.append((a, b + 1, h))
+    return out
 
 
 # nouns for a situation or position someone is in (〜にあって)
@@ -193,7 +208,7 @@ P("ni_atte", "〜にあって", "in (a situation)", "Noun + にあって",
   check=lambda t, i, k: i > 0 and (t[i - 1].lemma in SITUATIONS or t[i - 1].s.endswith(("時", "下", "中", "期", "代"))))
 P("ni_kakawaru", "〜にかかわる", "affect, concerning (serious)", "Noun + にかかわる",
   """にかかわる means "be related to / affect (something serious)": 命にかかわる病気.""",
-  r"に(?:かかわ|関わ|係わ)(?:る|り(?!の|合|あ))", "これは命にかかわる問題だ。", after="n")  # not the noun 関わり
+  r"に(?:かかわ|関わ|係わ)(?:る|り(?!の|合|あ|が|は|も))", "これは命にかかわる問題だ。", after="n")  # not the noun 関わり
 P("ni_kataku_nai", "〜に難くない", "it's not hard to", "Noun / Verb + に難くない",
   """に難くない (かたくない) means "it is not hard to": 想像に難くない (it's easy to imagine). It is used with a few verbs of understanding: 想像, 理解, 察する.""",
   r"に(?:難|かた)くない", "彼の苦労は想像に難くない。", after="nv")
@@ -307,10 +322,10 @@ P("yue", "〜ゆえ(に)", "because of (literary)", "Noun / plain form + ゆえ�
   r"(?:ゆえ|故)(?:に|の)?", "若さゆえの過ちだった。", after="any", check=lambda t, i, k: t[i].kana == "ゆえ")
 P("sura", "〜すら", "even", "Noun + (で)すら",
   """すら is a literary さえ ("even"): 名前すら知らない (I don't even know his name). After a person or place it often becomes ですら; it usually goes with a negative.""",
-  r"(?:で)?すら", "彼は自分の名前すら書けない。", after="n")
+  r"(?:で)?すら(?!すら)", "彼は自分の名前すら書けない。", after="n")  # すらすら = fluently
 P("ikani", "いかに", "how (ever)", "いかに ...",
   """いかに is a formal "how": いかに大切か (how important it is), いかに努力しても.""",
-  r"いかに", "健康がいかに大切か、病気になって分かった。")
+  r"いかに(?!も)", "健康がいかに大切か、病気になって分かった。")  # いかにも = truly, typically
 P("tomo_arou", "〜ともあろう", "someone (of such standing)", "Noun + ともあろう + Noun",
   """ともあろう criticizes someone who should know better given their position: 大臣ともあろう人が、そんなことを言うなんて (to think that a minister would say such a thing). It is followed by 人 or 者.""",
   r"ともあろう", "大臣ともあろう人が、そんなことを言うなんて。", after="n")

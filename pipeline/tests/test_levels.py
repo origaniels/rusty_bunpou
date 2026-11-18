@@ -73,6 +73,10 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("sura", "フランス語すらすら読めるようになりたいなあ。"),
+    ("ikani", "そんなことをするとはいかにも彼らしい。"),
+    ("you_ga", "彼女は体重を減らそうと、ジムで何時間も過ごしている。"),
+    ("you_ga", "パーティーに一緒に行こうと、彼に誘われました。"),
     ("ni_taeru", "その痛みに耐えるさまざまな方法がある。"),
     ("ni_taru", "君たち全員に足りるだけのパンはある。"),
     ("wa_oroka", "君はおろかな行為をやめねばならない。"),
