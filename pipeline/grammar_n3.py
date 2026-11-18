@@ -112,7 +112,7 @@ P("osore_ga_aru", "〜おそれがある", "there's a risk that", "Verb (diction
 P("mono_da", "〜ものだ", "used to; it's natural that", "Plain form + ものだ",
   """ものだ states a general truth (人は変わるものだ, people change) or, with た, fond memories:
   子供のころよくここで遊んだものだ (I often used to play here as a child).""",
-  r"ものだ|もんだ", "子供のころは、よくこの川で泳いだものだ。", after="va")
+  r"(?:ものだ|もんだ)(?!と)", "子供のころは、よくこの川で泳いだものだ。", after="va")
 P("you_na", "〜ような / 〜のような", "like, such as", "Noun + の + ような",
   """ような compares or gives an example: 夢のような話 (a dreamlike story), 日本のような国 (countries like
   Japan). Before verbs it becomes ように.""",
