@@ -76,6 +76,12 @@ pub trait Platform {
     /// Remove a reminder notification that is currently shown.
     fn dismiss_reminder(&self) {}
     fn request_notification_permission(&self) {}
+    /// Save a copy of the progress file (`path`) where the user picks, suggesting `name`.
+    /// The outcome is left in `backup-result.txt` next to it (see [`check_backup_files`]).
+    fn export_progress(&self, _path: &str, _name: &str) {}
+    /// Let the user pick an exported file; it is copied next to the progress as
+    /// `progress.import.json` and imported when the app comes back (see [`check_backup_files`]).
+    fn pick_import(&self) {}
     /// Called shortly after start-up.
     fn on_started(&self) {}
 }
@@ -158,6 +164,61 @@ pub fn reminder_text(lang: Lang, count: usize) -> String {
         (Lang::Fr, 1) => "1 révision de grammaire vous attend".into(),
         (Lang::Fr, n) => format!("{n} révisions de grammaire vous attendent"),
     }
+}
+
+/// Date as YYYY-MM-DD (UTC) for file names.
+fn date_string(ms: i64) -> String {
+    // days since 1970-01-01 → civil date (Howard Hinnant's algorithm)
+    let z = ms.div_euclid(86_400_000) + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + if m <= 2 { 1 } else { 0 };
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+/// Pick up what the file picker left behind (see [`Platform::export_progress`] / `pick_import`):
+/// an imported file to load, or the outcome of an export. Returns a message for the user.
+pub fn check_backup_files(st: &mut State) -> Option<String> {
+    let dir = st.progress.path()?.parent()?.to_path_buf();
+    let fr = st.progress.settings.lang() == Lang::Fr;
+    let incoming = dir.join("progress.import.json");
+    if let Ok(text) = std::fs::read_to_string(&incoming) {
+        let _ = std::fs::remove_file(&incoming);
+        let msg = match st.progress.import(&text) {
+            Ok(n) => {
+                // the imported file may change the language too
+                let fr = st.progress.settings.lang() == Lang::Fr;
+                if fr { format!("Progression importée : {n} points appris.") } else { format!("Progress imported: {n} learned points.") }
+            }
+            Err(e) => {
+                event(&format!("import failed: {e}"));
+                if fr { "Import impossible : ce n'est pas un fichier de progression." } else { "Import failed: this is not a progress file." }
+                    .into()
+            }
+        };
+        event(&format!("imported: {msg}"));
+        return Some(msg);
+    }
+    let result = dir.join("backup-result.txt");
+    let outcome = std::fs::read_to_string(&result).ok()?;
+    let _ = std::fs::remove_file(&result);
+    event(&format!("backup {outcome}"));
+    Some(
+        match (outcome.trim(), fr) {
+            ("exported", false) => "Progress exported.",
+            ("exported", true) => "Progression exportée.",
+            ("cancelled", false) => "Cancelled.",
+            ("cancelled", true) => "Annulé.",
+            (_, false) => "Something went wrong, nothing was changed.",
+            (_, true) => "Une erreur s'est produite, rien n'a été modifié.",
+        }
+        .into(),
+    )
 }
 
 /// Switch the Slint UI strings (@tr) to `lang`; "" is the untranslated (English) source.
@@ -738,6 +799,18 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         });
     }
 
+    ui.on_export_progress(cb!(|ui, c, st, p| {
+        st.progress.save();
+        let Some(path) = st.progress.path().map(|p| p.to_string_lossy().to_string()) else { return };
+        ui.set_backup_status("".into());
+        p.export_progress(&path, &format!("bunpo-progress-{}.json", date_string(now_ms())));
+    }));
+
+    ui.on_import_progress(cb!(|ui, c, st, p| {
+        let _ = (&ui, &st);
+        p.pick_import();
+    }));
+
     ui.on_reset_point(cb!(|ui, c, st, p| {
         if let Some(id) = st.detail.clone() {
             st.progress.reset_point(&id);
@@ -790,9 +863,19 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         let p = platform.clone();
         RESUME_HOOK.with(|h| {
             *h.borrow_mut() = Some(Box::new(move || {
-                let (Some(ui), Ok(st)) = (w.upgrade(), st.try_borrow()) else { return };
+                let st_rc = &st;
+                let (Some(ui), Ok(st)) = (w.upgrade(), st_rc.try_borrow()) else { return };
                 event("resumed");
                 p.dismiss_reminder();
+                drop(st);
+                if let Ok(mut st) = st_rc.try_borrow_mut() {
+                    if let Some(msg) = check_backup_files(&mut st) {
+                        ui.set_backup_status(msg.into());
+                        apply_language(st.progress.settings.lang());
+                        refresh_settings(&ui, &st);
+                    }
+                }
+                let Ok(st) = st_rc.try_borrow() else { return };
                 refresh_home(&ui, &c, &st);
                 refresh_list(&ui, &c, &st);
                 sync_reminder(&*p, &st.progress);

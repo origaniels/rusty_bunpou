@@ -28,6 +28,12 @@ impl Platform for Recorder {
     fn request_notification_permission(&self) {
         self.0.borrow_mut().push("permission".into());
     }
+    fn export_progress(&self, path: &str, name: &str) {
+        self.0.borrow_mut().push(format!("export {path} {name}"));
+    }
+    fn pick_import(&self) {
+        self.0.borrow_mut().push("pick-import".into());
+    }
 }
 impl Recorder {
     fn last(&self) -> String {
@@ -716,6 +722,11 @@ fn check_every_screen(width: f32, french: bool) {
     t.app.ui.set_confirm_reset(true);
     check("reset all dialog");
     t.app.ui.set_confirm_reset(false);
+    t.app.ui.set_confirm_import(true);
+    check("import dialog");
+    t.app.ui.set_confirm_import(false);
+    t.app.ui.set_backup_status("Une erreur s'est produite, rien n'a été modifié.".into());
+    check("settings with a backup message");
     // start level above N5: the learn card gets its extra lines
     t.app.ui.invoke_set_start_level(4);
     t.app.ui.invoke_go_home();
@@ -741,3 +752,75 @@ fn every_screen_fits_narrow_phone_english() {
 fn every_screen_fits_narrow_phone_french() {
     check_every_screen(360.0, true);
 }
+
+// ------------------------------------------------------------------ export / import
+
+fn tmp_dir(name: &str) -> std::path::PathBuf {
+    let d = std::env::temp_dir().join(format!("bunpo-ui-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(&d).unwrap();
+    d
+}
+
+#[test]
+fn export_saves_then_hands_the_file_to_the_platform() {
+    let dir = tmp_dir("export");
+    let t = setup_with(Progress::load(&dir.join("progress.json")));
+    t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0)); // whole settings page in view
+    t.app.state.borrow_mut().progress.settings.batch_size = 3; // unsaved change
+    t.press("Settings");
+    t.press("Export progress");
+    let last = t.rec.last();
+    assert!(last.starts_with("export ") && last.contains("progress.json bunpo-progress-20"), "{last}");
+    assert!(last.ends_with(".json"));
+    // saved first, so the exported file is up to date
+    assert_eq!(Progress::load(&dir.join("progress.json")).settings.batch_size, 3);
+    // the picker reports back through backup-result.txt, read when the app resumes
+    std::fs::write(dir.join("backup-result.txt"), "exported").unwrap();
+    on_resume();
+    assert_eq!(t.app.ui.get_backup_status(), "Progress exported.");
+    assert!(!dir.join("backup-result.txt").exists());
+}
+
+#[test]
+fn import_asks_first_then_loads_the_picked_file() {
+    let dir = tmp_dir("import");
+    let t = setup_with(Progress::load(&dir.join("progress.json")));
+    t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0)); // whole settings page in view
+    t.press("Settings");
+    t.press("Import progress");
+    assert!(t.app.ui.get_confirm_import(), "asks before replacing anything");
+    assert_ne!(t.rec.last(), "pick-import");
+    t.press("Choose a file");
+    assert_eq!(t.rec.last(), "pick-import");
+
+    // the picked file: another phone's progress, in French, with two learned points
+    let mut other = Progress::in_memory();
+    other.settings.language = "fr".into();
+    for id in ["da", "desu"] {
+        other.cards.insert(id.into(), bunpo_core::store::Card { state: 2, due: i64::MAX / 2, ..Default::default() });
+    }
+    std::fs::write(dir.join("progress.import.json"), serde_json::to_string(&other).unwrap()).unwrap();
+    on_resume();
+    assert_eq!(t.app.ui.get_backup_status(), "Progression importée\u{a0}: 2 points appris.".replace('\u{a0}', " "));
+    assert_eq!(t.app.ui.get_home().learned, 2);
+    assert_eq!(t.app.ui.get_language_index(), 1, "imported settings apply at once");
+    assert!(t.exists("Accueil"), "UI switched to French");
+    assert!(!dir.join("progress.import.json").exists());
+    assert!(dir.join("progress.json.before-import").exists());
+}
+
+#[test]
+fn importing_a_wrong_file_changes_nothing() {
+    let dir = tmp_dir("bad-import");
+    let mut p = Progress::load(&dir.join("progress.json"));
+    p.settings.batch_size = 10;
+    p.save();
+    let t = setup_with(Progress::load(&dir.join("progress.json")));
+    std::fs::write(dir.join("progress.import.json"), "my shopping list").unwrap();
+    on_resume();
+    assert_eq!(t.app.ui.get_backup_status(), "Import failed: this is not a progress file.");
+    assert_eq!(t.app.state.borrow().progress.settings.batch_size, 10);
+    assert!(!dir.join("progress.import.json").exists());
+}
+

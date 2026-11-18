@@ -185,3 +185,21 @@ msgstr "Annuler"
 
 msgid "Language"
 msgstr "Langue"
+
+msgid "Backup"
+msgstr "Sauvegarde"
+
+msgid "Export progress"
+msgstr "Exporter"
+
+msgid "Import progress"
+msgstr "Importer"
+
+msgid "Your progress is only stored on this phone: export it now and then (Drive, email, …) to keep a copy."
+msgstr "Votre progression n'est enregistrée que sur ce téléphone : exportez-la de temps en temps (Drive, e-mail…) pour en garder une copie."
+
+msgid "Replace your progress with an exported file? Your current progress is kept on the phone as a backup copy."
+msgstr "Remplacer votre progression par un fichier exporté ? La progression actuelle est conservée sur le téléphone comme copie de secours."
+
+msgid "Choose a file"
+msgstr "Choisir un fichier"

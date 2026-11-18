@@ -6,7 +6,8 @@
         android:label="文法 SRS"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="false"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:allowBackup="false">
         <activity
             android:name="android.app.NativeActivity"
             android:exported="true"
@@ -18,7 +19,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- review reminders (the only Java component; see ReviewReminder.java) -->
+        <!-- export / import of the progress file through the system file picker (see Backup.java) -->
+        <activity
+            android:name=".Backup"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <!-- review reminders (see ReviewReminder.java) -->
         <receiver android:name=".ReviewReminder" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

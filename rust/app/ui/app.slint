@@ -363,6 +363,9 @@ export component AppWindow inherits Window {
     in property <int> start-level-index: 0;
     in property <int> language-index: 0; // 0 English, 1 French
     in-out property <bool> confirm-reset;
+    in-out property <bool> confirm-import;
+    /// result of the last export / import, shown under the backup buttons
+    in property <string> backup-status;
 
     callback start-learn();
     callback lesson-prev();
@@ -391,6 +394,8 @@ export component AppWindow inherits Window {
     callback set-language(int);
     callback reset-point();
     callback reset-all();
+    callback export-progress();
+    callback import-progress();
 
     /// Rust bumps this to move keyboard focus into the answer field.
     in property <int> focus-tick;
@@ -408,6 +413,7 @@ export component AppWindow inherits Window {
             if (event.text == Key.Back) {
                 if (root.show-notes) { root.show-notes = false; return accept; }
                 if (root.confirm-reset) { root.confirm-reset = false; return accept; }
+                if (root.confirm-import) { root.confirm-import = false; return accept; }
                 return root.go-back() ? accept : reject;
             }
             reject
@@ -703,6 +709,17 @@ export component AppWindow inherits Window {
                     Text { text: @tr("Target retention (FSRS)"); font-size: 17px; color: Theme.fg; }
                     Segmented { options: ["85%", "90%", "95%"]; selected: root.retention-index; picked(i) => { root.set-retention(i); } }
                     Text { text: @tr("Higher retention = more frequent reviews. 90% is a good default."); font-size: 13px; color: Theme.muted; wrap: word-wrap; }
+                    Text { text: @tr("Backup"); font-size: 17px; color: Theme.fg; }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Btn { text: @tr("Export progress"); horizontal-stretch: 1; clicked => { root.export-progress(); } }
+                        Btn { text: @tr("Import progress"); horizontal-stretch: 1; clicked => { root.confirm-import = true; } }
+                    }
+                    Text {
+                        text: root.backup-status != "" ? root.backup-status
+                            : @tr("Your progress is only stored on this phone: export it now and then (Drive, email, …) to keep a copy.");
+                        font-size: 13px; color: root.backup-status != "" ? Theme.fg : Theme.muted; wrap: word-wrap;
+                    }
                     HorizontalLayout { alignment: start; Btn { text: @tr("Reset all progress"); clicked => { root.confirm-reset = true; } } }
                     Text {
                         text: @tr("Most example sentences come from Tatoeba (tatoeba.org), licensed CC-BY 2.0 FR, and show their Tatoeba number and contributor. A few were written for this app and are marked as such.");
@@ -760,6 +777,30 @@ export component AppWindow inherits Window {
                                 root.confirm-reset = false;
                                 if (root.screen == 4) { root.reset-point(); } else { root.reset-all(); }
                             }
+                        }
+                    }
+                }
+            }
+        }
+        if root.confirm-import: Rectangle {
+            background: #000000a0;
+            TouchArea { clicked => { root.confirm-import = false; } }
+            Rectangle {
+                x: 24px; width: parent.width - 48px; height: ibox.preferred-height; y: (parent.height - self.height) / 2;
+                background: Theme.card; border-radius: 20px;
+                TouchArea { }
+                ibox := VerticalLayout {
+                    padding: 20px; spacing: 16px;
+                    Text {
+                        text: @tr("Replace your progress with an exported file? Your current progress is kept on the phone as a backup copy.");
+                        color: Theme.fg; wrap: word-wrap;
+                    }
+                    HorizontalLayout {
+                        spacing: 8px; alignment: end;
+                        Btn { text: @tr("Cancel"); clicked => { root.confirm-import = false; } }
+                        Btn {
+                            text: @tr("Choose a file"); primary: true;
+                            clicked => { root.confirm-import = false; root.import-progress(); }
                         }
                     }
                 }

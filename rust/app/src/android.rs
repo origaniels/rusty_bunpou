@@ -7,6 +7,7 @@ use slint::android::AndroidApp;
 use std::rc::Rc;
 
 const REMINDER_CLASS: &str = "dev.local.bunpo.rust.ReviewReminder";
+const BACKUP_CLASS: &str = "dev.local.bunpo.rust.Backup";
 
 pub fn log(msg: &str) {
     use std::ffi::CString;
@@ -25,13 +26,22 @@ pub struct AndroidPlatform {
 impl AndroidPlatform {
     /// Run `f` with a JNI env, the activity and the ReviewReminder class.
     fn with_reminder<R>(&self, f: impl FnOnce(&mut jni::JNIEnv, &JObject, &JClass) -> jni::errors::Result<R>) -> Option<R> {
+        self.with_class(REMINDER_CLASS, f)
+    }
+
+    /// Run `f` with a JNI env, the activity and one of the app's Java classes.
+    fn with_class<R>(
+        &self,
+        class_name: &str,
+        f: impl FnOnce(&mut jni::JNIEnv, &JObject, &JClass) -> jni::errors::Result<R>,
+    ) -> Option<R> {
         let res = (|| {
             let vm = unsafe { JavaVM::from_raw(self.app.vm_as_ptr() as *mut jni::sys::JavaVM)? };
             let mut env = vm.attach_current_thread()?;
             let activity = unsafe { JObject::from_raw(self.app.activity_as_ptr() as jni::sys::jobject) };
             // app classes are only visible through the activity's class loader (not FindClass)
             let loader = env.call_method(&activity, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])?.l()?;
-            let name = env.new_string(REMINDER_CLASS)?;
+            let name = env.new_string(class_name)?;
             let class = env
                 .call_method(&loader, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;", &[JValue::Object(&name)])?
                 .l()?;
@@ -90,6 +100,26 @@ impl Platform for AndroidPlatform {
         self.with_reminder(|env, act, cls| {
             env.call_static_method(cls, "requestPermission", "(Landroid/app/Activity;)V", &[JValue::Object(act)])
                 .map(|_| ())
+        });
+    }
+
+    fn export_progress(&self, path: &str, name: &str) {
+        self.with_class(BACKUP_CLASS, |env, act, cls| {
+            let path = env.new_string(path)?;
+            let name = env.new_string(name)?;
+            env.call_static_method(
+                cls,
+                "export",
+                "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;)V",
+                &[JValue::Object(act), JValue::Object(&path), JValue::Object(&name)],
+            )
+            .map(|_| ())
+        });
+    }
+
+    fn pick_import(&self) {
+        self.with_class(BACKUP_CLASS, |env, act, cls| {
+            env.call_static_method(cls, "pickImport", "(Landroid/app/Activity;)V", &[JValue::Object(act)]).map(|_| ())
         });
     }
 
