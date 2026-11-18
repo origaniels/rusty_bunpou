@@ -1,5 +1,45 @@
 """N2 grammar points (original explanations; `ex` sentences are only used by the tests)."""
+import re
+
 from grammar_n4 import _volitional
+
+# nouns for people (or groups / pets), for points that take someone's point of view
+PEOPLE = {"親", "両親", "子供", "子ども", "子", "母", "父", "母親", "父親", "彼", "彼女", "私", "僕", "俺", "先生",
+          "学生", "生徒", "客", "お客", "人", "夫", "妻", "主人", "社員", "会社", "店", "犬", "猫", "大人", "若者",
+          "老人", "日本人", "外国人", "相手", "本人", "家族", "息子", "娘", "兄", "姉", "弟", "妹", "友達", "友人",
+          "上司", "部下", "患者", "医者", "選手", "読者", "消費者", "市民", "国民", "政府", "女性", "男性", "あなた"}
+
+
+def _literal_ataru(t, i, k):
+    """当たる in its own senses: be hit by (流れ弾に当たって), be exposed to (風に当たる), handle (任務に
+    あたっている), ask (ジェーンにあたってみる)."""
+    if i > 0 and t[i - 1].lemma in ("火", "日", "日光", "髪", "顔", "頭", "体", "ボール", "風", "雨", "霧", "夜霧",
+                                     "雪", "弾", "流れ弾", "光", "日差し", "任務", "任", "事件"):
+        return True
+    rest = "".join(x.s for x in t[k:])
+    return bool(re.match(r"(?:い|み|く|もら|貰|しま)", rest))
+
+
+PLACES = {"空", "飛行機", "宇宙", "遠く", "上", "窓", "山", "外", "下", "横", "遠方", "船", "ここ", "そこ",
+          "あそこ", "丘", "屋上", "塔", "月"}
+
+
+def _seen_from_a_place(t, i, k):
+    """から見ると is only "from the viewpoint of" after a person or a viewpoint word (観点, 立場 ...);
+    空から見ると / 飛行機から見ると are literally "seen from up there"."""
+    if not any(x.lemma == "見る" for x in t[i:k]):
+        return False
+    return not (i > 0 and (is_person(t[i - 1]) or t[i - 1].lemma in ("観点", "見地", "立場", "目", "視点")))
+
+
+def is_person(t):
+    """Token naming a person or group: 子供, 田中さん, 私たち, a proper noun, a personal pronoun."""
+    if t.lemma in PEOPLE or t.s in PEOPLE or t.p2 == "固有名詞":
+        return True
+    if t.s.endswith(("さん", "たち", "達", "側", "ら")) or t.lemma in ("さん", "たち", "達", "側"):
+        return True
+    return t.p1 == "代名詞" and t.s not in ("何", "なに", "なん", "誰", "だれ", "どれ", "これ", "それ", "あれ",
+                                          "ここ", "そこ", "あそこ", "どこ")
 from patterns import ARU, NARU, SURU, first_lemma, first_pos, point, prev_is
 
 
@@ -52,18 +92,24 @@ P("ni_saishite", "〜に際して", "on the occasion of", "Noun / Verb + に際�
   r"に(?:際|さい)(?:して|し)", "出発に際して、皆さんに挨拶をしました。", after="nv")
 P("ni_atatte", "〜にあたって", "at the time of, when (starting)", "Noun / Verb + にあたって",
   """にあたって means "when undertaking (something important)": 開店にあたって準備をする.""",
-  r"に(?:あた|当た)(?:って|り)", "新しい生活を始めるにあたって、目標を立てました。", after="nv")
+  # not 火に当たる (warm oneself), 祖母にあたります (is my grandmother), 髪に当たって (hit)
+  r"に(?:あた|当た)(?:って|り)(?!ま)", "新しい生活を始めるにあたって、目標を立てました。", after="nv",
+  check=lambda t, i, k: not _literal_ataru(t, i, k),
+  neg=r"が[^、。]*に(?:あた|当た)って")
 P("to_sureba", "〜とすれば / 〜としたら", "if (we assume)", "Plain form + とすれば",
   """とすれば / とすると / としたら mean "assuming that": 明日行くとしたら、何時がいい? (if we go tomorrow, what
   time is good?).""",
-  r"と(?:すれば|すると|したら)", "明日行くとしたら、何時がいいですか。", after="any")
+  # not 別とすれば (apart from), ひょっとしたら (maybe), 〜ようとすれば (try to)
+  r"(?<!別)(?<!ひょっ)(?<!ひょ)(?<!よう)(?<!こう)(?<!そう)と(?:すれば|すると|したら)", "明日行くとしたら、何時がいいですか。",
+  after="any")
 P("to_naru_to", "〜となると", "when it comes to; if it becomes", "Noun / plain form + となると",
   """となると means "when it comes to / if it's the case that": 留学となると、お金がかかる.""",
   r"となると|となれば|となったら", "留学となると、お金がかかります。", after="any")
 P("to_ieba", "〜といえば", "speaking of", "Noun + といえば",
   """といえば picks up a topic just mentioned: 京都といえば、お寺が有名だ (speaking of Kyoto, it's famous for
   its temples).""",
-  r"と(?:いえ|言え)ば", "京都といえば、お寺が有名です。", after="any")
+  # not なんと言えば (how to say), どちらかと言えば (if anything), 私はと言えば
+  r"(?<!なん)(?<!何)(?<!どちらか)(?<!どっちか)(?<!は)と(?:いえ|言え)ば", "京都といえば、お寺が有名です。", after="any")
 P("kara_to_itte", "〜からといって", "just because", "Plain form + からといって",
   """からといって denies an easy conclusion: 高いからといって、いいものとは限らない (just because it's expensive
   doesn't mean it's good).""",
@@ -73,13 +119,15 @@ P("kara_koso", "〜からこそ", "precisely because", "Plain form + からこ�
   r"からこそ", "好きだからこそ、厳しく言うのです。", after="any")
 P("kara_suru_to", "〜からすると", "from the viewpoint of, judging from", "Noun + からすると / からすれば",
   """からすると means "judging from / from the standpoint of": 親からすると、子供はいつまでも子供だ.""",
-  r"から(?:すると|すれば|見ると|見れば|みると|みれば)", "あの様子からすると、何かあったようだ。", after="n")
+  r"から(?:すると|すれば|見ると|見れば|みると|みれば)", "あの様子からすると、何かあったようだ。", after="n",
+  check=lambda t, i, k: not _seen_from_a_place(t, i, k))
 P("kara_shite", "〜からして", "even (starting with); judging from", "Noun + からして",
   """からして means "to begin with even": 名前からして怪しい (even the name is suspicious).""",
-  r"からして", "あの店は名前からして怪しい。", after="n")
+  r"からして(?!もら|貰)", "あの店は名前からして怪しい。", after="n")  # 人からしてもらう
 P("ni_shitara", "〜にしたら", "from the standpoint of", "Noun (person) + にしたら / にすれば",
   """にしたら / にすれば take another person's point of view: 子供にしたら、つまらない話だろう.""",
-  r"に(?:したら|すれば|してみれば)", "子供にしたら、つまらない話でしょう。", after="n")
+  r"に(?:したら|すれば|してみれば)", "子供にしたら、つまらない話でしょう。", after="n",
+  check=lambda t, i, k: i > 0 and is_person(t[i - 1]))  # someone's point of view, not 〜にする
 P("nai_kagiri", "〜ない限り", "unless", "Verb (ない) + 限り",
   """ない限り (かぎり) means "unless": 謝らない限り許さない (I won't forgive you unless you apologize).""",
   r"ない(?:限|かぎ)り", "謝らない限り、許しません。", pre="va")

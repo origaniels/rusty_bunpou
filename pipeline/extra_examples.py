@@ -22,6 +22,14 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("歩いて行けないことはないが、遠いですよ。", "You could walk there, but it's far."),
     ],
     # ------------------------------------------------------------------ N2
+    "ni_shitara": [
+        ("親にしたら、子供はいつまでも子供だ。", "To parents, a child is always a child."),
+        ("子供にしたら、毎日塾に通うのはつらいだろう。", "For a child, going to cram school every day must be hard."),
+        ("彼女にしてみれば、突然の話で驚いたはずだ。", "From her point of view, it came out of nowhere: she must have been shocked."),
+        ("お客さんにしたら、待たされるのは嫌なものだ。", "From the customer's side, nobody likes being kept waiting."),
+        ("先生にすれば、生徒の成長が一番うれしいのだろう。", "For a teacher, seeing students grow is probably the greatest joy."),
+        ("犬にしたら、毎日同じ散歩コースは退屈かもしれない。", "For the dog, the same walk every day might be boring."),
+    ],
     "ageku": [
         ("さんざん待たされたあげく、会議は中止になった。", "After being kept waiting for ages, the meeting was cancelled."),
         ("悩んだあげく、彼は会社を辞めた。", "After agonizing over it, he quit the company."),
