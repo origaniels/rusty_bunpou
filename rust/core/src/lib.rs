@@ -1,6 +1,7 @@
 //! Platform-independent core of the grammar SRS: content, kana input, FSRS scheduling,
 //! progress storage, quiz sessions and furigana layout.
 
+pub mod chart;
 pub mod clock;
 pub mod content;
 pub mod fsrs;
