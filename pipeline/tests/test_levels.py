@@ -73,6 +73,8 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("o_ni_naru", "いろいろお世話になりました。"),  # set phrase
+    ("noni", "あなたの家を見つけるのに、何の苦労もありませんでしたよ。"),  # purpose のに
     ("koto_ga_aru_some", "明日は特に何もすることがありません。"),  # こと = thing to do
     ("koto_ga_aru_some", "実はお願いしたいことがありまして。"),
     ("koto_ga_aru_some", "なにか私にできることがありましたらお知らせ下さい。"),

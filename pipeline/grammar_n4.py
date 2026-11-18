@@ -263,7 +263,8 @@ P("kenjougo_verbs", "Humble verbs (謙譲語)", "(humble verbs)", "参る, 申�
   "明日、そちらに伺います。", tail=True, check=lambda t, i, k: t[i].p1 == "動詞" or t[i].lemma == "拝見")
 P("o_ni_naru", "お〜になる", "(honorific action)", "お + Verb stem + になる",
   """お + verb stem + になる makes most verbs honorific: お帰りになる (go home), お待ちになる (wait).""",
-  r"お[^、。]{1,4}?に" + NARU, "社長はもうお帰りになりました。", tail=True, check=first_pos("接頭辞"))
+  # お世話になる (be indebted) is a set phrase, not honorific お〜になる
+  r"お(?!世話)[^、。]{1,4}?に" + NARU, "社長はもうお帰りになりました。", tail=True, check=first_pos("接頭辞"))
 P("o_suru", "お〜する", "(humble action)", "お + Verb stem + する",
   """お + verb stem + する humbly describes what you do for someone: お持ちします (let me carry it),
   ご案内します (I'll show you around; ご for Sino-Japanese words).""",
@@ -332,7 +333,7 @@ P("ga_suru", "〜がする", "(I) sense, there's a smell/sound/taste", "Noun + �
   r"(?:匂い|におい|臭い|音|声|味|感じ)が" + SURU, "台所からいい匂いがします。", tail=True)
 
 # ---------------------------------------------------------------- reason / purpose / contrast
-_PURPOSE_TAIL = r"、[^。]*?(?:かか(?!わら)|要る|要り|いくら|十分|遅すぎ|必要|便利)"
+_PURPOSE_TAIL = r"、[^。]*?(?:かか(?!わら)|要る|要り|いくら|十分|遅すぎ|必要|便利|苦労|手間)"
 
 
 def _purpose_after_comma(t, k):
