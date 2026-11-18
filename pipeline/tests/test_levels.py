@@ -73,6 +73,12 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("wo_moto_ni", "椅子を元に戻したいのですが。"),
+    ("wo_tooshite", "この報告書にざっと目を通していただけませんか。"),
+    ("wo_megutte", "お城を巡るのが趣味です。"),
+    ("wo_hajime", "彼女は夕食後すぐ宿題を始めた。"),
+    ("ni_kakete", "気にかけてくれてありがとう。"),
+    ("ni_mukete", "男は銃を警官に向けた。"),
     ("ni_kuwaete", "まず卵を強くかき混ぜそれをスープに加えます。"),
     ("ni_sotte", "本当にそう思います。"),
     ("ni_kuwaete", "僕もゲームに加えて下さい。"),

@@ -252,16 +252,21 @@ P("ni_motozuite", "〜に基づいて", "based on", "Noun + に基づいて",
   r"に(?:基|もと)づ(?:いて|いた|く|き)", "これは事実に基づいた話です。", after="n")
 P("wo_moto_ni", "〜をもとに", "based on (using as material)", "Noun + をもとに",
   """をもとに means "based on, using X as material": 経験をもとに小説を書いた (I wrote a novel based on my experience). Compare に基づいて, which means "in accordance with" rules or facts.""",
-  r"を(?:もと|基|元)に(?:して)?", "自分の経験をもとに小説を書いた。", after="n")
+  r"を(?:もと|基|元)に(?!戻|もど)(?:して)?", "自分の経験をもとに小説を書いた。", after="n")  # 元に戻す = put back
 P("wo_tooshite", "〜を通して / 〜を通じて", "through, via; throughout", "Noun + を通して",
   """を通して (とおして) / を通じて (つうじて) mean "through (a means)" or "throughout (a period)".""",
-  r"を(?:通|とお|つう)(?:して|じて|じ)", "友人を通して彼と知り合いました。", after="n")
+  r"を(?:通|とお|つう)(?:して|じて|じ)(?!させ)", "友人を通して彼と知り合いました。", after="n",
+  check=lambda t, i, k: not (i > 0 and t[i - 1].s in ("目", "手", "袖", "糸", "針", "声")))  # 目を通す (look over)
 P("wo_megutte", "〜をめぐって", "concerning (a dispute)", "Noun + をめぐって",
   """をめぐって means "over / around (an issue people argue about)": 遺産をめぐって争う.""",
-  r"を(?:めぐ|巡)(?:って|る)", "遺産をめぐって、兄弟が争っている。", after="n")
+  r"を(?:めぐ|巡)(?:って|る)", "遺産をめぐって、兄弟が争っている。", after="n",
+  # literally going around: 城を巡る (tour), 地球をめぐる (orbit)
+  check=lambda t, i, k: not (i > 0 and t[i - 1].lemma in ("城", "お城", "地球", "太陽", "月", "世界", "各地", "名所",
+                                                          "寺", "お寺", "島", "国々", "町", "池", "公園", "温泉")))
 P("wo_hajime", "〜をはじめ", "starting with, including", "Noun + をはじめ",
   """をはじめ means "beginning with (as the main example)": 社長をはじめ、社員全員が集まった.""",
-  r"を(?:はじめ|始め)(?:として|とする)?", "社長をはじめ、社員全員が集まった。", after="n")
+  # "starting with X" is followed by a comma / として / とする; otherwise it's the verb 始める
+  r"を(?:はじめ|始め)(?:として|とする|(?=、))", "社長をはじめ、社員全員が集まった。", after="n")
 P("ni_hanshite", "〜に反して", "contrary to", "Noun + に反して",
   """に反して (はんして) means "contrary to, against": 予想に反して、試合に負けた (contrary to expectations, we lost the game). It is used with expectations, wishes or rules; before a noun it becomes に反する.""",
   r"に(?:反|はん)(?:して|し|する)", "予想に反して、試合に負けた。", after="n")
@@ -273,13 +278,18 @@ P("ni_watatte", "〜にわたって", "over, throughout (a range)", "Noun + に�
   r"に(?:わた|渡)(?:って|り|る)", "三日間にわたって会議が開かれた。", after="n")
 P("ni_kakete", "〜にかけて", "through, over (from ... to)", "Noun + にかけて",
   """から〜にかけて means "from ... through ..." for a stretch of time or space with fuzzy edges: 夜から朝にかけて雨が降る (it will rain from night into the morning). Compare から〜まで, which has clear end points.""",
-  r"にかけて(?:は)?", "夜から朝にかけて雨が降るでしょう。", after="n")
+  # から〜にかけて; not 気にかける (care), 鼻にかける (boast), 死にかける (be dying)
+  r"にかけて(?:は)?", "夜から朝にかけて雨が降るでしょう。", after="n",
+  check=lambda t, i, k: not (i > 0 and t[i - 1].s in ("気", "鼻", "死", "心", "手", "遅く", "電話", "秤", "天秤")))
 P("ni_oite", "〜において", "in, at (formal)", "Noun + において",
   """において is a formal で: 会議は大阪において行われる (the conference will be held in Osaka).""",
   r"において|における|においては", "会議は東京において行われます。", after="n")
 P("ni_mukete", "〜に向けて", "toward, for", "Noun + に向けて",
   """に向けて (むけて) means "toward (a goal or target)": 試験に向けて勉強している (I'm studying for the exam). It can also mean "aimed at" people: 若者に向けたメッセージ (a message for young people).""",
-  r"に(?:向|む)け(?:て)?", "来月の試験に向けて勉強しています。", after="n")
+  r"に(?:向|む)け(?!ら)(?:て)?", "来月の試験に向けて勉強しています。", after="n",
+  # pointing something at: 銃を警官に向けた, 顔はこっちに向けて
+  check=lambda t, i, k: "を" not in "".join(x.s for x in t[:i]).split("、")[-1]
+  and not (i > 0 and t[i - 1].s in ("こっち", "そっち", "あっち", "こちら", "そちら", "あちら", "私", "僕", "上", "下")))
 P("wo_kikkake_ni", "〜をきっかけに", "taking ... as a chance", "Noun + をきっかけに",
   """をきっかけに means "with X as the trigger / taking X as the occasion": 留学をきっかけに料理を始めた (studying abroad got me into cooking). を契機に and を機に are more formal variants.""",
   r"を(?:きっかけ|契機|機)に(?:して)?", "留学をきっかけに、料理を始めました。", after="any")
