@@ -71,6 +71,11 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("tara_dou", "明日雨が降ったらどうしようか。"),  # what shall we do if
+    ("tara_dou", "失敗したらどうなるんですか。"),  # what happens if
+    ("tara_dou", "それ自分がされたらどう思う？"),  # how would you feel if
+    ("te_aru", "オーストラリアの学校にも運動会ってあるんですか？"),  # 運動会って, not てある
+    ("cha_ikenai", "なんで僕がやらなくちゃいけないの。"),  # なくちゃ = must
     ("deshita", "私のことでしたらご心配なく。"),
     ("de_are", "必要であれば、明日来ますよ。"),             # conditional であれば
     ("ni_shiro", "捕まらないようにしろよ。"),                # imperative of する

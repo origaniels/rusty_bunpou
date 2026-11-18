@@ -72,7 +72,8 @@ P("ba_yokatta", "〜ばよかった", "should have, I wish I had", "Verb (ば-fo
   r"ば(?:よかった|良かった)", "もっと勉強すればよかった。", pre="va")
 P("tara_dou", "〜たらどう", "why don't you ...?", "Verb (た-form) + らどう(ですか)",
   """たらどう(ですか) is a friendly suggestion: 医者に行ったらどうですか (why don't you see a doctor?).""",
-  r"(?:た|だ)らどう", "少し休んだらどうですか。", pre="v")
+  # not たらどうする / どうなる / どうしよう (what to do / what happens if ...)
+  r"(?:た|だ)らどう(?![しすなや思])", "少し休んだらどうですか。", pre="v")
 
 # ---------------------------------------------------------------- appearance / hearsay / guessing
 P("sou_look", "〜そう (looks like)", "looks like, seems about to", "Verb stem / adj stem + そう",
@@ -155,7 +156,9 @@ P("te_oku", "〜ておく", "do in advance", "Verb (て-form) + おく",
 P("te_aru", "〜てある", "has been done (state)", "Transitive verb (て-form) + ある",
   """てある describes the state left by someone's deliberate action: 窓が開けてある (the window has been
   opened, and is open). The object usually takes が.""",
-  r"[てで]" + ARU, "壁に絵がかけてあります。", pre="v", tail=True, check=first_lemma("て"))
+  r"[てで]" + ARU, "壁に絵がかけてあります。", pre="v", tail=True,
+  # 会う is intransitive: 会ってある only comes from 運動会って being split as 運動 + 会っ + て
+  check=lambda toks, i, k: toks[i].lemma == "て" and not (i > 0 and toks[i - 1].lemma == "会う"))
 P("te_iku", "〜ていく", "go on doing; change from now on", "Verb (て-form) + いく",
   """ていく shows movement or change continuing away from now: これから寒くなっていく
   (it will keep getting colder). Also literal: 持っていく (take something along).""",
@@ -216,7 +219,8 @@ P("temo_kamawanai", "〜てもかまわない", "it's fine if, don't mind", "Ver
   r"[てで]も(?:かま|構)(?:わない|わず|わん|いません)", "ここに座ってもかまいませんか。", pre="va")
 P("cha_ikenai", "〜ちゃいけない", "mustn't (casual)", "Verb (て-form → ちゃ/じゃ) + いけない",
   """ちゃいけない / じゃいけない are the casual contraction of てはいけない: 触っちゃだめ (don't touch!).""",
-  r"(?:ちゃ|じゃ)(?:いけ|だめ|ダメ)", "ここで泳いじゃいけないよ。", pre="v")
+  # なくちゃいけない is "must" (なくてはいけない), not "mustn't"
+  r"(?<!なく)(?:ちゃ|じゃ)(?:いけ|だめ|ダメ)", "ここで泳いじゃいけないよ。", pre="v")
 
 # ---------------------------------------------------------------- potential / passive / causative
 P("potential", "Potential form", "can, be able to", "Verb (potential form)",
