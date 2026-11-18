@@ -545,12 +545,13 @@ export component AppWindow inherits Window {
                                 HorizontalLayout {
                                     for i in 6: VerticalLayout {
                                         horizontal-stretch: 1;
-                                        Text { text: pie.counts[i]; font-size: 18px; font-weight: 700; color: Theme.fg; horizontal-alignment: center; }
+                                        // the color dot sits by the number so the stage name gets the whole column
                                         HorizontalLayout {
-                                            alignment: center; spacing: 4px;
+                                            alignment: center; spacing: 5px;
                                             Rectangle { width: 8px; height: 8px; y: (parent.height - self.height) / 2; border-radius: 4px; background: root.stage-colors[i]; }
-                                            Text { text: [@tr("New"), @tr("Beginner"), @tr("Adept"), @tr("Seasoned"), @tr("Expert"), @tr("Mastered")][i]; font-size: 11px; color: Theme.muted; }
+                                            Text { text: pie.counts[i]; font-size: 18px; font-weight: 700; color: Theme.fg; }
                                         }
+                                        Text { text: [@tr("New"), @tr("Beginner"), @tr("Adept"), @tr("Seasoned"), @tr("Expert"), @tr("Mastered")][i]; font-size: 11px; color: Theme.muted; horizontal-alignment: center; }
                                     }
                                 }
                             }
