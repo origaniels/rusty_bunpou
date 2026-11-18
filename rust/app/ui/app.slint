@@ -114,18 +114,18 @@ component Btn inherits Rectangle {
     in property <bool> primary;
     in property <bool> enabled: true;
     callback clicked();
-    min-height: 48px;
-    preferred-height: 48px;
-    min-width: label.preferred-width + 36px;
-    preferred-width: label.preferred-width + 36px;
-    border-radius: 24px;
+    min-height: 44px;
+    preferred-height: 44px;
+    min-width: label.preferred-width + 32px;
+    preferred-width: label.preferred-width + 32px;
+    border-radius: 12px;
     background: !enabled ? (primary ? #3a3846 : transparent)
         : primary ? (ta.pressed ? Theme.accent.darker(0.25) : Theme.accent)
         : (ta.pressed ? #ffffff1c : transparent);
     border-width: primary ? 0px : 1px;
-    border-color: enabled ? #77748a : #4a4658;
+    border-color: enabled ? #5c596c : #3e3b4a;
     label := Text {
-        text: root.text; font-size: 16px; font-weight: 600;
+        text: root.text; font-size: 15px; font-weight: 600;
         color: !root.enabled ? #77748a : root.primary ? #2a0f0b : Theme.fg;
     }
     ta := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
@@ -133,6 +133,107 @@ component Btn inherits Rectangle {
     accessible-label: root.text;
     accessible-enabled: root.enabled;
     accessible-action-default => { if (root.enabled) { root.clicked(); } }
+}
+
+// line icon drawn from SVG path data (24×24 viewbox, stroked)
+component Icon inherits Path {
+    in property <string> d;
+    width: 24px; height: 24px;
+    viewbox-width: 24; viewbox-height: 24;
+    commands: d;
+    fill: transparent;
+    stroke-width: 2px;
+}
+
+// compact "‹" back button
+component BackBtn inherits Rectangle {
+    callback clicked();
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: ta.pressed ? #ffffff1c : transparent;
+    Icon { d: "M 15 5 L 8 12 L 15 19"; stroke: Theme.fg; x: 8px; y: 8px; }
+    ta := TouchArea { clicked => { root.clicked(); } }
+    accessible-role: button;
+    accessible-label: @tr("‹ Back");
+    accessible-action-default => { root.clicked(); }
+}
+
+// one row of mutually exclusive choices (3 / 5 / 10, N5 … N1, English / Français)
+component Segmented inherits Rectangle {
+    in property <[string]> options;
+    in property <int> selected;
+    callback picked(int);
+    height: 40px;
+    border-radius: 12px;
+    background: Theme.card;
+    HorizontalLayout {
+        padding: 3px; spacing: 3px;
+        for o[i] in root.options: Rectangle {
+            horizontal-stretch: 1;
+            border-radius: 9px;
+            background: i == root.selected ? Theme.accent : (t.pressed ? #ffffff14 : transparent);
+            Text {
+                text: o; font-size: 15px; font-weight: 600;
+                color: i == root.selected ? #2a0f0b : Theme.fg;
+                horizontal-alignment: center; vertical-alignment: center;
+            }
+            t := TouchArea { clicked => { root.picked(i); } }
+            accessible-role: button;
+            accessible-label: o;
+            accessible-action-default => { root.picked(i); }
+        }
+    }
+}
+
+// bottom menu bar: Home / Grammar / Stats / Settings
+component NavItem inherits Rectangle {
+    in property <string> label;
+    in property <string> name; // accessible label (kept stable for tests)
+    in property <string> d;
+    in property <bool> active;
+    callback clicked();
+    horizontal-stretch: 1;
+    VerticalLayout {
+        padding-top: 8px; padding-bottom: 8px; spacing: 4px; alignment: center;
+        HorizontalLayout {
+            alignment: center;
+            Rectangle {
+                width: 56px; height: 30px; border-radius: 15px;
+                background: root.active ? Theme.accent.with-alpha(0.22) : (ta.pressed ? #ffffff14 : transparent);
+                Icon { d: root.d; stroke: root.active ? Theme.accent : Theme.muted; x: 16px; y: 3px; }
+            }
+        }
+        Text {
+            text: root.label; font-size: 12px; font-weight: root.active ? 700 : 500;
+            color: root.active ? Theme.fg : Theme.muted; horizontal-alignment: center;
+        }
+    }
+    ta := TouchArea { clicked => { root.clicked(); } }
+    accessible-role: button;
+    accessible-label: root.name;
+    accessible-action-default => { root.clicked(); }
+}
+
+component NavBar inherits Rectangle {
+    in property <int> current; // screen id
+    in property <length> inset; // bottom safe area (gesture bar)
+    callback home();
+    callback grammar();
+    callback stats();
+    callback settings();
+    background: #1c1a22;
+    Rectangle { y: 0; height: 1px; background: #2e2c36; }
+    HorizontalLayout {
+        padding-left: 8px; padding-right: 8px; padding-bottom: root.inset;
+        NavItem { label: @tr("Home"); name: @tr("Home"); active: root.current == 0; clicked => { root.home(); }
+            d: "M 4 11 L 12 4 L 20 11 M 6 9.5 L 6 20 L 18 20 L 18 9.5 M 10 20 L 10 14 L 14 14 L 14 20"; }
+        NavItem { label: @tr("Grammar"); name: @tr("Grammar list"); active: root.current == 3 || root.current == 4; clicked => { root.grammar(); }
+            d: "M 5 4 L 15 4 L 19 8 L 19 20 L 5 20 Z M 8 10 L 16 10 M 8 13.5 L 16 13.5 M 8 17 L 13 17"; }
+        NavItem { label: @tr("Stats"); name: @tr("Stats"); active: root.current == 6; clicked => { root.stats(); }
+            d: "M 4 20 L 20 20 M 7 20 L 7 13 M 12 20 L 12 6 M 17 20 L 17 10"; }
+        NavItem { label: @tr("Settings"); name: @tr("Settings"); active: root.current == 5; clicked => { root.settings(); }
+            d: "M 4 7 L 20 7 M 4 17 L 20 17 M 9 4.5 L 9 9.5 M 15 14.5 L 15 19.5"; }
+    }
 }
 
 component ToggleRow {
@@ -167,9 +268,9 @@ component TopBar {
     callback back();
     preferred-height: 56px;
     HorizontalLayout {
-        padding-left: 4px; padding-right: 12px; spacing: 8px;
-        if show-back: Btn { text: @tr("‹ Back"); horizontal-stretch: 0; clicked => { root.back(); } }
-        Text { text: root.title; font-size: 22px; color: Theme.fg; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+        padding-left: root.show-back ? 8px : 20px; padding-right: 16px; spacing: 6px;
+        if show-back: VerticalLayout { alignment: center; BackBtn { clicked => { root.back(); } } }
+        Text { text: root.title; font-size: 21px; font-weight: 600; color: Theme.fg; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
     }
 }
 
@@ -292,6 +393,7 @@ export component AppWindow inherits Window {
     /// Rust bumps this to move keyboard focus into the answer field.
     in property <int> focus-tick;
 
+    property <bool> tab-screen: root.screen == 0 || root.screen == 3 || root.screen == 4 || root.screen == 5 || root.screen == 6;
     property <length> kb-height: self.virtual-keyboard-size.height > 0 ? max(0px, self.height - self.virtual-keyboard-position.y) : 0px;
 
     // the root scope owns keyboard focus outside the quiz so it receives the Android Back key
@@ -312,7 +414,8 @@ export component AppWindow inherits Window {
         VerticalLayout {
             x: 0; y: 0; width: root.width; height: root.height;
             padding-top: root.safe-area-insets.top;
-            padding-bottom: max(root.safe-area-insets.bottom, root.kb-height);
+            // on tab screens the menu bar reaches the bottom edge and pads itself
+            padding-bottom: root.tab-screen ? 0px : max(root.safe-area-insets.bottom, root.kb-height);
             padding-left: root.safe-area-insets.left;
             padding-right: root.safe-area-insets.right;
 
@@ -346,12 +449,6 @@ export component AppWindow inherits Window {
                         if root.home.next-titles != "": Text { text: @tr("Next: {}", root.home.next-titles); font-size: 14px; color: Theme.muted; wrap: word-wrap; }
                         Btn { text: root.home.learn-label; primary: true; enabled: root.home.new-count > 0; clicked => { root.start-learn(); } }
                     }
-                }
-                HorizontalLayout {
-                    spacing: 12px;
-                    Btn { text: @tr("Grammar list"); clicked => { root.open-list(); } }
-                    Btn { text: @tr("Stats"); clicked => { root.open-stats(); } }
-                    Btn { text: @tr("Settings"); clicked => { root.open-settings(); } }
                 }
                 Text { text: @tr("Example sentences: {}", root.home.source); font-size: 12px; color: Theme.muted; wrap: word-wrap; }
             }
@@ -409,13 +506,17 @@ export component AppWindow inherits Window {
                         }
                         Text { text: @tr("Answer: {}", root.quiz.answer); font-size: 18px; color: Theme.fg; wrap: word-wrap; }
                         Text { text: root.quiz.grammar-line; color: Theme.fg; wrap: word-wrap; }
-                        HorizontalLayout {
-                            spacing: 8px; alignment: start;
-                            Btn { text: @tr("Grammar notes"); clicked => { answer.clear-focus(); root.open-notes(); } }
-                            if root.quiz.verdict == 2: Btn { text: @tr("Typo"); clicked => { root.quiz-typo(); } }
-                            if root.quiz.verdict == 2: Btn { text: @tr("Retry"); clicked => { root.quiz-retry(); answer.focus(); } }
+                        // two rows so long (French) labels never run off the screen
+                        if root.quiz.verdict == 2: HorizontalLayout {
+                            spacing: 8px;
+                            Btn { text: @tr("Typo"); horizontal-stretch: 1; clicked => { root.quiz-typo(); } }
+                            Btn { text: @tr("Retry"); horizontal-stretch: 1; clicked => { root.quiz-retry(); answer.focus(); } }
                         }
-                        Text { text: root.quiz.attribution; font-size: 12px; color: Theme.muted; }
+                        HorizontalLayout {
+                            alignment: start;
+                            Btn { text: @tr("Grammar notes"); clicked => { answer.clear-focus(); root.open-notes(); } }
+                        }
+                        Text { text: root.quiz.attribution; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
                     }
                 }
                 HorizontalLayout {
@@ -444,7 +545,7 @@ export component AppWindow inherits Window {
 
             // ---------------------------------------------------------- grammar list
             if root.screen == 3: VerticalLayout {
-                TopBar { title: @tr("Grammar"); back => { root.go-back(); } }
+                TopBar { title: @tr("Grammar"); show-back: false; }
                 ListView {
                     vertical-stretch: 1;
                     for item in root.grammar-list: TouchArea {
@@ -494,7 +595,7 @@ export component AppWindow inherits Window {
 
             // ---------------------------------------------------------- stats
             if root.screen == 6: VerticalLayout {
-                TopBar { title: @tr("Stats"); back => { root.go-back(); } }
+                TopBar { title: @tr("Stats"); show-back: false; }
                 Scroller {
                     vertical-stretch: 1;
                     Card {
@@ -563,38 +664,30 @@ export component AppWindow inherits Window {
 
             // ---------------------------------------------------------- settings
             if root.screen == 5: VerticalLayout {
-                TopBar { title: @tr("Settings"); back => { root.go-back(); } }
+                TopBar { title: @tr("Settings"); show-back: false; }
                 Scroller {
                     vertical-stretch: 1;
                     Text { text: @tr("Language"); font-size: 17px; color: Theme.fg; }
-                    HorizontalLayout {
-                        spacing: 8px; alignment: start;
-                        // language names are never translated
-                        for name[i] in ["English", "Français"]: Btn { text: name; primary: root.language-index == i; clicked => { root.set-language(i); } }
-                    }
+                    // language names are never translated
+                    Segmented { options: ["English", "Français"]; selected: root.language-index; picked(i) => { root.set-language(i); } }
                     ToggleRow { text: @tr("Furigana (readings above kanji)"); checked: root.furigana; toggled(v) => { root.set-furigana(v); } }
                     ToggleRow { text: @tr("Show the translation before answering"); checked: root.english; toggled(v) => { root.set-english(v); } }
                     ToggleRow { text: @tr("Convert romaji to kana"); checked: root.romaji; toggled(v) => { root.set-romaji(v); } }
                     ToggleRow { text: @tr("Remind me when reviews are due"); checked: root.notifications; toggled(v) => { root.set-notifications(v); } }
                     Text { text: @tr("New points per lesson"); font-size: 17px; color: Theme.fg; }
-                    HorizontalLayout {
-                        spacing: 8px; alignment: start;
-                        for n in [3, 5, 10]: Btn { text: n; primary: root.batch-size == n; clicked => { root.set-batch(n); } }
+                    Segmented {
+                        options: ["3", "5", "10"];
+                        selected: root.batch-size == 3 ? 0 : root.batch-size == 10 ? 2 : 1;
+                        picked(i) => { root.set-batch([3, 5, 10][i]); }
                     }
                     Text { text: @tr("Start lessons at"); font-size: 17px; color: Theme.fg; }
-                    HorizontalLayout {
-                        spacing: 8px; alignment: start;
-                        for name[i] in ["N5", "N4", "N3", "N2", "N1"]: Btn { text: name; primary: root.start-level-index == i; clicked => { root.set-start-level(i); } }
-                    }
+                    Segmented { options: ["N5", "N4", "N3", "N2", "N1"]; selected: root.start-level-index; picked(i) => { root.set-start-level(i); } }
                     Text {
                         text: @tr("Lessons teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again.");
                         font-size: 13px; color: Theme.muted; wrap: word-wrap;
                     }
                     Text { text: @tr("Target retention (FSRS)"); font-size: 17px; color: Theme.fg; }
-                    HorizontalLayout {
-                        spacing: 8px; alignment: start;
-                        for label[i] in ["85%", "90%", "95%"]: Btn { text: label; primary: root.retention-index == i; clicked => { root.set-retention(i); } }
-                    }
+                    Segmented { options: ["85%", "90%", "95%"]; selected: root.retention-index; picked(i) => { root.set-retention(i); } }
                     Text { text: @tr("Higher retention = more frequent reviews. 90% is a good default."); font-size: 13px; color: Theme.muted; wrap: word-wrap; }
                     HorizontalLayout { alignment: start; Btn { text: @tr("Reset all progress"); clicked => { root.confirm-reset = true; } } }
                     Text {
@@ -602,6 +695,15 @@ export component AppWindow inherits Window {
                         font-size: 13px; color: Theme.muted; wrap: word-wrap;
                     }
                 }
+            }
+            if root.tab-screen: NavBar {
+                current: root.screen;
+                inset: root.safe-area-insets.bottom;
+                height: 64px + root.safe-area-insets.bottom;
+                home => { root.go-home(); }
+                grammar => { root.open-list(); }
+                stats => { root.open-stats(); }
+                settings => { root.open-settings(); }
             }
         }
 

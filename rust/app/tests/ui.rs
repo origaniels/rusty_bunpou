@@ -506,8 +506,9 @@ fn switching_to_french_translates_the_ui_and_is_remembered() {
     assert_eq!(t.app.state.borrow().progress.settings.language, "fr");
     assert_eq!(t.app.ui.get_language_index(), 1);
     // @tr strings come from the bundled .po, Rust-built ones from the app
-    assert!(t.exists("‹ Retour"), "Slint strings are translated");
-    assert!(!t.exists("‹ Back"));
+    // Slint strings (@tr) come from the bundled .po: the menu bar shows "Accueil"
+    assert!(t.exists("Accueil") && t.exists("Réglages"), "Slint strings are translated");
+    assert!(!t.exists("Home"));
     t.app.ui.invoke_go_home();
     assert!(t.exists("Réglages") && t.exists("Grammaire"));
     assert!(t.exists("Apprendre 5 nouveaux"), "Rust-built label is translated");
@@ -527,7 +528,7 @@ fn switching_to_french_translates_the_ui_and_is_remembered() {
     assert!(t.exists("Réglages"));
     t.press("Réglages");
     t.press("English");
-    assert!(t.exists("‹ Back") && !t.exists("‹ Retour"));
+    assert!(t.exists("Home") && !t.exists("Accueil"));
 }
 
 #[test]
@@ -571,3 +572,25 @@ fn every_ui_string_has_a_french_translation() {
     }
     assert!(missing.is_empty(), "no French for: {missing:?}");
 }
+
+#[test]
+fn menu_bar_switches_tabs_and_back_goes_home() {
+    let t = setup();
+    t.press("Stats");
+    assert_eq!(t.screen(), SCREEN_STATS);
+    t.press("Settings");
+    assert_eq!(t.screen(), SCREEN_SETTINGS);
+    t.press("Grammar list");
+    assert_eq!(t.screen(), SCREEN_LIST);
+    // a grammar point opens on top of the list; Back returns to the list, then home
+    t.press("だ");
+    assert_eq!(t.screen(), SCREEN_DETAIL);
+    assert!(t.app.ui.invoke_go_back());
+    assert_eq!(t.screen(), SCREEN_LIST);
+    assert!(t.app.ui.invoke_go_back());
+    assert_eq!(t.screen(), SCREEN_HOME, "tabs don't stack up history");
+    t.press("Settings");
+    t.press("Home");
+    assert_eq!(t.screen(), SCREEN_HOME);
+}
+

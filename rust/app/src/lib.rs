@@ -376,6 +376,9 @@ fn show(ui: &AppWindow, st: &mut State, screen: i32) {
     let cur = ui.get_screen();
     if screen == SCREEN_HOME {
         st.stack.clear();
+    } else if [SCREEN_LIST, SCREEN_STATS, SCREEN_SETTINGS].contains(&screen) {
+        // menu-bar tabs: switching tabs doesn't pile up history, Back goes home
+        st.stack = vec![SCREEN_HOME];
     } else if cur != screen {
         st.stack.push(cur);
     }
