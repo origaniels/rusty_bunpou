@@ -73,7 +73,7 @@ launch
 
 echo "== settings: 3 points per lesson (だ, です, でした: one possible answer each)"
 tap 853 1458; wait_ev '^screen=5'              # Settings (fresh home: no "next review" line)
-tap 112 964                                    # "3"
+tap 112 1248                                    # "3"
 $A shell input keyevent 4; wait_ev '^screen=0 back'
 echo "== lesson"
 tap 524 1217                                   # Learn 3 new
