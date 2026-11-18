@@ -30,6 +30,14 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("安いと思って買ったばかりに、すぐ壊れて損をした。", "Just because I bought it thinking it was cheap, it broke right away and I lost out."),
         ("彼の言葉を信じたばかりに、ひどい目にあった。", "Just because I believed what he said, I had a terrible time."),
     ],
+    "wo_hajime": [
+        ("社長をはじめ、社員全員がパーティーに参加した。", "Everyone in the company, starting with the president, came to the party."),
+        ("東京をはじめ、日本の大都市はどこも物価が高い。", "Big Japanese cities, Tokyo first among them, are all expensive."),
+        ("寿司をはじめとする日本料理は海外でも人気だ。", "Japanese food, sushi above all, is popular abroad too."),
+        ("両親をはじめ、多くの人に助けてもらった。", "Many people helped me, my parents first of all."),
+        ("校長先生をはじめとして、先生方が全員集まった。", "All the teachers gathered, starting with the principal."),
+        ("京都をはじめ、奈良や大阪にも行った。", "I went to Kyoto, and also to Nara and Osaka."),
+    ],
     "ni_shitara": [
         ("親にしたら、子供はいつまでも子供だ。", "To parents, a child is always a child."),
         ("子供にしたら、毎日塾に通うのはつらいだろう。", "For a child, going to cram school every day must be hard."),
