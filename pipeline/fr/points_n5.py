@@ -513,6 +513,7 @@ FR = {
         meaning="appelé, nommé",
         structure="Nom propre + という + Nom",
         explanation="""X という Y signifie « un Y appelé X » : 田中という人 (une personne qui s'appelle
-        Tanaka), 「こころ」という本 (un livre intitulé « Kokoro »).""",
+        Tanaka), 「こころ」という本 (un livre intitulé « Kokoro »). Il relie aussi toute une phrase à
+        un nom qui la résume : 結婚したといううわさ (la rumeur selon laquelle elle s'est mariée).""",
     ),
 }
