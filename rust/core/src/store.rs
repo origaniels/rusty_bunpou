@@ -17,6 +17,9 @@ pub struct Card {
     pub lapses: u32,
     pub step: u32,
     pub last_sentence: u64,
+    /// when the point was (re)learned in a lesson; 0 in files from before this was recorded
+    #[serde(default)]
+    pub learned_at: i64,
 }
 
 impl Card {
@@ -230,6 +233,9 @@ pub mod scheduler {
             last_sentence: sentence,
             ..card.clone()
         };
+        if card.is_new() {
+            c.learned_at = now;
+        }
         if !correct {
             if card.state == 2 {
                 c.lapses += 1;

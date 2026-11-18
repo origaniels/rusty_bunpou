@@ -11,4 +11,5 @@ pub mod layout;
 pub mod lessons;
 pub mod reminder;
 pub mod session;
+pub mod stats;
 pub mod store;
