@@ -111,6 +111,14 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("彼がそう言うなら、よほど困っているのだろう。", "If he says so, he must be in real trouble."),
     ],
     # ------------------------------------------------------------------ N1
+    "katawara": [
+        ("彼は会社に勤めるかたわら、小説を書いている。", "Alongside his office job, he writes novels."),
+        ("彼女は大学で教えるかたわら、翻訳の仕事もしている。", "Besides teaching at a university, she also works as a translator."),
+        ("母は家事のかたわら、絵を描いている。", "My mother paints alongside her housework."),
+        ("彼は仕事のかたわら、ボランティア活動を続けている。", "On top of his job, he keeps doing volunteer work."),
+        ("学生たちは勉強のかたわら、アルバイトをしている。", "The students have part-time jobs alongside their studies."),
+        ("父は農業を営むかたわら、町の議員も務めている。", "Besides running the farm, my father also serves on the town council."),
+    ],
     "atte_no": [
         ("健康あっての人生だ。", "Life is only worth living if you have your health."),
         ("家族の支えあっての今の私です。", "I am who I am today only thanks to my family's support."),
