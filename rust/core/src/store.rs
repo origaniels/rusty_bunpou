@@ -80,12 +80,33 @@ pub struct LogEntry {
     pub answer: String,
 }
 
+/// A problem the user noticed with a sentence, to be fixed in the content later.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Report {
+    pub point: String,
+    pub sentence: u64,
+    pub ts: i64,
+    /// one of [`REPORT_REASONS`]
+    pub reason: String,
+    pub note: String,
+    /// what the user typed, if they were answering
+    pub answer: String,
+    /// UI language at the time (which translation they saw)
+    pub lang: String,
+}
+
+/// Report reasons, in the order the app shows them.
+pub const REPORT_REASONS: [&str; 5] = ["wrong-grammar", "translation", "reading", "answer-rejected", "other"];
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Progress {
     pub cards: HashMap<String, Card>,
     pub settings: Settings,
     pub log: Vec<LogEntry>,
+    /// sentence reports, kept across resets and merged on import
+    pub reports: Vec<Report>,
     #[serde(skip)]
     path: Option<PathBuf>,
 }
@@ -148,6 +169,12 @@ impl Progress {
         self.cards = new.cards;
         self.settings = new.settings;
         self.log = new.log;
+        for r in new.reports {
+            if !self.reports.contains(&r) {
+                self.reports.push(r);
+            }
+        }
+        self.reports.sort_by_key(|r| r.ts);
         self.save();
         Ok(self.cards.values().filter(|c| !c.is_new()).count())
     }
@@ -163,6 +190,11 @@ impl Progress {
     pub fn reset_all(&mut self) {
         self.cards.clear();
         self.log.clear();
+        self.save();
+    }
+
+    pub fn add_report(&mut self, report: Report) {
+        self.reports.push(report);
         self.save();
     }
 

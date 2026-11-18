@@ -134,3 +134,25 @@ fn import_rejects_files_that_are_not_progress() {
     }
     assert_eq!(p.settings.batch_size, 10, "nothing changed");
 }
+
+#[test]
+fn reports_survive_reset_and_merge_on_import() {
+    use bunpo_core::store::Report;
+    let mut p = Progress::in_memory();
+    let mine = Report { point: "da".into(), sentence: 1, ts: 10, reason: "translation".into(), ..Default::default() };
+    p.add_report(mine.clone());
+    p.reset_all();
+    assert_eq!(p.reports, vec![mine.clone()], "resetting progress keeps reports");
+
+    let mut other = Progress::in_memory();
+    let theirs = Report { point: "desu".into(), sentence: 2, ts: 5, reason: "other".into(), note: "?".into(), ..Default::default() };
+    other.reports = vec![theirs.clone(), mine.clone()];
+    p.import(&serde_json::to_string(&other).unwrap()).unwrap();
+    assert_eq!(p.reports, vec![theirs, mine], "merged, no duplicates, oldest first");
+}
+
+#[test]
+fn old_progress_files_have_no_reports() {
+    let p: Progress = serde_json::from_str(r#"{"cards":{}}"#).unwrap();
+    assert!(p.reports.is_empty());
+}
