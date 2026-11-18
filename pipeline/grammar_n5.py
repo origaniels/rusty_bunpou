@@ -325,7 +325,9 @@ so on). Compare と, which gives a complete list. It is often paired with など
 """)
 def m_ya(toks):
     return [(i, i + 1, None) for i, t in enumerate(toks)
-            if t.s == "や" and t.p1 == "助詞" and at(toks, i - 1) and toks[i - 1].p1 in ("名詞", "代名詞", "接尾辞")]
+            if t.s == "や" and t.p1 == "助詞" and at(toks, i - 1) and toks[i - 1].p1 in ("名詞", "代名詞", "接尾辞")
+            # 今や (nowadays) and 〜やそこら (or so) are not lists
+            and toks[i - 1].s != "今" and not (at(toks, i + 1) and toks[i + 1].s == "そこ")]
 
 
 @point("kara_from", "から (from)", "from (starting point)", "Noun + から",
@@ -952,7 +954,8 @@ To chain an い-adjective with something else, use its て-form: drop い and ad
 def m_kute(toks):
     return [(i, i + 2, i) for i, t in enumerate(toks)
             if t.is_adj and t.lemma != "無い" and t.s.endswith("く") and te(at(toks, i + 1))
-            and toks[i + 1].s == "て"]
+            and toks[i + 1].s == "て"
+            and not (at(toks, i + 2) and toks[i + 2].s == "も")]  # くても = even if
 
 
 @point("naru", "なる (become)", "become", "い-adj → く + なる / Noun, な-adj + に + なる",

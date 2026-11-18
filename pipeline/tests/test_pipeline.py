@@ -88,6 +88,9 @@ POSITIVE = [
 
 # (point id, sentence) — things a matcher must NOT pick up
 NEGATIVE = [
+    ("ya", "今や有名店ですね。"),  # 今や = nowadays
+    ("ya", "外国語は１年やそこらで身につけられるものではない。"),  # やそこら = or so
+    ("kute", "遅くても来ないよりまし。"),  # くても = even if
     ("mo", "食べてもいい。"),             # ても is not "also"
     ("mo", "何も食べない。"),             # 何も is its own expression
     ("wa", "ここで泳いではいけない。"),    # ては is not the topic marker
