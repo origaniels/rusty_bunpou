@@ -119,6 +119,22 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("店は今が稼ぎ時とばかりに値段を上げた。", "The shop raised its prices as if to say \"now's the time to make money.\""),
         ("彼はうるさいとばかりに、ドアを強く閉めた。", "He slammed the door as if to say \"you're too noisy.\""),
     ],
+    "mono_wo": [
+        ("言ってくれれば手伝ったものを。", "If only you'd told me, I would have helped."),
+        ("もっと早く出発すれば間に合ったものを。", "If only we'd left earlier, we would have made it."),
+        ("正直に話せば許してもらえたものを。", "If only he'd told the truth, he would have been forgiven."),
+        ("一言謝ればよかったものを。", "If only he had just said sorry."),
+        ("薬を飲んでいれば治ったものを。", "If only you'd taken the medicine, you'd be better."),
+        ("地図を見れば迷わなかったものを。", "If only I'd looked at the map, I wouldn't have got lost."),
+    ],
+    "wo_oite": [
+        ("この仕事は彼をおいて適任者はいない。", "There's nobody better suited for this job than him."),
+        ("日本料理なら、この店をおいてほかにない。", "For Japanese food, there's no place but this restaurant."),
+        ("彼女をおいて、このチームのリーダーはいない。", "There's no one but her to lead this team."),
+        ("富士山をおいて、日本を代表する山はない。", "No mountain represents Japan the way Mount Fuji does."),
+        ("あなたをおいて、相談できる人はいません。", "There's no one but you I can turn to."),
+        ("春をおいて、花見に適した季節はない。", "No season suits cherry-blossom viewing like spring."),
+    ],
     "katawara": [
         ("彼は会社に勤めるかたわら、小説を書いている。", "Alongside his office job, he writes novels."),
         ("彼女は大学で教えるかたわら、翻訳の仕事もしている。", "Besides teaching at a university, she also works as a translator."),

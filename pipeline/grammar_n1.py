@@ -201,10 +201,16 @@ P("ni_soku_shite", "〜に即して", "in accordance with", "Noun + に即して
   r"に(?:即|則)(?:して|した|し)", "事実に即して判断すべきだ。", after="n")
 P("ni_taeru", "〜に堪える / 堪えない", "worth; unbearable", "Noun / Verb + に堪える",
   """に堪える (たえる) means "worthy of" (鑑賞に堪える); に堪えない means "can't bear" (見るに堪えない).""",
-  r"に(?:堪|耐|た)え(?:る|ない|ません)", "その映像は見るに堪えないものだった。", after="nv")
+  # "worthy of" (鑑賞に堪える) / "unbearable" (見るに堪えない), not 痛みに耐える (endure), 地震に堪える (withstand)
+  r"に(?:堪|耐|た)え(?:る|ない|ません)", "その映像は見るに堪えないものだった。", after="nv",
+  check=lambda t, i, k: "ない" in "".join(x.s for x in t[i:k + 1]) or "ませ" in "".join(x.s for x in t[i:k + 1])
+  or (i > 0 and t[i - 1].lemma in ("鑑賞", "批判", "使用", "実用", "任", "職", "見る", "聞く", "読む", "観賞")))
 P("ni_taru", "〜に足る", "worthy of, enough to", "Noun / Verb + に足る",
   """に足る (たる) means "worthy of, sufficient for": 信頼するに足る人物 (a person worthy of trust). It is formal; the negative is に足りない: 取るに足りない (trivial).""",
-  r"に(?:足|た)(?:る|りる|らない)", "彼は信頼するに足る人物だ。", after="nv")
+  # "worthy of / enough to" after a verb or 信頼 / 尊敬 …; not 全員に足りる (enough food for everyone)
+  r"に(?:足|た)(?:る|りる|らない)", "彼は信頼するに足る人物だ。", after="nv",
+  check=lambda t, i, k: i > 0 and (t[i - 1].p1 == "動詞" or t[i - 1].lemma in ("信頼", "尊敬", "注目", "考慮", "満足",
+                                                                              "信用", "評価", "賞賛", "称賛")))
 P("ni_hikikae", "〜にひきかえ", "in contrast to", "Noun + にひきかえ",
   """にひきかえ means "in (sharp) contrast to": 兄にひきかえ、弟はよく勉強する (unlike his older brother, the younger one studies hard). It often carries the speaker's judgment of one side.""",
   r"に(?:ひきかえ|引き換え|引き替え)", "兄にひきかえ、弟はよく勉強する。", after="any")
@@ -219,7 +225,7 @@ P("no_kiwami", "〜の極み", "the height of", "Noun + の極み",
   r"の(?:極|きわ)み", "これは贅沢の極みだ。", after="n")
 P("wa_oroka", "〜はおろか", "let alone", "Noun + はおろか",
   """はおろか means "let alone, not to mention": 漢字はおろか、ひらがなも読めない (he can't even read hiragana, let alone kanji). The second part usually has も or さえ and a negative.""",
-  r"はおろか", "漢字はおろか、ひらがなも読めない。", after="n")
+  r"はおろか(?![なに])", "漢字はおろか、ひらがなも読めない。", after="n")  # おろかな / おろかにも = 愚か (foolish)
 P("ba_koso", "〜ばこそ", "precisely because", "Verb (ば) + こそ",
   """ばこそ stresses that something is precisely the reason: あなたのことを思えばこそ、注意するのです (it's precisely because I care about you that I warn you). It is a formal からこそ.""",
   r"ばこそ", "あなたのことを思えばこそ、注意するのです。", pre="va")
@@ -252,13 +258,18 @@ P("mo_sarukoto_nagara", "〜もさることながら", "not only ... but also", 
   r"もさることながら", "味もさることながら、見た目も美しい。", after="n")
 P("mono_wo", "〜ものを", "if only (regret)", "Plain form + ものを",
   """ものを expresses regret: 言ってくれればよかったものを (if only you had told me).""",
-  r"ものを(?=[。、！])", "言ってくれれば手伝ったものを。", after="va")
+  # regret ("if only"): after a past or conditional result, not もの + を (好きなものを、召し上がれ)
+  r"ものを(?=[。！])|ものを(?=、)(?=[^。]*(?:のに|ば))", "言ってくれれば手伝ったものを。", after="va",
+  check=lambda t, i, k: i > 0 and (t[i - 1].lemma in ("た", "う", "よう", "だ") or t[i - 1].s.endswith(("た", "だ", "う"))))
 P("wo_oite", "〜をおいて", "other than, besides", "Noun + をおいて + negative",
   """をおいて + negative means "apart from (X, there is no one/nothing)": 彼をおいて適任者はいない (there's no one better suited than him). It strongly praises X as the only choice.""",
-  r"をおいて|を置いて", "この仕事は彼をおいて適任者はいない。", after="n", req=NEG)
+  # "other than (X, nobody)": kana おいて + ほか / 適任 … + negative; not 置いて (put, leave behind)
+  r"をおいて", "この仕事は彼をおいて適任者はいない。", after="n", req=NEG,
+  neg=r"をおいて(?:い|行|来|く|出|は|お|ま|あ|下)")
 P("wo_kagiri_ni", "〜を限りに", "as of, from ... on (no more)", "Noun + を限りに",
   """を限りに means "as of (and no longer)": 今日を限りに、タバコをやめる (as of today, I quit smoking). It marks the last time something happens.""",
-  r"を(?:限|かぎ)りに", "今日を限りに、タバコをやめます。", after="n")
+  r"を(?:限|かぎ)りに", "今日を限りに、タバコをやめます。", after="n",
+  check=lambda t, i, k: not (i > 0 and t[i - 1].lemma in ("声", "力")))  # 声を限りに (at the top of one's voice)
 P("wo_kawakiri_ni", "〜を皮切りに", "starting with", "Noun + を皮切りに",
   """を皮切りに (かわきりに) means "starting with (and then many more)": 東京を皮切りに全国でコンサートを行う.""",
   r"を(?:皮切|かわき)りに", "東京を皮切りに、全国でコンサートを行う。", after="n")
@@ -273,7 +284,8 @@ P("wo_fumaete", "〜を踏まえて", "based on, considering", "Noun + を踏ま
   r"を(?:踏|ふ)まえ(?:て|た)?", "調査の結果を踏まえて、計画を立てる。", after="n")
 P("wo_motte", "〜をもって", "with, by means of; as of", "Noun + をもって",
   """をもって is formal "with / by" or "as of": 本日をもって閉店いたします (we close as of today).""",
-  r"をもって|を以て|を持って(?=閉|終|退|最)", "本日をもって閉店いたします。", after="n")
+  # formal "with / as of"; not もっている / もって行く / もって逃げる (have, carry)
+  r"を(?:もって|以て)(?![いい行逃来く帰きまるドた])|を持って(?=閉|終|退|最)", "本日をもって閉店いたします。", after="n")
 P("wo_monotomosezu", "〜をものともせず", "in defiance of", "Noun + をものともせず",
   """をものともせず means "undaunted by, in defiance of": 雨をものともせず、試合は続けられた (the game went on undeterred by the rain). It praises someone overcoming a difficulty.""",
   r"をものともせず", "彼は怪我をものともせず、最後まで戦った。", after="n")
