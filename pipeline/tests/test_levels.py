@@ -73,6 +73,8 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("to_itta", "彼女は昨日病気だといったが、それは本当のことではなかった。"),
+    ("dake_ni", "トムはメアリーとほんの数分会うためだけに、何時間も待った。"),
     ("mono_dakara", "結果は望ましいものではなかった。"),
     ("mono_ga_aru", "何か必要なものがあったら、遠慮なく言ってください。"),
     ("koto_ka", "なるほど、そういうことか。"),

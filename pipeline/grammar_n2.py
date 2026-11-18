@@ -419,12 +419,14 @@ P("koto_kara", "〜ことから", "from the fact that", "Plain form + ことか�
 P("to_iu_mono_da", "〜というものだ", "that's what (it is)", "Plain form + というものだ",
   """というものだ gives a general verdict about how something is: それが人生というものだ (that's life). It often sounds like a conclusion or mild lecture; というものではない denies such a generalization.""",
   r"というもの(?:だ|です)", "それが人生というものだ。", after="any")
-P("to_iu_koto_da", "〜ということだ (hearsay)", "I hear that, they say", "Plain form + ということだ",
-  """ということだ / とのことだ report information: 会議は中止だということだ (I hear the meeting is cancelled).""",
+P("to_iu_koto_da", "〜ということだ (hearsay)", "I hear that; that means", "Plain form + ということだ",
+  """ということだ / とのことだ report information: 会議は中止だということだ (I hear the meeting is cancelled). It also sums something up or rephrases it: 要は時間が足りないということだ (in short, there
+  isn't enough time).""",
   r"ということ(?:だ|です)|とのこと(?:だ|です)", "会議は中止になったということです。", after="any")
 P("to_itta", "〜といった", "such as", "Noun + といった + Noun",
   """といった lists examples: 寿司や天ぷらといった日本料理 (Japanese food such as sushi and tempura).""",
-  r"といった", "寿司や天ぷらといった日本料理が好きです。", after="any")
+  r"といった", "寿司や天ぷらといった日本料理が好きです。", after="any",
+  check=lambda t, i, k: k < len(t) and t[k].p1 in ("名詞", "接頭辞"))  # + noun; 病気だといったが = "said"
 P("ka_no_you", "〜かのように", "as if", "Plain form + かのように",
   """かのように means "as if (but not really)": 何もなかったかのように笑った (laughed as if nothing had happened).""",
   r"かのよう(?:に|な|だ)", "彼は何もなかったかのように笑った。", after="any")
@@ -433,7 +435,7 @@ P("dake_atte", "〜だけあって", "as you'd expect from", "Plain form / Noun 
   r"だけ(?:あって|のことはある|のことはあります)", "プロだけあって、さすがに上手だ。", after="any")
 P("dake_ni", "〜だけに", "all the more because", "Plain form / Noun + だけに",
   """だけに means "precisely because (so all the more)": 期待していただけに、がっかりした.""",
-  r"だけに(?=、)", "期待していただけに、がっかりした。", after="any")
+  r"(?<!ため)だけに(?=、)", "期待していただけに、がっかりした。", after="any")  # ためだけに = just for
 P("amari_excess", "〜あまり", "so much that", "Noun + の / Verb + あまり",
   """あまり (in this use) means "from too much ...": 緊張のあまり、何も言えなかった (I was so nervous I couldn't
   speak).""",

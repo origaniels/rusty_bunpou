@@ -577,10 +577,11 @@ FR = {
     ),
     "to_iu_koto_da": dict(
         title="〜ということだ (ouï-dire)",
-        meaning="j'ai appris que, il paraît que",
+        meaning="il paraît que ; cela veut dire que",
         structure="Forme neutre + ということだ",
         explanation="""ということだ / とのことだ rapportent une information : 会議は中止だということだ
-        (il paraît que la réunion est annulée).""",
+        (il paraît que la réunion est annulée). Il sert aussi à résumer ou reformuler :
+        要は時間が足りないということだ (bref, ça veut dire qu'on manque de temps).""",
     ),
     "to_itta": dict(
         meaning="tel que, comme",
