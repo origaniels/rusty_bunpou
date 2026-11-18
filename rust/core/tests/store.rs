@@ -80,3 +80,24 @@ fn start_level_defaults_to_n5_and_round_trips() {
     p.save();
     assert_eq!(Progress::load(&path).settings.start_level, "N2");
 }
+
+#[test]
+fn unreadable_progress_is_kept_aside_not_overwritten() {
+    let path = tmp("corrupt");
+    std::fs::write(&path, "{ not json").unwrap();
+    let mut p = Progress::load(&path);
+    assert!(p.cards.is_empty());
+    let mut bad = path.as_os_str().to_owned();
+    bad.push(".bad");
+    assert_eq!(std::fs::read_to_string(&bad).unwrap(), "{ not json", "original kept as .bad");
+    p.settings.furigana = false;
+    p.save();
+    assert_eq!(std::fs::read_to_string(&bad).unwrap(), "{ not json", "saving doesn't touch it");
+    // a missing file is just a fresh start, nothing to keep
+    let fresh = tmp("missing");
+    let _ = std::fs::remove_file(&fresh);
+    Progress::load(&fresh);
+    let mut b = fresh.as_os_str().to_owned();
+    b.push(".bad");
+    assert!(!std::path::Path::new(&b).exists());
+}

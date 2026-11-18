@@ -91,11 +91,21 @@ pub struct Progress {
 }
 
 impl Progress {
+    /// Load progress; a missing file means a fresh start. A file that exists but can't be read
+    /// or parsed is moved aside to `<file>.bad` first, so the next save can't overwrite (lose) it.
     pub fn load(path: &Path) -> Progress {
-        let mut p: Progress = std::fs::read_to_string(path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
+        let mut p: Progress = match std::fs::read_to_string(path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Progress::default(),
+            read => match read.ok().and_then(|s| serde_json::from_str(&s).ok()) {
+                Some(p) => p,
+                None => {
+                    let mut bad = path.as_os_str().to_owned();
+                    bad.push(".bad");
+                    let _ = std::fs::rename(path, &bad);
+                    Progress::default()
+                }
+            },
+        };
         p.path = Some(path.to_path_buf());
         p
     }
