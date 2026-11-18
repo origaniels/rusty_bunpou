@@ -264,7 +264,7 @@ P("to_itte_mo", "〜といっても", "although I say", "Plain form / Noun + と
   # not といっても過言ではない / といってもいい (one could say), 何といっても (after all)
   r"(?<!何)(?<!なん)と(?:いっ|言っ)ても(?!過言|いい|良い|よい|よろし|大げさ|言い過ぎ)",
   "料理ができるといっても、簡単なものだけです。", after="any",
-  neg=r"と(?:いっ|言っ)ても[^。]*(?:過言|大げさ|言い過ぎ)")
+  neg=r"と(?:いっ|言っ)ても[^。]*(?:過言|大げさ|言い過ぎ|差し支え|差しつかえ|通用|意味)")
 P("kawari_ni", "〜かわりに", "instead of; in exchange for", "Noun + の / Verb + かわりに",
   """かわりに means "instead of" (父のかわりに行く, go in my father's place) or "in exchange for".""",
   r"(?:かわり|代わり)に", "父のかわりに私が行きます。", after="any")
@@ -303,7 +303,7 @@ P("kakeru", "〜かける / 〜かけ", "half-done, about to", "Verb stem + か�
   やめた (started to say something and stopped).""",
   "", "読みかけの本が机の上にある。",
   # 見かけ (appearance); 話しかける / 微笑みかける ... (address someone) are not "half-done"
-  custom=compound("掛け", "掛ける", skip=("見かけ", "見掛け", "話す", "微笑む", "笑う", "呼ぶ", "問う", "語る",
+  custom=compound("掛け", "掛ける", skip=("見かけ", "見掛け", "みかけ", "きっかけ", "切っ掛け", "話す", "微笑む", "笑う", "呼ぶ", "問う", "語る",
                                          "働く", "押す", "追う", "見る")))
 P("dasu", "〜出す", "suddenly start", "Verb stem + 出す",
   """出す (だす) after a verb stem means "suddenly start": 急に泣き出した (suddenly burst into tears).""",
@@ -332,7 +332,8 @@ P("furi", "〜ふりをする", "pretend to", "Plain form / Noun + の + ふり�
   r"(?:ふり|振り)を" + SURU, "弟は寝ているふりをしていた。", after="any", tail=True)
 P("tokoro_datta", "〜ところだった", "almost, nearly", "Verb (dictionary) + ところだった",
   """ところだった means something almost happened: もう少しで遅刻するところだった (I was nearly late).""",
-  r"ところだった", "もう少しで遅刻するところだった。", after="v")
+  r"ところだった", "もう少しで遅刻するところだった。", after="v",
+  check=lambda t, i, k: not (i > 0 and t[i - 1].lemma in ("居る", "いる")))  # ているところだった = in the middle of
 P("nai_you_ni", "〜ないように", "so as not to", "Verb (ない) + ように",
   """ないように means "so as not to": 風邪をひかないように気をつけて (take care not to catch a cold).""",
   r"ないように", "風邪をひかないように気をつけてください。", pre="v")
@@ -344,7 +345,8 @@ P("you_ni_omoeru", "〜ように見える", "looks as if", "Plain form / Noun + 
   r"ように(?:見え|みえ)", "彼は疲れているように見えます。", after="any", tail=True)
 P("gimi", "〜気味", "a bit, slightly (tendency)", "Noun / verb stem + 気味",
   """気味 (ぎみ) means "a touch of, tending to": 風邪気味 (a bit of a cold), 疲れ気味 (a little tired).""",
-  r"(?:気味|ぎみ)", "今日はちょっと風邪気味です。", after="any")
+  # 不気味 (eerie), 気味が悪い, いい気味 (serves you right) are other words
+  r"(?<!不)(?<!いい)(?:気味|ぎみ)(?!が|の悪)", "今日はちょっと風邪気味です。", after="any")
 P("gachi", "〜がち", "tend to", "Noun / verb stem + がち",
   """がち means "tend to (often, usually bad)": 病気がち (sickly), 忘れがち (tend to forget).""",
   r"がち", "冬は運動不足になりがちです。", after="any", check=first_pos("接尾辞"))
@@ -366,7 +368,7 @@ P("teki", "〜的", "-ic, -al (adjective from noun)", "Noun + 的",
   r"的(?:な|に|だ|です)?", "これは経済的な車です。", after="n")
 P("tate", "〜たて", "freshly, just", "Verb stem + たて",
   """たて means "fresh from": 焼きたてのパン (freshly baked bread), 生まれたての赤ちゃん.""",
-  "", "焼きたてのパンはおいしい。", custom=compound("立て", "立て"))
+  "", "焼きたてのパンはおいしい。", custom=compound("立て", "立て", skip=("気立て", "手立て", "仕立て", "組み立て")))
 P("datte", "〜だって", "even; I hear; because", "Noun + だって",
   """だって is casual: "even" (子供だって分かる), "I hear" (雨だって), or at the start "but/because".""",
   r"だって", "そんなこと、子供だって分かるよ。", after="any")

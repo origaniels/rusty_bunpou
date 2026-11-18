@@ -73,6 +73,12 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("gimi", "とても不気味だと思った。"),
+    ("gimi", "いい気味。"),
+    ("tate", "彼女は気立てがいい。"),
+    ("kakeru", "２人が知り合ったきっかけは何だったの？"),
+    ("tokoro_datta", "彼女はそのとき、夕食を作っているところだった。"),
+    ("to_itte_mo", "彼女は２０歳といっても通用する。"),
     ("ni_shite_mo", "薬だけを頼りにしても治らないよ。"),
     ("kakeru", "彼は見かけよりずっと年をとっている。"),  # appearance
     ("kakeru", "彼女は僕に微笑みかけながら一曲歌った。"),
