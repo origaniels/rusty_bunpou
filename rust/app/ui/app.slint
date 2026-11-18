@@ -28,6 +28,10 @@ export struct LevelRow { name: string, learned: int, total: int }
 export struct PieSlice { path: string, fill: color }
 export struct LevelPie { name: string, learned: int, total: int, slices: [PieSlice], counts: [int] }
 
+export struct DayCell { level: int, label: string } // level -1 = after today (not drawn)
+export struct ForecastBar { label: string, count: int }
+export struct Leech { id: string, title: string, meaning: string, mistakes: string }
+
 export struct QuizData {
     title: string, done: int, total: int, key: string, en: string, hint: string,
     verdict: int, // 0 = unanswered, 1 = correct, 2 = wrong
@@ -373,6 +377,12 @@ export component AppWindow inherits Window {
     in-out property <string> report-note;
     in property <string> report-sentence;
     in property <int> report-count;
+    /// stats screen
+    in property <string> streak-line;
+    in property <[DayCell]> activity;
+    in property <[ForecastBar]> forecast;
+    in property <int> forecast-max: 1;
+    in property <[Leech]> leeches;
 
     callback start-learn();
     callback lesson-prev();
@@ -635,6 +645,95 @@ export component AppWindow inherits Window {
                 TopBar { title: @tr("Stats"); show-back: false; }
                 Scroller {
                     vertical-stretch: 1;
+                    // ------------------------------------------------ streak + activity calendar
+                    Card {
+                        VerticalLayout {
+                            padding: 16px; spacing: 12px;
+                            property <string> tip;
+                            Text { text: root.streak-line; font-size: 17px; font-weight: 600; color: Theme.fg; wrap: word-wrap; }
+                            // 15 weeks, one column per week (Monday on top); squares sized to the width
+                            cal := Rectangle {
+                                property <length> gap: 3px;
+                                property <length> cell: min(24px, (self.width - 14 * self.gap) / 15);
+                                height: 7 * self.cell + 6 * self.gap;
+                                for c[i] in root.activity: Rectangle {
+                                    x: floor(i / 7) * (cal.cell + cal.gap);
+                                    y: mod(i, 7) * (cal.cell + cal.gap);
+                                    width: cal.cell; height: cal.cell;
+                                    border-radius: 3px;
+                                    visible: c.level >= 0;
+                                    background: [#34323f, #1f4a7a, #2f74c8, #5d9de8, #a9cdf6][max(0, c.level)];
+                                    TouchArea { clicked => { tip = c.label; } }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 4px;
+                                Text {
+                                    text: tip != "" ? tip : @tr("Tap a day to see its reviews.");
+                                    font-size: 13px; color: tip != "" ? Theme.fg : Theme.muted; horizontal-stretch: 1;
+                                    vertical-alignment: center; wrap: word-wrap;
+                                }
+                                Text { text: @tr("Less"); font-size: 12px; color: Theme.muted; vertical-alignment: center; }
+                                for l in 5: Rectangle {
+                                    width: 10px; height: 10px; y: (parent.height - self.height) / 2; border-radius: 2px;
+                                    background: [#34323f, #1f4a7a, #2f74c8, #5d9de8, #a9cdf6][l];
+                                }
+                                Text { text: @tr("More"); font-size: 12px; color: Theme.muted; vertical-alignment: center; }
+                            }
+                        }
+                    }
+                    // ------------------------------------------------ reviews forecast (7 days)
+                    Card {
+                        VerticalLayout {
+                            padding: 16px; spacing: 10px;
+                            Text { text: @tr("Upcoming reviews"); font-size: 17px; font-weight: 600; color: Theme.fg; }
+                            HorizontalLayout {
+                                spacing: 6px; height: 120px;
+                                for b in root.forecast: VerticalLayout {
+                                    horizontal-stretch: 1; spacing: 4px; alignment: end;
+                                    // only days with reviews get a number
+                                    Text { text: b.count > 0 ? b.count : ""; font-size: 13px; font-weight: 600; color: Theme.fg; horizontal-alignment: center; }
+                                    HorizontalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 16px;
+                                            height: max(2px, 70px * b.count / root.forecast-max);
+                                            border-radius: 4px;
+                                            background: b.count > 0 ? #3987e5 : #34323f;
+                                        }
+                                    }
+                                    Text { text: b.label; font-size: 12px; color: Theme.muted; horizontal-alignment: center; }
+                                }
+                            }
+                        }
+                    }
+                    // ------------------------------------------------ leeches
+                    if root.leeches.length > 0: Card {
+                        VerticalLayout {
+                            padding: 16px; spacing: 8px;
+                            Text { text: @tr("Leeches"); font-size: 17px; font-weight: 600; color: Theme.fg; }
+                            Text {
+                                text: @tr("Points you got wrong 3 times in your last 5 reviews. Open one to read the notes again, or reset it to learn it again.");
+                                font-size: 13px; color: Theme.muted; wrap: word-wrap;
+                            }
+                            for l in root.leeches: TouchArea {
+                                height: lrow.preferred-height;
+                                clicked => { root.open-detail(l.id); }
+                                lrow := HorizontalLayout {
+                                    padding-top: 8px; padding-bottom: 8px; spacing: 12px;
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        Text { text: l.title; font-size: 18px; color: Theme.fg; wrap: word-wrap; }
+                                        Text { text: l.meaning; font-size: 13px; color: Theme.muted; wrap: word-wrap; }
+                                    }
+                                    Text { text: @tr("{} wrong", l.mistakes); font-size: 13px; color: Theme.bad; vertical-alignment: center; }
+                                }
+                                accessible-role: list-item;
+                                accessible-label: l.title;
+                                accessible-action-default => { root.open-detail(l.id); }
+                            }
+                        }
+                    }
                     Card {
                         VerticalLayout {
                             padding: 16px; spacing: 14px;

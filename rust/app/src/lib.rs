@@ -343,6 +343,109 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
         level_rows: model(level_rows(content, &st.progress)),
     });
     ui.set_level_pies(model(level_pies(content, &st.progress)));
+    refresh_stats(ui, content, st, now);
+}
+
+/// Weeks shown in the activity calendar.
+pub const ACTIVITY_WEEKS: usize = 15;
+
+fn day_label(lang: Lang, day: i64) -> String {
+    let (_, m, d) = bunpo_core::clock::civil_date(day);
+    let wd = (day + 3).rem_euclid(7) as usize; // 1970-01-01 was a Thursday; 0 = Monday
+    match lang {
+        Lang::En => {
+            let w = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][wd];
+            let mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m as usize - 1];
+            format!("{w} {d} {mo}")
+        }
+        Lang::Fr => {
+            let w = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."][wd];
+            let mo = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."][m as usize - 1];
+            format!("{w} {d} {mo}")
+        }
+    }
+}
+
+/// Activity calendar cells, column by column (one column per week, Monday on top). Days after
+/// today have level -1 (not drawn).
+pub fn activity_cells(lang: Lang, progress: &Progress, now: i64) -> Vec<DayCell> {
+    let today = bunpo_core::clock::local_day(now);
+    let weekday = (today + 3).rem_euclid(7);
+    let first = today - weekday - 7 * (ACTIVITY_WEEKS as i64 - 1);
+    let days = (today - first + 1) as usize;
+    let counts = bunpo_core::stats::activity(progress, now, days);
+    (0..ACTIVITY_WEEKS * 7)
+        .map(|i| {
+            let day = first + i as i64;
+            if day > today {
+                return DayCell { level: -1, label: "".into() };
+            }
+            let n = counts[i];
+            let level = match n {
+                0 => 0,
+                1..=5 => 1,
+                6..=15 => 2,
+                16..=30 => 3,
+                _ => 4,
+            };
+            let label = match (lang, n) {
+                (Lang::En, 1) => format!("{}: 1 review", day_label(lang, day)),
+                (Lang::En, _) => format!("{}: {n} reviews", day_label(lang, day)),
+                (Lang::Fr, 0 | 1) => format!("{}\u{a0}: {n} révision", day_label(lang, day)),
+                (Lang::Fr, _) => format!("{}\u{a0}: {n} révisions", day_label(lang, day)),
+            };
+            DayCell { level, label: label.into() }
+        })
+        .collect()
+}
+
+fn refresh_stats(ui: &AppWindow, content: &Content, st: &State, now: i64) {
+    use bunpo_core::stats;
+    let lang = st.progress.settings.lang();
+    let fr = lang == Lang::Fr;
+    let (cur, best) = stats::streak(&st.progress, now);
+    let days = |n: usize| match (fr, n) {
+        (false, 1) => "1 day".to_string(),
+        (false, _) => format!("{n} days"),
+        (true, 0 | 1) => format!("{n} jour"),
+        (true, _) => format!("{n} jours"),
+    };
+    ui.set_streak_line(
+        if fr { format!("Série\u{a0}: {} · record\u{a0}: {}", days(cur), days(best)) } else { format!("Streak: {} · best: {}", days(cur), days(best)) }
+            .into(),
+    );
+    let cells = activity_cells(lang, &st.progress, now);
+    ui.set_activity(model(cells));
+    let today = bunpo_core::clock::local_day(now);
+    let fc = stats::forecast(&st.progress, now, 7);
+    ui.set_forecast_max(fc.iter().copied().max().unwrap_or(0).max(1) as i32);
+    ui.set_forecast(model(
+        fc.iter()
+            .enumerate()
+            .map(|(i, &n)| ForecastBar {
+                label: if i == 0 {
+                    (if fr { "Auj." } else { "Today" }).into()
+                } else {
+                    day_label(lang, today + i as i64).split(' ').next().unwrap_or("").into()
+                },
+                count: n as i32,
+            })
+            .collect(),
+    ));
+    ui.set_leeches(model(
+        stats::leeches(&st.progress)
+            .into_iter()
+            .filter_map(|(id, n)| {
+                let p = content.get(&id)?;
+                Some(Leech {
+                    id: id.as_str().into(),
+                    title: p.title_in(lang).into(),
+                    meaning: p.meaning_in(lang).into(),
+                    mistakes: format!("{n} / {}", stats::LEECH_WINDOW).into(),
+                })
+            })
+            .collect(),
+    ));
 }
 
 /// Learned / total per JLPT level, in content order (N5 first).

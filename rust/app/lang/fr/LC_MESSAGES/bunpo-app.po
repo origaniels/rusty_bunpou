@@ -239,3 +239,24 @@ msgstr "Les signalements restent sur ce téléphone. Exportez-les depuis les Ré
 
 msgid "Save report"
 msgstr "Enregistrer"
+
+msgid "Tap a day to see its reviews."
+msgstr "Touchez un jour pour voir ses révisions."
+
+msgid "Less"
+msgstr "Moins"
+
+msgid "More"
+msgstr "Plus"
+
+msgid "Upcoming reviews"
+msgstr "Révisions à venir"
+
+msgid "Leeches"
+msgstr "Points difficiles"
+
+msgid "Points you got wrong 3 times in your last 5 reviews. Open one to read the notes again, or reset it to learn it again."
+msgstr "Points ratés 3 fois lors de vos 5 dernières révisions. Ouvrez-en un pour relire les notes, ou réinitialisez-le pour le réapprendre."
+
+msgid "{} wrong"
+msgstr "{} ratées"

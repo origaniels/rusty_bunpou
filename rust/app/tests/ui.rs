@@ -8,7 +8,7 @@ use i_slint_backend_testing::ElementHandle;
 use i_slint_core::input::TouchPhase;
 use i_slint_core::lengths::LogicalPoint;
 use i_slint_core::platform::{InternalEvent, WindowEvent};
-use slint::ComponentHandle;
+use slint::{ComponentHandle, Model};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -721,6 +721,16 @@ fn check_every_screen(width: f32, french: bool) {
     check("grammar list, N5 folded");
     t.app.ui.invoke_open_stats();
     check("stats");
+    // a leech with the longest title and meaning there is
+    {
+        let lang = if french { bunpo_core::i18n::Lang::Fr } else { bunpo_core::i18n::Lang::En };
+        let p = t.app.content.points.iter().max_by_key(|p| p.title_in(lang).chars().count() + p.meaning_in(lang).chars().count()).unwrap();
+        let mut st = t.app.state.borrow_mut();
+        make_leech(&mut st.progress, &p.id);
+    }
+    t.app.ui.invoke_go_home();
+    t.app.ui.invoke_open_stats();
+    check("stats with a leech");
     t.app.ui.invoke_open_settings();
     check("settings");
     t.app.ui.set_confirm_reset(true);
@@ -885,4 +895,47 @@ fn no_export_reports_button_without_reports() {
     t.press("Settings");
     assert!(t.exists("Export progress"));
     assert!(!t.exists("Export reports (0)"));
+}
+
+// ------------------------------------------------------------------ stats: streak, forecast, leeches
+
+fn make_leech(p: &mut Progress, id: &str) {
+    let now = clock::now_ms();
+    p.cards.insert(id.into(), bunpo_core::store::Card { state: 1, due: now + HOUR, learned_at: now - 10 * DAY, ..Default::default() });
+    for i in 0..4 {
+        p.log.push(bunpo_core::store::LogEntry { point: id.into(), sentence: 1, ts: now - 9 * DAY + i * DAY, grade: if i == 2 { 3 } else { 1 }, answer: "".into() });
+    }
+}
+
+#[test]
+fn stats_show_streak_forecast_and_leeches() {
+    let t = setup();
+    t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0));
+    t.learn_lesson(); // today: 5 answers, 5 cards due in 4 hours
+    make_leech(&mut t.app.state.borrow_mut().progress, "da");
+    t.press("Stats");
+    // today, plus the leech's reviews 9 to 6 days ago
+    assert_eq!(t.app.ui.get_streak_line(), "Streak: 1 day · best: 4 days");
+    let fc: Vec<i32> = t.app.ui.get_forecast().iter().map(|b| b.count).collect();
+    assert_eq!(fc.len(), 7);
+    assert_eq!(fc.iter().sum::<i32>(), 5, "the leech is due in an hour, the 4 others in 4 hours: {fc:?}");
+    let cells = t.app.ui.get_activity();
+    assert_eq!(cells.row_count(), ACTIVITY_WEEKS * 7);
+    let today = cells.iter().filter(|c| c.level >= 0).last().unwrap();
+    assert!(today.label.ends_with(": 5 reviews"), "{}", today.label);
+    let leeches = t.app.ui.get_leeches();
+    assert_eq!(leeches.row_count(), 1);
+    assert_eq!(leeches.row_data(0).unwrap().mistakes, "3 / 5");
+    t.press(&leeches.row_data(0).unwrap().title);
+    assert_eq!(t.screen(), SCREEN_DETAIL);
+    assert_eq!(t.app.ui.get_notes().title, leeches.row_data(0).unwrap().title);
+}
+
+#[test]
+fn no_leech_section_without_leeches() {
+    let t = setup();
+    t.learn_lesson();
+    t.press("Stats");
+    assert_eq!(t.app.ui.get_leeches().row_count(), 0);
+    assert!(!t.exists("Leeches"));
 }
