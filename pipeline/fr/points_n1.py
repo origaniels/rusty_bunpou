@@ -529,7 +529,8 @@ FR = {
     "n_ga_tame": dict(
         meaning="afin de (littéraire)",
         structure="Verbe (radical de la forme en ない) + んがため",
-        explanation="""んがため est un « pour » littéraire : 勝たんがため (afin de vaincre).""",
+        explanation="""んがため est un « pour » littéraire : 勝たんがため (afin de vaincre). Il se forme
+        sur le radical de la forme en ない (勝つ → 勝た) ; する devient せんがため.""",
     ),
     "n_bakari": dict(
         meaning="presque, comme sur le point de",

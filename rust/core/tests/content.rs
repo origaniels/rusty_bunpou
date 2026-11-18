@@ -113,3 +113,26 @@ fn fixed_form_points_blank_exactly_that_form() {
         }
     }
 }
+
+#[test]
+fn everything_has_french() {
+    use bunpo_core::i18n::Lang;
+    let c = Content::bundled();
+    assert!(!c.source_fr.is_empty());
+    for p in &c.points {
+        let f = p.fr.as_ref().unwrap_or_else(|| panic!("no French for {}", p.id));
+        assert!(!f.meaning.is_empty() && !f.structure.is_empty() && f.explanation.len() > 60, "{}", p.id);
+        assert_ne!(p.explanation_in(Lang::Fr), p.explanation, "{}: French falls back to English", p.id);
+        for s in &p.sentences {
+            assert!(!s.fr.is_empty(), "no French for {} / #{} {}", p.id, s.id, s.ja);
+            // the credit line always names the original sentence and, for Tatoeba French, its translation
+            let a = s.attribution(Lang::Fr);
+            if s.src != "app" {
+                assert!(a.starts_with(&format!("Tatoeba #{}", s.id)), "{a}");
+                if s.fr_src != "app" {
+                    assert!(s.fr_id > 0 && a.contains(&format!("trad. #{}", s.fr_id)), "{a}");
+                }
+            }
+        }
+    }
+}
