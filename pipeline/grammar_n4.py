@@ -406,7 +406,9 @@ P("hajimeru", "〜始める", "start to", "Verb stem + 始める",
   r"(?:始|はじ)め", "雨が降り始めました。", pre="v", tail=True, check=first_lemma("始める"))
 P("owaru", "〜終わる", "finish doing", "Verb stem + 終わる",
   """終わる (おわる) after a verb stem means "finish doing": 本を読み終わった (I finished reading the book).""",
-  r"(?:終|お)わ(?:る|り|っ|ら)", "その本はもう読み終わりました。", pre="v", tail=True, check=first_lemma("終わる"))
+  r"(?:終|お)わ(?:る|り|っ|ら)", "その本はもう読み終わりました。", pre="v", tail=True,
+  # 言って終わる (end by saying) is not stem + 終わる
+  check=lambda t, i, k: t[i].lemma == "終わる" and not (i > 0 and t[i - 1].s in ("て", "で")))
 P("tsuzukeru", "〜続ける", "keep doing", "Verb stem + 続ける",
   """続ける (つづける) after a verb stem means "continue doing": 一時間歩き続けた (I kept walking for an
   hour).""",
@@ -424,7 +426,8 @@ P("aida", "〜間 / 間に", "while, during", "Verb (ている) / Noun + の + �
 P("uchi_ni", "〜うちに", "while (still); before it changes", "Verb / adj / Noun + の + うちに",
   """うちに means doing something while a state lasts: 若いうちに旅行したい (I want to travel while I'm
   young). ないうちに = before something happens.""",
-  r"うちに", "若いうちにたくさん旅行したいです。", after="nva", check=first_lemma("内"))
+  # not うちに帰る / 来る ... (うち = home)
+  r"うちに(?!帰|かえ|来|き[てまた]|戻|遊)", "若いうちにたくさん旅行したいです。", after="nva", check=first_lemma("内"))
 P("made_ni", "〜までに", "by (deadline)", "Noun / Verb + までに",
   """までに sets a deadline: 五時までに帰る (be back by five). Compare まで, "until".""",
   r"までに", "五時までに帰ってください。", after="nv")
@@ -447,7 +450,7 @@ P("naide", "〜ないで (without)", "without doing", "Verb (ない-form) + で"
 P("zu_ni", "〜ずに", "without doing (written)", "Verb (ない-stem) + ずに",
   """ずに is the more written equivalent of ないで: 何も言わずに帰った (left without saying anything).
   する becomes せずに.""",
-  r"ずに", "彼は何も言わずに帰りました。", pre="v")
+  r"ずに(?!は)", "彼は何も言わずに帰りました。", pre="v")  # ずにはいられない is an N2 point
 P("nakute", "〜なくて", "because not", "Verb/adj (ない-form minus い) + くて",
   """なくて gives a negative reason: 友達が来なくて寂しかった (I was lonely because my friend didn't
   come).""",
@@ -463,7 +466,8 @@ P("oki_ni", "〜おきに", "every other, at intervals of", "Amount + おきに"
 P("toka", "〜とか", "things like, or", "Noun / Verb + とか",
   """とか lists examples casually: 本とか雑誌とか (books, magazines and such). It's the spoken
   counterpart of や...など.""",
-  r"とか(?![^。]*とか)", "週末は映画とか買い物とかに行きます。", after="nv", check=first_pos("助詞"))  # blank the last one
+  r"(?<!なん)(?<!何)(?<!っ)とか(?![^。]*とか)", "週末は映画とか買い物とかに行きます。", after="nv",
+  check=first_pos("助詞"))  # なんとか (somehow) is not a list  # blank the last one
 P("nado", "〜など / なんか", "and so on, things like", "Noun + など",
   """など means "and so on / such as": 果物などを買った. なんか is a casual version that can also be
   dismissive: 宿題なんかしたくない.""",
@@ -471,7 +475,8 @@ P("nado", "〜など / なんか", "and so on, things like", "Noun + など",
 P("demo_suggest", "〜でも (or something)", "or something, even", "Noun + でも",
   """でも after a noun softens a suggestion: お茶でも飲みませんか (would you like some tea or something?).
   It can also mean "even": 子供でも分かる.""",
-  r"でも", "お茶でも飲みませんか。", after="n",
+  # 何でも, 誰でも ... are "question word + でも" (any-)
+  r"(?<!何)(?<!なん)(?<!誰)(?<!だれ)(?<!どこ)(?<!いつ)(?<!どれ)でも", "お茶でも飲みませんか。", after="n",
   check=lambda t, i, k: t[i].p1 == "助詞",
   req=r"でも.{0,8}(?:ませんか|ましょう|どう|いかが|しよう|行こう|飲もう|食べよう)")
 P("q_ka", "Question word + か", "some- (something, someone)", "何か, 誰か, どこか, いつか",

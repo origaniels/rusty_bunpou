@@ -73,6 +73,12 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("uchi_ni", "私はたいてい７時頃うちに帰ります。"),  # うち = home
+    ("toka", "僕はなんとか時間までにそこに着いた。"),  # なんとか = somehow
+    ("toka", "なんで出発前に買っとかなかったの？"),  # っとく = ておく
+    ("demo_suggest", "彼は何でも自分の思い通りにしようとする。"),  # 何でも = anything
+    ("owaru", "あのドラマ、最後にいつも意味深な言葉を言って終わるよね。"),
+    ("zu_ni", "私は彼のことを考えずにはいられない。"),  # N2 ずにはいられない
     ("o_ni_naru", "いろいろお世話になりました。"),  # set phrase
     ("noni", "あなたの家を見つけるのに、何の苦労もありませんでしたよ。"),  # purpose のに
     ("koto_ga_aru_some", "明日は特に何もすることがありません。"),  # こと = thing to do
