@@ -430,3 +430,26 @@ fn original_sentences_are_not_credited_to_tatoeba() {
     }
     assert!(originals > 100, "{originals}");
 }
+
+#[test]
+fn stats_screen_pies_and_per_level_counts() {
+    use slint::Model;
+    let t = setup();
+    t.learn_lesson();
+    t.press("Stats");
+    assert_eq!(t.screen(), SCREEN_STATS);
+    let pies = t.app.ui.get_level_pies();
+    assert_eq!(pies.row_count(), 5);
+    let n5 = pies.row_data(0).unwrap();
+    let counts: Vec<i32> = (0..6).map(|i| n5.counts.row_data(i).unwrap()).collect();
+    assert_eq!(counts.iter().sum::<i32>(), n5.total, "every point is in exactly one stage");
+    assert_eq!(counts[0], n5.total - 5, "the rest of N5 is still New");
+    assert_eq!(counts[1], 5, "the five learned points are Beginners");
+    assert_eq!(n5.learned, 5);
+    assert_eq!(n5.slices.row_count(), 2, "two non-empty stages → two slices");
+    let n4 = pies.row_data(1).unwrap();
+    assert_eq!(n4.slices.row_count(), 1, "all New → one full grey circle");
+    assert_eq!(t.app.ui.get_stage_colors().row_count(), 6);
+    assert!(t.app.ui.invoke_go_back());
+    assert_eq!(t.screen(), SCREEN_HOME);
+}

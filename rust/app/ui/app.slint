@@ -24,6 +24,9 @@ export struct ListItem { id: string, num: string, title: string, meaning: string
 
 export struct LevelRow { name: string, learned: int, total: int }
 
+export struct PieSlice { path: string, fill: color }
+export struct LevelPie { name: string, learned: int, total: int, slices: [PieSlice], counts: [int] }
+
 export struct QuizData {
     title: string, done: int, total: int, key: string, en: string, hint: string,
     verdict: int, // 0 = unanswered, 1 = correct, 2 = wrong
@@ -234,7 +237,10 @@ export component AppWindow inherits Window {
     background: Theme.bg;
     default-font-size: 16px;
 
-    in-out property <int> screen; // 0 home, 1 lesson, 2 quiz, 3 list, 4 detail, 5 settings
+    in-out property <int> screen; // 0 home, 1 lesson, 2 quiz, 3 list, 4 detail, 5 settings, 6 stats
+    in property <[LevelPie]> level-pies;
+    /// colors of the SRS stages New, Beginner ... Mastered (pie slices and legend)
+    in property <[color]> stage-colors;
     in property <HomeData> home;
     in property <PointData> lesson-point;
     in property <int> lesson-index;
@@ -268,6 +274,7 @@ export component AppWindow inherits Window {
     callback open-list();
     callback open-detail(string);
     callback open-settings();
+    callback open-stats();
     callback set-furigana(bool);
     callback set-english(bool);
     callback set-romaji(bool);
@@ -326,28 +333,10 @@ export component AppWindow inherits Window {
                         Btn { text: root.home.learn-label; primary: true; enabled: root.home.new-count > 0; clicked => { root.start-learn(); } }
                     }
                 }
-                Card {
-                    VerticalLayout {
-                        padding: 16px; spacing: 10px;
-                        Text { text: "Progress: " + root.home.learned + " / " + root.home.total; font-size: 17px; font-weight: 600; color: Theme.fg; }
-                        for row in root.home.level-rows: HorizontalLayout {
-                            spacing: 10px;
-                            Text { text: row.name; width: 32px; font-size: 14px; font-weight: 600; color: Theme.fg; vertical-alignment: center; }
-                            ProgressBar { y: (parent.height - self.height) / 2; horizontal-stretch: 1; progress: row.total > 0 ? row.learned / row.total : 0; }
-                            Text { text: row.learned + " / " + row.total; width: 64px; font-size: 13px; color: Theme.muted; horizontal-alignment: right; vertical-alignment: center; }
-                        }
-                        HorizontalLayout {
-                            for name[i] in ["Beginner", "Adept", "Seasoned", "Expert", "Mastered"]: VerticalLayout {
-                                Text { text: root.home.levels[i]; font-size: 20px; font-weight: 700; color: Theme.fg; horizontal-alignment: center; }
-                                Text { text: name; font-size: 12px; color: Theme.muted; horizontal-alignment: center; }
-                            }
-                        }
-                        Text { text: "Reviews in the last 24 h: " + root.home.reviews-24h; font-size: 13px; color: Theme.muted; }
-                    }
-                }
                 HorizontalLayout {
                     spacing: 12px;
                     Btn { text: "Grammar list"; clicked => { root.open-list(); } }
+                    Btn { text: "Stats"; clicked => { root.open-stats(); } }
                     Btn { text: "Settings"; clicked => { root.open-settings(); } }
                 }
                 Text { text: "Example sentences: " + root.home.source; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
@@ -486,6 +475,74 @@ export component AppWindow inherits Window {
                         }
                     }
                     GrammarBody { p: root.notes; furigana: root.furigana; }
+                }
+            }
+
+            // ---------------------------------------------------------- stats
+            if root.screen == 6: VerticalLayout {
+                TopBar { title: "Stats"; back => { root.go-back(); } }
+                Scroller {
+                    vertical-stretch: 1;
+                    Card {
+                        VerticalLayout {
+                            padding: 16px; spacing: 14px;
+                            Text { text: "Progress: " + root.home.learned + " / " + root.home.total + " learned"; font-size: 17px; font-weight: 600; color: Theme.fg; }
+                            HorizontalLayout {
+                                spacing: 4px;
+                                for pie in root.level-pies: VerticalLayout {
+                                    spacing: 6px;
+                                    Text { text: pie.name; font-size: 15px; font-weight: 700; color: Theme.fg; horizontal-alignment: center; }
+                                    HorizontalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 58px; height: 58px;
+                                            for sl in pie.slices: Path {
+                                                width: parent.width; height: parent.height;
+                                                viewbox-width: 100; viewbox-height: 100;
+                                                commands: sl.path;
+                                                fill: sl.fill;
+                                                stroke: Theme.card; stroke-width: 1.5px;
+                                            }
+                                        }
+                                    }
+                                    Text { text: pie.learned + " / " + pie.total; font-size: 12px; color: Theme.muted; horizontal-alignment: center; }
+                                }
+                            }
+                            // legend (identity is never color-alone: every stage is named)
+                            for row in [[0, 1, 2], [3, 4, 5]]: HorizontalLayout {
+                                spacing: 8px;
+                                for i in row: HorizontalLayout {
+                                    // equal-width columns so both legend rows line up
+                                    spacing: 6px; width: (parent.width - 16px) / 3;
+                                    Rectangle { width: 12px; height: 12px; y: (parent.height - self.height) / 2; border-radius: 6px; background: root.stage-colors[i]; }
+                                    Text { text: ["New", "Beginner", "Adept", "Seasoned", "Expert", "Mastered"][i]; font-size: 13px; color: Theme.fg; vertical-alignment: center; }
+                                }
+                            }
+                        }
+                    }
+                    // one section per level with the exact count for every SRS stage
+                    Card {
+                        VerticalLayout {
+                            padding: 16px; spacing: 14px;
+                            Text { text: "By level"; font-size: 17px; font-weight: 600; color: Theme.fg; }
+                            for pie in root.level-pies: VerticalLayout {
+                                spacing: 6px;
+                                Text { text: "JLPT " + pie.name; font-size: 15px; font-weight: 700; color: Theme.accent; }
+                                HorizontalLayout {
+                                    for i in 6: VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        Text { text: pie.counts[i]; font-size: 18px; font-weight: 700; color: Theme.fg; horizontal-alignment: center; }
+                                        HorizontalLayout {
+                                            alignment: center; spacing: 4px;
+                                            Rectangle { width: 8px; height: 8px; y: (parent.height - self.height) / 2; border-radius: 4px; background: root.stage-colors[i]; }
+                                            Text { text: ["New", "Beginner", "Adept", "Seasoned", "Expert", "Mastered"][i]; font-size: 11px; color: Theme.muted; }
+                                        }
+                                    }
+                                }
+                            }
+                            Text { text: "Reviews in the last 24 h: " + root.home.reviews-24h; font-size: 13px; color: Theme.muted; }
+                        }
+                    }
                 }
             }
 

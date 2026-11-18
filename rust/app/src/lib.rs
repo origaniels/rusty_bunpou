@@ -23,6 +23,45 @@ pub const SCREEN_QUIZ: i32 = 2;
 pub const SCREEN_LIST: i32 = 3;
 pub const SCREEN_DETAIL: i32 = 4;
 pub const SCREEN_SETTINGS: i32 = 5;
+pub const SCREEN_STATS: i32 = 6;
+
+/// SRS stage colors: New (neutral grey), then Beginner → Mastered as one blue ramp that gets
+/// brighter (= further along) on the dark surface. Validated as an ordinal ramp against the
+/// card color (#2b2a33): monotone lightness, visible steps, darkest step ≥ 2:1 contrast.
+const STAGE_COLORS: [(u8, u8, u8); 6] =
+    [(0x55, 0x53, 0x5e), (0x25, 0x6a, 0xbf), (0x39, 0x87, 0xe5), (0x6d, 0xa7, 0xec), (0x9e, 0xc5, 0xf4), (0xcd, 0xe2, 0xfb)];
+
+fn stage_color(i: usize) -> slint::Color {
+    let (r, g, b) = STAGE_COLORS[i];
+    slint::Color::from_rgb_u8(r, g, b)
+}
+
+/// One pie per JLPT level: points per SRS stage (New, Beginner ... Mastered).
+pub fn level_pies(content: &Content, progress: &Progress) -> Vec<LevelPie> {
+    let mut out: Vec<(String, [u32; 6])> = vec![];
+    for p in &content.points {
+        if out.last().is_none_or(|(n, _)| *n != p.level) {
+            out.push((p.level.clone(), [0; 6]));
+        }
+        let card = progress.card(&p.id);
+        let stage = if card.is_new() { 0 } else { 1 + LEVELS.iter().position(|l| *l == card.level_name()).unwrap_or(0) };
+        out.last_mut().unwrap().1[stage] += 1;
+    }
+    out.into_iter()
+        .map(|(name, counts)| LevelPie {
+            name: name.into(),
+            learned: (counts.iter().sum::<u32>() - counts[0]) as i32,
+            total: counts.iter().sum::<u32>() as i32,
+            counts: model(counts.iter().map(|&c| c as i32).collect()),
+            slices: model(
+                bunpo_core::chart::pie_slices(&counts, 100.0)
+                    .into_iter()
+                    .map(|s| PieSlice { path: s.path.into(), fill: stage_color(s.category) })
+                    .collect(),
+            ),
+        })
+        .collect()
+}
 const RETENTIONS: [f64; 3] = [0.85, 0.9, 0.95];
 const LEVELS: [&str; 5] = ["Beginner", "Adept", "Seasoned", "Expert", "Mastered"];
 
@@ -181,6 +220,7 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
         source: content.source.as_str().into(),
         level_rows: model(level_rows(content, &st.progress)),
     });
+    ui.set_level_pies(model(level_pies(content, &st.progress)));
 }
 
 /// Learned / total per JLPT level, in content order (N5 first).
@@ -348,6 +388,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         detail: None,
     }));
     let ui = AppWindow::new()?;
+    ui.set_stage_colors(model((0..6).map(stage_color).collect()));
 
     {
         let c = content.clone();
@@ -543,6 +584,11 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             show(&ui, &mut st, SCREEN_DETAIL);
         });
     }
+
+    ui.on_open_stats(cb!(|ui, c, st| {
+        refresh_home(&ui, &c, &st);
+        show(&ui, &mut st, SCREEN_STATS);
+    }));
 
     ui.on_open_settings(cb!(|ui, c, st| {
         refresh_settings(&ui, &st);
