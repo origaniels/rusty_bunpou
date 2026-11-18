@@ -179,23 +179,49 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
         levels: model(levels.to_vec()),
         reviews_24h: st.progress.reviews_since(now - 86_400_000) as i32,
         source: content.source.as_str().into(),
+        level_rows: model(level_rows(content, &st.progress)),
     });
 }
 
+/// Learned / total per JLPT level, in content order (N5 first).
+pub fn level_rows(content: &Content, progress: &Progress) -> Vec<LevelRow> {
+    let mut rows: Vec<LevelRow> = vec![];
+    for p in &content.points {
+        if rows.last().is_none_or(|r| r.name != p.level.as_str()) {
+            rows.push(LevelRow { name: p.level.as_str().into(), learned: 0, total: 0 });
+        }
+        let r = rows.last_mut().unwrap();
+        r.total += 1;
+        if !progress.card(&p.id).is_new() {
+            r.learned += 1;
+        }
+    }
+    rows
+}
+
 fn refresh_list(ui: &AppWindow, content: &Content, st: &State) {
-    ui.set_grammar_list(model(
-        content
-            .points
-            .iter()
-            .map(|p| ListItem {
-                id: p.id.as_str().into(),
-                num: (p.order + 1).to_string().into(),
-                title: p.title.as_str().into(),
-                meaning: p.meaning.as_str().into(),
-                level: st.progress.card(&p.id).level_name().into(),
-            })
-            .collect(),
-    ));
+    let mut items = vec![];
+    let mut level = "";
+    let mut n = 0;
+    for p in &content.points {
+        let header = if p.level != level {
+            level = &p.level;
+            n = 0;
+            format!("JLPT {}", p.level)
+        } else {
+            String::new()
+        };
+        n += 1;
+        items.push(ListItem {
+            id: p.id.as_str().into(),
+            num: n.to_string().into(),
+            title: p.title.as_str().into(),
+            meaning: p.meaning.as_str().into(),
+            level: st.progress.card(&p.id).level_name().into(),
+            header: header.into(),
+        });
+    }
+    ui.set_grammar_list(model(items));
 }
 
 fn refresh_settings(ui: &AppWindow, st: &State) {
@@ -235,12 +261,7 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         q.last_answer = sess.last_answer.as_str().into();
         q.answer = s.answers.iter().take(2).cloned().collect::<Vec<_>>().join("  /  ").into();
         q.grammar_line = format!("Grammar: {} — {}", p.title, p.meaning).into();
-        q.attribution = if s.owner.is_empty() {
-            format!("Tatoeba #{}", s.id)
-        } else {
-            format!("Tatoeba #{} by {}", s.id, s.owner)
-        }
-        .into();
+        q.attribution = s.attribution().into();
         ui.set_notes(point_data(content, st, &p.id));
     }
     ui.set_quiz(q);
@@ -304,6 +325,7 @@ fn layout_for(content: &Content, key: &str, mode: i32, typed: &str, furigana: bo
                 })
                 .collect(),
         ),
+        frames: model(l.cloze_rects.iter().map(|r| Frame { x: r.x, y: r.y, w: r.w, h: r.h }).collect()),
         cloze_x: l.cloze.x,
         cloze_y: l.cloze.y,
         cloze_w: l.cloze.w,

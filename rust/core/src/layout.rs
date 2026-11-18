@@ -39,8 +39,10 @@ pub struct Rect {
 #[derive(Debug, Clone, Default)]
 pub struct Layout {
     pub glyphs: Vec<Glyph>,
-    /// Frame around the cloze's main text line (box in Blank mode).
+    /// Frame around the cloze's main text line (box in Blank mode); the first line if it wraps.
     pub cloze: Rect,
+    /// One frame per line the cloze occupies (a long cloze may wrap).
+    pub cloze_rects: Vec<Rect>,
     pub height: f32,
     pub main_h: f32,
     pub ruby_h: f32,
@@ -132,12 +134,16 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
     let mut units: Vec<Unit> = Vec::new();
     let mut blank_added = false;
     let ps = pieces(s);
+    // a cloze that fits on one line stays together; a longer one may wrap like normal text
+    let cloze_w: f32 = ps.iter().filter(|p| p.cloze).map(|p| text_width(&p.text, m.font)).sum();
+    // (leave room for one closing punctuation mark that sticks to the cloze)
+    let keep_cloze_together = cloze_w + 2.0 * pad + m.font <= max_width;
     let has_ruby = |i: usize| m.furigana && ps.get(i).is_some_and(|p| !p.ruby.is_empty());
     for (i, Piece { text, ruby, cloze }) in ps.iter().enumerate() {
         let (text, ruby, cloze) = (text.clone(), ruby.clone(), *cloze);
         if cloze && mode == ClozeMode::Blank {
             if !blank_added {
-                let w = (text_width(typed, m.font) + 2.0 * pad).max(m.font * 3.0);
+                let w = (text_width(typed, m.font) + 2.0 * pad).max(m.font * 3.0).min(max_width);
                 units.push(Unit { items: vec![], width: w, is_blank: true, blank_w: w });
                 blank_added = true;
             }
@@ -162,6 +168,7 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
         let attach = NO_LINE_START.contains(first) && !units.is_empty();
         // cloze characters in Highlight/Revealed stay together as one unit
         let join_cloze = cloze
+            && keep_cloze_together
             && units.last().is_some_and(|u| !u.is_blank && u.items.last().is_some_and(|it| it.2));
         if attach || join_cloze {
             let u = units.last_mut().unwrap();
@@ -179,37 +186,53 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
     let (mut x, mut y) = (0.0f32, 0.0f32);
     // cloze frame: 0 = not reached, 1 = open, 2 = closed
     let mut frame = 0u8;
-    let (mut cmin, mut cmax) = (0.0f32, 0.0f32);
+    // per line: (y, min x, max x)
+    let mut segs: Vec<(f32, f32, f32)> = vec![];
     for u in units {
         let has_cloze = u.is_blank || u.items.iter().any(|it| it.2);
-        let extra = if has_cloze { 2.0 * p } else { 0.0 };
+        // padding of the cloze frame: both sides if the unit holds the cloze, the closing side
+        // if the frame is still open and this unit comes right after it
+        let extra = if has_cloze { 2.0 * p } else if frame == 1 { p } else { 0.0 };
         if x > 0.0 && x + u.width + extra > max_width {
             x = 0.0;
             y += line_h + gap;
         }
         if u.is_blank {
             out.cloze = Rect { x, y: y + ruby_h, w: u.blank_w, h: main_h };
+            out.cloze_rects.push(out.cloze);
             x += u.blank_w;
         }
         for (text, ruby, in_cloze, w, ruby_w, ruby_x) in u.items {
             if in_cloze && frame == 0 {
                 frame = 1;
                 x += p;
-                cmin = x;
-                out.cloze.y = y + ruby_h;
             } else if !in_cloze && frame == 1 {
                 frame = 2;
                 x += p;
             }
-            out.glyphs.push(Glyph { x, y: y + ruby_h, w, text, ruby, ruby_w, ruby_x, in_cloze });
-            x += w;
+            let gy = y + ruby_h;
             if in_cloze {
-                cmax = x;
+                match segs.last_mut() {
+                    Some(seg) if seg.0 == gy => seg.2 = x + w,
+                    _ => segs.push((gy, x, x + w)),
+                }
             }
+            out.glyphs.push(Glyph { x, y: gy, w, text, ruby, ruby_w, ruby_x, in_cloze });
+            x += w;
         }
     }
-    if mode != ClozeMode::Blank && frame > 0 {
-        out.cloze = Rect { x: cmin - p, y: out.cloze.y, w: cmax - cmin + 2.0 * p, h: main_h };
+    if mode != ClozeMode::Blank && !segs.is_empty() {
+        let n = segs.len();
+        out.cloze_rects = segs
+            .iter()
+            .enumerate()
+            .map(|(k, &(sy, a, b))| {
+                let left = if k == 0 { p } else { 0.0 };
+                let right = if k == n - 1 { p } else { 0.0 };
+                Rect { x: a - left, y: sy, w: b - a + left + right, h: main_h }
+            })
+            .collect();
+        out.cloze = out.cloze_rects[0];
     }
     out.height = y + line_h;
     out
@@ -274,9 +297,12 @@ mod tests {
                     let l = layout(s, 300.0, Metrics::new(24.0, true), mode, "");
                     // every glyph stays inside the width (single over-wide units aside)
                     for g in &l.glyphs {
-                        assert!(g.x + g.w <= 300.0 + 30.0, "{} overflows", s.ja);
+                        assert!(g.x + g.w <= 300.0 + 0.5, "{} overflows", s.ja);
                     }
                     assert!(l.cloze.w > 0.0, "no cloze rect for {}", s.ja);
+                    for r in &l.cloze_rects {
+                        assert!(r.x >= -0.5 && r.x + r.w <= 300.0 + 0.5, "frame overflows in {}", s.ja);
+                    }
                     // rebuilt text matches (blank mode drops the cloze chars)
                     let text: String = l.glyphs.iter().map(|g| g.text.as_str()).collect();
                     if mode == ClozeMode::Blank {

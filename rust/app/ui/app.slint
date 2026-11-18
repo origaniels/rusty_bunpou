@@ -4,7 +4,10 @@ import { LineEdit, Switch, ScrollView, ListView } from "std-widgets.slint";
 
 export struct Glyph { x: length, y: length, w: length, text: string, ruby: string, ruby-x: length, ruby-w: length, cloze: bool }
 
+export struct Frame { x: length, y: length, w: length, h: length }
+
 export struct SentenceData {
+    frames: [Frame],
     glyphs: [Glyph],
     cloze-x: length, cloze-y: length, cloze-w: length, cloze-h: length,
     height: length, ruby-h: length, main-h: length,
@@ -17,7 +20,9 @@ export struct PointData {
     explanation: string, status: string, can-reset: bool, examples: [Example],
 }
 
-export struct ListItem { id: string, num: string, title: string, meaning: string, level: string }
+export struct ListItem { id: string, num: string, title: string, meaning: string, level: string, header: string }
+
+export struct LevelRow { name: string, learned: int, total: int }
 
 export struct QuizData {
     title: string, done: int, total: int, key: string, en: string, hint: string,
@@ -28,7 +33,7 @@ export struct QuizData {
 
 export struct HomeData {
     due: int, new-count: int, learned: int, total: int, next-due: string, next-titles: string,
-    learn-label: string, levels: [int], reviews-24h: int, source: string,
+    learn-label: string, levels: [int], reviews-24h: int, source: string, level-rows: [LevelRow],
 }
 
 export global Logic {
@@ -60,10 +65,13 @@ component SentenceView {
     min-height: d.height;
     preferred-height: d.height;
 
+    // one frame per line: a long blank may wrap
     if mode == 0: Rectangle {
-        x: d.cloze-x; y: d.cloze-y; width: d.cloze-w; height: d.cloze-h;
-        background: Theme.gold.with-alpha(0.25);
-        border-radius: 4px;
+        for f in d.frames: Rectangle {
+            x: f.x; y: f.y; width: f.w; height: f.h;
+            background: Theme.gold.with-alpha(0.25);
+            border-radius: 4px;
+        }
     }
     for g in d.glyphs: Rectangle {
         x: g.x; y: g.y - d.ruby-h; width: g.w; height: d.ruby-h + d.main-h;
@@ -85,12 +93,15 @@ component SentenceView {
         }
     }
     if mode != 0: Rectangle {
-        x: d.cloze-x; y: d.cloze-y; width: d.cloze-w; height: d.cloze-h;
-        border-width: 2px; border-radius: 4px; border-color: root.frame-color;
-        if mode == 1: Text {
-            text: typed; font-size: root.font-size; color: Theme.accent;
-            horizontal-alignment: center; vertical-alignment: center; wrap: no-wrap;
+        for f in d.frames: Rectangle {
+            x: f.x; y: f.y; width: f.w; height: f.h;
+            border-width: 2px; border-radius: 4px; border-color: root.frame-color;
         }
+    }
+    if mode == 1: Text {
+        x: d.cloze-x; y: d.cloze-y; width: d.cloze-w; height: d.cloze-h;
+        text: typed; font-size: root.font-size; color: Theme.accent;
+        horizontal-alignment: center; vertical-alignment: center; wrap: no-wrap; overflow: elide;
     }
 }
 
@@ -318,8 +329,13 @@ export component AppWindow inherits Window {
                 Card {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
-                        Text { text: "N5 progress: " + root.home.learned + " / " + root.home.total; font-size: 17px; font-weight: 600; color: Theme.fg; }
-                        ProgressBar { progress: root.home.total > 0 ? root.home.learned / root.home.total : 0; }
+                        Text { text: "Progress: " + root.home.learned + " / " + root.home.total; font-size: 17px; font-weight: 600; color: Theme.fg; }
+                        for row in root.home.level-rows: HorizontalLayout {
+                            spacing: 10px;
+                            Text { text: row.name; width: 32px; font-size: 14px; font-weight: 600; color: Theme.fg; vertical-alignment: center; }
+                            ProgressBar { y: (parent.height - self.height) / 2; horizontal-stretch: 1; progress: row.total > 0 ? row.learned / row.total : 0; }
+                            Text { text: row.learned + " / " + row.total; width: 64px; font-size: 13px; color: Theme.muted; horizontal-alignment: right; vertical-alignment: center; }
+                        }
                         HorizontalLayout {
                             for name[i] in ["Beginner", "Adept", "Seasoned", "Expert", "Mastered"]: VerticalLayout {
                                 Text { text: root.home.levels[i]; font-size: 20px; font-weight: 700; color: Theme.fg; horizontal-alignment: center; }
@@ -425,16 +441,23 @@ export component AppWindow inherits Window {
 
             // ---------------------------------------------------------- grammar list
             if root.screen == 3: VerticalLayout {
-                TopBar { title: "Grammar — N5"; back => { root.go-back(); } }
+                TopBar { title: "Grammar"; back => { root.go-back(); } }
                 ListView {
                     vertical-stretch: 1;
                     for item in root.grammar-list: TouchArea {
-                        height: row.preferred-height;
+                        height: col.preferred-height;
                         clicked => { root.open-detail(item.id); }
                         accessible-role: list-item;
                         accessible-label: item.title;
                         accessible-action-default => { root.open-detail(item.id); }
-                        row := HorizontalLayout {
+                        col := VerticalLayout {
+                        // section header at the first point of each JLPT level
+                        if item.header != "": Rectangle {
+                            height: 44px;
+                            background: Theme.card;
+                            Text { x: 16px; text: item.header; font-size: 17px; font-weight: 700; color: Theme.accent; vertical-alignment: center; }
+                        }
+                        HorizontalLayout {
                             padding: 12px; padding-left: 16px; spacing: 12px;
                             Text { text: item.num; width: 28px; color: Theme.muted; vertical-alignment: center; }
                             VerticalLayout {
@@ -443,6 +466,7 @@ export component AppWindow inherits Window {
                                 Text { text: item.meaning; font-size: 13px; color: Theme.muted; wrap: word-wrap; }
                             }
                             Pill { text: item.level; y: (parent.height - self.height) / 2; }
+                        }
                         }
                         Rectangle { y: parent.height - 1px; height: 1px; background: #3a3846; }
                     }

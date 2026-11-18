@@ -389,3 +389,44 @@ fn resume_refreshes_due_counts() {
     assert!(t.rec.last().starts_with("schedule"), "reminder re-armed: {:?}", t.rec.0.borrow());
     clock::reset();
 }
+
+#[test]
+fn progress_per_level_and_list_headers() {
+    use slint::Model;
+    let t = setup();
+    let rows = t.app.ui.get_home().level_rows;
+    let names: Vec<String> = (0..rows.row_count()).map(|i| rows.row_data(i).unwrap().name.to_string()).collect();
+    assert_eq!(names, ["N5", "N4", "N3", "N2", "N1"]);
+    let total: i32 = (0..rows.row_count()).map(|i| rows.row_data(i).unwrap().total).sum();
+    assert_eq!(total, t.app.ui.get_home().total);
+    t.learn_lesson();
+    let n5 = t.app.ui.get_home().level_rows.row_data(0).unwrap();
+    assert_eq!(n5.learned, 5);
+
+    let list = t.app.ui.get_grammar_list();
+    let headers: Vec<String> = (0..list.row_count())
+        .map(|i| list.row_data(i).unwrap().header.to_string())
+        .filter(|h| !h.is_empty())
+        .collect();
+    assert_eq!(headers, ["JLPT N5", "JLPT N4", "JLPT N3", "JLPT N2", "JLPT N1"]);
+    // numbering restarts per level
+    let first_n4 = (0..list.row_count()).map(|i| list.row_data(i).unwrap()).find(|r| r.header == "JLPT N4").unwrap();
+    assert_eq!(first_n4.num, "1");
+}
+
+#[test]
+fn original_sentences_are_not_credited_to_tatoeba() {
+    let t = setup();
+    let mut originals = 0;
+    for s in t.app.content.points.iter().flat_map(|p| &p.sentences) {
+        let a = s.attribution();
+        if s.src == "app" {
+            originals += 1;
+            assert_eq!(a, "Example written for this app");
+        } else {
+            assert!(a.starts_with("Tatoeba #"), "{a}");
+            assert!(s.id < 900_000_000, "Tatoeba ids are real ids: {}", s.id);
+        }
+    }
+    assert!(originals > 100, "{originals}");
+}

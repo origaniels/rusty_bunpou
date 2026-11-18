@@ -19,6 +19,22 @@ pub struct Sentence {
     pub cloze: [usize; 2],
     pub answers: Vec<String>,
     pub hint: Option<String>,
+    /// "app" for example sentences written for this app (not from Tatoeba).
+    #[serde(default)]
+    pub src: String,
+}
+
+impl Sentence {
+    /// Credit line shown under the sentence.
+    pub fn attribution(&self) -> String {
+        if self.src == "app" {
+            "Example written for this app".into()
+        } else if self.owner.is_empty() {
+            format!("Tatoeba #{}", self.id)
+        } else {
+            format!("Tatoeba #{} by {}", self.id, self.owner)
+        }
+    }
 }
 
 impl Sentence {

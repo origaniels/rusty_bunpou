@@ -82,7 +82,7 @@ def tokenize(text: str) -> list[Tok]:
     for i, t in enumerate(out):
         if t.s == "何" and t.kana == "なん" and i + 1 < len(out):
             n = out[i + 1]
-            if n.p1 == "助詞" and n.s in ("か", "を", "が", "も", "に", "へ", "や", "から", "まで", "より", "しか", "でも"):
+            if n.p1 == "助詞" and n.s in ("か", "かしら", "を", "が", "も", "に", "へ", "や", "から", "まで", "より", "しか", "でも"):
                 t.kana = "なに"
     return out
 

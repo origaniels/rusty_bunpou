@@ -67,6 +67,8 @@ def load_candidates():
     for line in open(RAW / "jpn_sentences_detailed.tsv", encoding="utf8"):
         p = line.rstrip("\n").split("\t")
         sid, text, owner = int(p[0]), p[2], p[3]
+        # Japanese doesn't use spaces; the tokenizer drops them, which would desync furigana and text
+        text = re.sub(r"[ 　]+", "", text)
         if not (5 <= len(text) <= MAX_LEN) or BAD_CHARS.search(text):
             continue
         if text[-1] not in "。？！?!":
@@ -341,7 +343,7 @@ def main():
                 print("  ", s["ja"][:a] + "[" + s["ja"][a:b] + "]" + s["ja"][b:], "|", s["en"], "|", s["hint"])
 
     OUT.mkdir(parents=True, exist_ok=True)
-    content = dict(version=2, source="Tatoeba (https://tatoeba.org), CC-BY 2.0 FR", points=points_out)
+    content = dict(version=2, source="Tatoeba (https://tatoeba.org), CC-BY 2.0 FR; some examples written for this app", points=points_out)
     (OUT / "content.json").write_text(json.dumps(content, ensure_ascii=False, separators=(",", ":")), encoding="utf8")
 
     print(f"\n{'level':6} {'points':>7} {'dropped':>8} {'sentences':>10} {'avg/pt':>7} {'median':>7} {'<8':>4}")

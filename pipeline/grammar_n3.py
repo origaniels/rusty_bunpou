@@ -221,7 +221,7 @@ P("to_wa", "〜とは (definition)", "what is meant by", "Noun + とは",
   """とは introduces a definition: 「愛」とは何か (what is love?). It's a formal というのは.""",
   r"とは", "幸せとは何でしょうか。", after="n", neg=r"とは(?:言|限)")
 P("to_iu_no_wa", "〜というのは", "(what is called) ...", "Noun / sentence + というのは",
-  """というのは explains or defines: 「積ん読」というのは、本を買っても読まないことだ.""",
+  """というのは introduces something in order to explain or define it: 「積ん読」というのは、本を買っても読まないことだ ("tsundoku" means buying books and not reading them). It also gives a reason at the start of a sentence: というのは... (the thing is...).""",
   r"というのは|ってのは", "大人になるというのは、責任を持つことだ。", after="any")
 P("to_iu_koto", "〜ということ", "the fact that", "Plain form + ということ",
   """ということ turns a sentence into a noun phrase: 彼が結婚したということを知らなかった (I didn't know that he
@@ -303,7 +303,7 @@ P("nai_koto_wa_nai", "〜ないことはない", "it's not that ... not (can, af
   """ないことはない is a cautious double negative: 行けないことはない (it's not that I can't go).""",
   r"ないことは(?:ない|ありません)", "行けないことはないですが、少し遠いです。", pre="va")
 P("you_ni_omoeru", "〜ように見える", "looks as if", "Plain form / Noun + の + ように見える",
-  """ように見える describes appearance: 彼は疲れているように見える (he looks tired).""",
+  """ように見える describes how something appears from the outside: 彼は疲れているように見える (he looks tired). After a noun use のように見える; そうに見える is a close, slightly more direct alternative.""",
   r"ように(?:見え|みえ)", "彼は疲れているように見えます。", after="any", tail=True)
 P("gimi", "〜気味", "a bit, slightly (tendency)", "Noun / verb stem + 気味",
   """気味 (ぎみ) means "a touch of, tending to": 風邪気味 (a bit of a cold), 疲れ気味 (a little tired).""",

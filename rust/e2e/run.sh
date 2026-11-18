@@ -72,7 +72,8 @@ launch
 [ "$(due_now)" = 0 ] || fail "fresh install has due reviews"; ok "fresh start, nothing due"
 
 echo "== settings: 3 points per lesson (だ, です, でした: one possible answer each)"
-tap 790 1823; wait_ev '^screen=5'              # Settings
+$A shell input swipe 540 2000 540 300 300; sleep 1   # scroll home to the bottom
+tap 790 2097; wait_ev '^screen=5'              # Settings
 tap 112 964                                    # "3"
 $A shell input keyevent 4; wait_ev '^screen=0 back'
 echo "== lesson"

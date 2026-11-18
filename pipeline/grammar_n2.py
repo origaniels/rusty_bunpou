@@ -105,7 +105,7 @@ P("nagara_mo", "〜ながらも", "although, while", "Verb stem / adj + なが�
   """ながらも means "although": 狭いながらも楽しい我が家 (our home, small but happy).""",
   r"ながらも", "狭いながらも、楽しい我が家です。", after="any")
 P("tsutsu_mo", "〜つつも", "although (doing)", "Verb stem + つつも",
-  """つつも is a written "although": 体に悪いと知りつつも、タバコがやめられない.""",
+  """つつも is a written "although (while doing)": 体に悪いと知りつつも、タバコがやめられない (although I know it is bad for me, I can't quit smoking). It usually involves knowing or thinking one thing while doing the opposite.""",
   r"つつも", "体に悪いと知りつつも、タバコがやめられない。", pre="v")
 P("tsutsu", "〜つつ", "while (doing)", "Verb stem + つつ",
   """つつ is a written ながら: 景色を楽しみつつ歩く (walk while enjoying the view).""",
@@ -149,7 +149,7 @@ P("wa_tomokaku", "〜はともかく", "leaving aside", "Noun + はともかく"
   """はともかく sets a point aside: 味はともかく、量が多い (taste aside, the portions are big).""",
   r"はともかく(?:として)?", "味はともかく、量が多い店です。", after="n")
 P("wa_motoyori", "〜はもとより", "not to mention", "Noun + はもとより",
-  """はもとより is a formal はもちろん: 子供はもとより大人も楽しめる.""",
+  """はもとより means "not to mention, let alone" and is a more formal はもちろん: 子供はもとより大人も楽しめる (adults can enjoy it, not to mention children). The second part usually contains も.""",
   r"はもとより", "子供はもとより、大人も楽しめます。", after="n")
 
 # ---------------------------------------------------------------- relations (formal)
@@ -160,7 +160,7 @@ P("wo_towazu", "〜を問わず", "regardless of", "Noun + を問わず",
   """を問わず (とわず) means "regardless of": 男女を問わず (regardless of gender).""",
   r"を(?:問|と)わず", "経験を問わず、誰でも応募できます。", after="n")
 P("ni_kagirazu", "〜に限らず", "not only", "Noun + に限らず",
-  """に限らず (かぎらず) means "not limited to": 若者に限らず、お年寄りにも人気がある.""",
+  """に限らず (かぎらず) means "not limited to": 若者に限らず、お年寄りにも人気がある (it is popular not only with young people but with the elderly too). The second half widens the scope, typically with も.""",
   r"に(?:限|かぎ)らず", "若者に限らず、お年寄りにも人気があります。", after="n")
 P("ni_kagiru", "〜に限る", "nothing beats", "Noun / Verb + に限る",
   """に限る means "X is the best": 夏はビールに限る (nothing beats beer in summer).""",
@@ -172,7 +172,7 @@ P("ni_sugi_nai", "〜に過ぎない", "merely, no more than", "Noun / plain for
   """に過ぎない (すぎない) means "nothing more than": それは噂に過ぎない (it's only a rumor).""",
   r"に(?:過|す)ぎ(?:ない|ません)", "それはただの噂に過ぎない。", after="any")
 P("ni_kuwaete", "〜に加えて", "in addition to", "Noun + に加えて",
-  """に加えて (くわえて) means "in addition to": 雨に加えて風も強くなった.""",
+  """に加えて (くわえて) means "in addition to": 雨に加えて風も強くなった (on top of the rain, the wind got stronger too). It is written or formal; casual speech would use それに or だけじゃなく.""",
   r"に(?:加|くわ)え(?:て)?", "雨に加えて、風も強くなってきた。", after="n")
 P("ni_tomonatte", "〜に伴って", "along with, as", "Noun / Verb + に伴って",
   """に伴って (ともなって) describes things changing together: 人口の増加に伴って、問題も増えた.""",
@@ -187,7 +187,7 @@ P("ni_motozuite", "〜に基づいて", "based on", "Noun + に基づいて",
   """に基づいて (もとづいて) means "based on": 事実に基づいた映画 (a film based on facts).""",
   r"に(?:基|もと)づ(?:いて|いた|く|き)", "これは事実に基づいた話です。", after="n")
 P("wo_moto_ni", "〜をもとに", "based on (using as material)", "Noun + をもとに",
-  """をもとに means "using X as a basis": 経験をもとに小説を書いた.""",
+  """をもとに means "based on, using X as material": 経験をもとに小説を書いた (I wrote a novel based on my experience). Compare に基づいて, which means "in accordance with" rules or facts.""",
   r"を(?:もと|基|元)に(?:して)?", "自分の経験をもとに小説を書いた。", after="n")
 P("wo_tooshite", "〜を通して / 〜を通じて", "through, via; throughout", "Noun + を通して",
   """を通して (とおして) / を通じて (つうじて) mean "through (a means)" or "throughout (a period)".""",
@@ -199,7 +199,7 @@ P("wo_hajime", "〜をはじめ", "starting with, including", "Noun + をはじ�
   """をはじめ means "beginning with (as the main example)": 社長をはじめ、社員全員が集まった.""",
   r"を(?:はじめ|始め)(?:として|とする)?", "社長をはじめ、社員全員が集まった。", after="n")
 P("ni_hanshite", "〜に反して", "contrary to", "Noun + に反して",
-  """に反して (はんして) means "against / contrary to": 予想に反して、試合に負けた.""",
+  """に反して (はんして) means "contrary to, against": 予想に反して、試合に負けた (contrary to expectations, we lost the game). It is used with expectations, wishes or rules; before a noun it becomes に反する.""",
   r"に(?:反|はん)(?:して|し|する)", "予想に反して、試合に負けた。", after="n")
 P("ni_sakidatte", "〜に先立って", "prior to", "Noun + に先立って",
   """に先立って (さきだって) means "before (as preparation)": 試合に先立って開会式が行われた.""",
@@ -208,28 +208,28 @@ P("ni_watatte", "〜にわたって", "over, throughout (a range)", "Noun + に�
   """にわたって means "spanning (a long time / wide area)": 三日間にわたって会議が開かれた.""",
   r"に(?:わた|渡)(?:って|り|る)", "三日間にわたって会議が開かれた。", after="n")
 P("ni_kakete", "〜にかけて", "through, over (from ... to)", "Noun + にかけて",
-  """から〜にかけて means "from ... through ...": 夜から朝にかけて雨が降る.""",
+  """から〜にかけて means "from ... through ..." for a stretch of time or space with fuzzy edges: 夜から朝にかけて雨が降る (it will rain from night into the morning). Compare から〜まで, which has clear end points.""",
   r"にかけて(?:は)?", "夜から朝にかけて雨が降るでしょう。", after="n")
 P("ni_oite", "〜において", "in, at (formal)", "Noun + において",
   """において is a formal で: 会議は大阪において行われる (the conference will be held in Osaka).""",
   r"において|における|においては", "会議は東京において行われます。", after="n")
 P("ni_mukete", "〜に向けて", "toward, for", "Noun + に向けて",
-  """に向けて (むけて) means "toward (a goal)": 試験に向けて勉強している.""",
+  """に向けて (むけて) means "toward (a goal or target)": 試験に向けて勉強している (I'm studying for the exam). It can also mean "aimed at" people: 若者に向けたメッセージ (a message for young people).""",
   r"に(?:向|む)け(?:て)?", "来月の試験に向けて勉強しています。", after="n")
 P("wo_kikkake_ni", "〜をきっかけに", "taking ... as a chance", "Noun + をきっかけに",
-  """をきっかけに means "with X as the trigger": 留学をきっかけに料理を始めた.""",
+  """をきっかけに means "with X as the trigger / taking X as the occasion": 留学をきっかけに料理を始めた (studying abroad got me into cooking). を契機に and を機に are more formal variants.""",
   r"を(?:きっかけ|契機|機)に(?:して)?", "留学をきっかけに、料理を始めました。", after="any")
 P("wo_nozoite", "〜を除いて", "except for", "Noun + を除いて",
-  """を除いて (のぞいて) means "except": 日曜日を除いて毎日営業している.""",
+  """を除いて (のぞいて) means "except for": 日曜日を除いて毎日営業している (we're open every day except Sunday). It is a formal 以外; を除き is the written variant.""",
   r"を(?:除|のぞ)(?:いて|き|く)", "日曜日を除いて、毎日営業しています。", after="n")
 P("nuki", "〜抜きで / 〜を抜きにして", "without, leaving out", "Noun + 抜きで",
   """抜き (ぬき) means "without": 朝ご飯抜きで出かけた (went out without breakfast).""",
   r"(?:抜|ぬ)き(?:で|に|の|には)", "朝ご飯抜きで出かけました。", after="n")
 P("irai", "〜以来", "since", "Verb (て) / Noun + 以来",
-  """以来 (いらい) means "ever since": 卒業して以来、彼に会っていない.""",
+  """以来 (いらい) means "ever since": 卒業して以来、彼に会っていない (I haven't seen him since we graduated). After a verb it takes the て-form; after a noun it attaches directly: 先月以来.""",
   r"以来", "卒業して以来、彼に会っていません。", after="any")
 P("sue_ni", "〜末(に)", "after (a long process), finally", "Verb (た) / Noun + の + 末に",
-  """末に (すえに) means "after a long process": よく考えた末に、会社を辞めた.""",
+  """末に (すえに) means "at the end of (a long process)": よく考えた末に、会社を辞めた (after thinking it over carefully, I quit my job). It attaches to a past verb or to Noun + の, and the result can be good or bad.""",
   r"(?:末|すえ)(?:に|の)?", "よく考えた末に、会社を辞めることにした。", after="any",
   check=lambda t, i, k: t[i].kana == "すえ")
 P("ageku", "〜あげく", "in the end (after much trouble)", "Verb (た) / Noun + の + あげく",
@@ -275,7 +275,7 @@ P("zaru_wo_enai", "〜ざるを得ない", "have no choice but to", "Verb (な�
   する becomes せざる.""",
   r"ざるを(?:得|え)(?:ない|ません|なかった)", "雨のため、試合を中止せざるを得ない。", pre="v?")
 P("zuni_wa_irarenai", "〜ずにはいられない", "can't help doing", "Verb (ない-stem) + ずにはいられない",
-  """ずにはいられない / ないではいられない mean "can't help but": 笑わずにはいられなかった.""",
+  """ずにはいられない / ないではいられない mean "can't help but": 笑わずにはいられなかった (I couldn't help laughing). It describes an urge you can't hold back; する becomes せずにはいられない.""",
   r"(?:ずには|ないでは)いられ(?:ない|ません|なかった)", "その話を聞いて、笑わずにはいられなかった。", pre="v")
 P("hoka_nai", "〜ほかない", "have no choice but", "Verb (dictionary) + ほかない",
   """ほかない / よりほかない mean "there's nothing to do but": 待つほかない (all we can do is wait).""",
@@ -301,7 +301,7 @@ P("mono_ka", "〜ものか", "no way (I'll ...)", "Plain form + ものか",
   """ものか (もんか) is an emphatic "never!": 二度と行くものか (I'll never go there again!).""",
   r"ものか|もんか", "あんな店、二度と行くものか。", after="va")
 P("mono_dakara", "〜ものだから", "because (excuse)", "Plain form + ものだから",
-  """ものだから gives a reason as an excuse: 道が混んでいたものだから、遅れてしまった.""",
+  """ものだから gives a reason, often as an excuse: 道が混んでいたものだから、遅れてしまった (the roads were jammed, you see, so I was late). In casual speech it becomes もんだから or もので.""",
   r"ものだから|もんだから|もので", "道が混んでいたものだから、遅れてしまいました。", after="va")
 P("mono_ga_aru", "〜ものがある", "there is something (feeling)", "Plain form + ものがある",
   """ものがある expresses an impression: 彼の歌には人を感動させるものがある (there's something moving in his songs).""",
@@ -326,7 +326,7 @@ P("koto_kara", "〜ことから", "from the fact that", "Plain form + ことか�
   """ことから gives the basis of a judgment or name: 富士山が見えることから、この町は富士見と呼ばれる.""",
   r"ことから", "富士山が見えることから、この町は富士見と呼ばれている。", after="any")
 P("to_iu_mono_da", "〜というものだ", "that's what (it is)", "Plain form + というものだ",
-  """というものだ gives a general verdict: それが人生というものだ (that's life).""",
+  """というものだ gives a general verdict about how something is: それが人生というものだ (that's life). It often sounds like a conclusion or mild lecture; というものではない denies such a generalization.""",
   r"というもの(?:だ|です)", "それが人生というものだ。", after="any")
 P("to_iu_koto_da", "〜ということだ (hearsay)", "I hear that, they say", "Plain form + ということだ",
   """ということだ / とのことだ report information: 会議は中止だということだ (I hear the meeting is cancelled).""",
@@ -357,7 +357,7 @@ P("semete", "せめて", "at least", "せめて ...",
   """せめて means "at least (it's the minimum I'd want)": せめて一日休みたい (I'd like at least a day off).""",
   r"せめて", "せめて一日だけでも休みたい。")
 P("mushiro", "むしろ", "rather", "むしろ ...",
-  """むしろ means "rather / if anything": 涼しいというより、むしろ寒い.""",
+  """むしろ means "rather, if anything": 涼しいというより、むしろ寒い (it's not so much cool as cold, if anything). It picks the more accurate of two options, often after より or というより.""",
   r"むしろ", "今日は涼しいというより、むしろ寒い。")
 P("kanarazushimo", "必ずしも〜ない", "not necessarily", "必ずしも + negative",
   """必ずしも〜ない means "not always / not necessarily": 高いものが必ずしもいいとは限らない.""",
@@ -366,11 +366,11 @@ P("douse", "どうせ", "anyway (resigned)", "どうせ ...",
   """どうせ expresses resignation: どうせ間に合わない (we won't make it anyway).""",
   r"どうせ", "どうせ間に合わないから、ゆっくり行こう。")
 P("douyara", "どうやら", "it seems (finally)", "どうやら ...",
-  """どうやら means "apparently, it seems": どうやら雨が降りそうだ.""",
+  """どうやら means "apparently, it seems (judging from the situation)": どうやら雨が降りそうだ (it looks like it's going to rain). It is usually followed by らしい, ようだ or そうだ.""",
   r"どうやら", "どうやら雨が降りそうだ。")
 P("yohodo", "よほど", "very, greatly (must have been)", "よほど ...",
   """よほど means "very much (judging from the evidence)": よほど疲れていたのだろう (he must have been very tired).""",
   r"よほど|余程", "よほど疲れていたのだろう。")
 P("toutei", "到底〜ない", "by no means, utterly not", "到底 + negative",
-  """到底 (とうてい) + negative means "absolutely cannot": 到底間に合わない.""",
+  """到底 (とうてい) + negative means "absolutely cannot, by no means": 到底間に合わない (there's no way we'll make it). It stresses that something is impossible, often with できない or 無理.""",
   r"到底|とうてい", "今からでは到底間に合わない。", req=NEG)
