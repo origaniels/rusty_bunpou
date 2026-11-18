@@ -15,5 +15,7 @@ if [[ "${1:-}" == "--e2e" ]]; then
   echo "### android e2e (emulator)"
   (cd rust && ./build-android.sh release x86_64 >/dev/null && cd android && ./gradlew assembleRelease -PskipCargo -q)
   rust/e2e/run.sh
+  echo "### android e2e, in French"
+  E2E_LANG=fr rust/e2e/run.sh
 fi
 echo "ALL TESTS PASSED"
