@@ -73,6 +73,12 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("ni_shite_wa", "今日はこれでおしまいにしてはどうでしょう。"),
+    ("ni_shite_mo", "約束を午前１０時３０分にしてもよろしいですか。"),
+    ("koso", "私たちの家へようこそ。"),
+    ("wa_mochiron", "彼女はもちろん英語が話せます。"),
+    ("ikura_temo", "魚は海にはいくらでもいる。"),
+    ("kiri", "３ヶ月に一回、新商品が発表されるのできりがない。"),
     ("mono_da", "僕たちは彼が死んだものだとあきらめた。"),  # ものと思う = assume
     ("kuse_ni", "彼はポケットに手を入れるのが癖になっている。"),  # habit
     ("ni_yotte", "壁により掛かるな。"),  # lean against

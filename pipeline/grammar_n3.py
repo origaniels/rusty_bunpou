@@ -174,11 +174,12 @@ P("ni_tsurete", "〜につれて", "as (gradually)", "Verb (dictionary) / Noun +
 P("ni_shite_wa", "〜にしては", "for (considering)", "Noun / plain form + にしては",
   """にしては says something is unexpected given a standard: 子供にしては上手だ (pretty good, for a child).""",
   # 人のせいにしてはいけない is にする + てはいけない (must not blame others)
-  r"にしては(?![^、。]*(?:いけ|だめ|駄目|ならな))", "初めてにしては上手ですね。", after="any")
+  r"にしては(?![^、。]*(?:いけ|だめ|駄目|ならな|どう|いられ))", "初めてにしては上手ですね。", after="any")
 P("ni_shite_mo", "〜にしても", "even if, even granting", "Noun / plain form + にしても",
   """にしても concedes a point: 忙しいにしても電話くらいできるだろう (even if you're busy, you could at least
   call).""",
-  r"にしても", "忙しいにしても、電話ぐらいできるでしょう。", after="nva")
+  # にしてもいい / よろしい = may I make it ...
+  r"にしても(?!いい|よろし|構|かま)", "忙しいにしても、電話ぐらいできるでしょう。", after="nva")
 P("wo_chuushin_ni", "〜を中心に", "centered on, focusing on", "Noun + を中心に",
   """を中心に means "centered on": 駅を中心に町が広がっている (the town spreads out around the station).""",
   r"を中心(?:に|として|と)", "駅を中心に町が広がっています。", after="n")
@@ -205,11 +206,12 @@ P("sae", "〜さえ", "even; if only", "Noun + さえ",
 P("koso", "〜こそ", "precisely, it's ... that", "Noun + こそ",
   """こそ strongly emphasizes: 今度こそ勝つ (this time for sure I'll win), こちらこそ (likewise / it's me who
   should thank you).""",
-  r"こそ", "今度こそ勝ちたいです。", after="any")
+  r"(?<!よう)こそ", "今度こそ勝ちたいです。", after="any")  # ようこそ = welcome
 P("wa_mochiron", "〜はもちろん", "not to mention, of course", "Noun + はもちろん",
   """はもちろん means "A goes without saying, and B too": 英語はもちろん、フランス語も話せる (he speaks French,
   not to mention English). The second part usually contains も.""",
-  r"はもちろん|はもちろんのこと", "英語はもちろん、フランス語も話せます。", after="n")
+  # "A goes without saying, and B too": B takes も (彼女はもちろん英語が話せる is just topic + of course)
+  r"はもちろん|はもちろんのこと", "英語はもちろん、フランス語も話せます。", after="n", req=r"はもちろん.*も")
 P("dekiru_dake", "できるだけ", "as much as possible", "できるだけ + Verb",
   """できるだけ means "as much as possible": できるだけ早く来てください (please come as soon as possible).""",
   r"できるだけ|出来るだけ", "できるだけ早く来てください。")
@@ -226,11 +228,11 @@ P("tatoe_temo", "たとえ〜ても", "even if", "たとえ + Verb (て) + も",
 P("ikura_temo", "いくら〜ても", "no matter how (much)", "いくら + Verb (て) + も",
   """いくら〜ても means "no matter how much": いくら食べても太らない (no matter how much I eat, I don't
   gain weight).""",
-  r"いくら", "いくら食べても太らない。", req=r"いくら.*(?:ても|でも)")
+  r"いくら(?![でか])", "いくら食べても太らない。", req=r"いくら.*(?:ても|でも)")  # いくらでも / いくらか
 P("kiri", "〜きり", "only; since (and no more)", "Noun / Verb (た) + きり",
   """きり means "only" (二人きり, just the two of us) or "since then, never again": 出かけたきり帰ってこない
   (went out and never came back).""",
-  r"きり|っきり", "彼は出かけたきり帰ってこない。", after="any", check=first_pos("助詞"))
+  r"(?:きり|っきり)(?!がな)", "彼は出かけたきり帰ってこない。", after="any", check=first_pos("助詞"))
 P("tte", "〜って", "(casual quote / topic)", "Plain form / Noun + って",
   """って is casual for と / という / は: 明日来るって (he says he'll come tomorrow), 田中さんって誰?
   (who's this Tanaka?).""",
