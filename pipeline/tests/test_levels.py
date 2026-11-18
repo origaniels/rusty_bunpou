@@ -73,6 +73,12 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("ni_shite_mo", "薬だけを頼りにしても治らないよ。"),
+    ("kakeru", "彼は見かけよりずっと年をとっている。"),  # appearance
+    ("kakeru", "彼女は僕に微笑みかけながら一曲歌った。"),
+    ("dasu", "彼の家を見つけだせなかった。"),
+    ("to_itte_mo", "彼は天才だと言っても過言ではない。"),
+    ("to_itte_mo", "何といっても私がまちがっておりました。"),
     ("ni_shite_wa", "今日はこれでおしまいにしてはどうでしょう。"),
     ("ni_shite_mo", "約束を午前１０時３０分にしてもよろしいですか。"),
     ("koso", "私たちの家へようこそ。"),

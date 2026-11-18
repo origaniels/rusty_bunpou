@@ -5,14 +5,16 @@ from grammar_n4 import _volitional
 from patterns import ARU, NARU, SURU, _tail, first_lemma, first_pos, point, prev_is, prev_not
 
 
-def compound(noun_suffix, suffix_lemma):
-    """Match a compound noun ending in `noun_suffix` (読みかけ, 焼きたて) or verb stem + suffix token."""
+def compound(noun_suffix, suffix_lemma, skip=()):
+    """Match a compound noun ending in `noun_suffix` (読みかけ, 焼きたて) or verb stem + suffix token.
+    `skip`: nouns (surface) or verb lemmas that look the same but mean something else."""
     def m(toks):
         out = []
         for j, t in enumerate(toks):
-            if t.p1 == "名詞" and t.lemma.endswith(noun_suffix) and len(t.s) > 2:
+            if t.p1 == "名詞" and t.lemma.endswith(noun_suffix) and len(t.s) > 2 and t.s not in skip:
                 out.append((j, j + 1, None))
-            elif t.lemma == suffix_lemma and j > 0 and toks[j - 1].p1 == "動詞" and toks[j - 1].cf.startswith("連用形"):
+            elif (t.lemma == suffix_lemma and j > 0 and toks[j - 1].p1 == "動詞"
+                  and toks[j - 1].cf.startswith("連用形") and toks[j - 1].lemma not in skip):
                 out.append((j - 1, j + 1, j - 1))
         return out
     return m
@@ -179,7 +181,9 @@ P("ni_shite_mo", "〜にしても", "even if, even granting", "Noun / plain form
   """にしても concedes a point: 忙しいにしても電話くらいできるだろう (even if you're busy, you could at least
   call).""",
   # にしてもいい / よろしい = may I make it ...
-  r"にしても(?!いい|よろし|構|かま)", "忙しいにしても、電話ぐらいできるでしょう。", after="nva")
+  r"にしても(?!いい|よろし|構|かま)", "忙しいにしても、電話ぐらいできるでしょう。", after="nva",
+  # 薬を頼りにしても / 危険を前にしても are 〜を〜にする + ても
+  check=lambda t, i, k: "を" not in "".join(x.s for x in t[:i]).split("、")[-1])
 P("wo_chuushin_ni", "〜を中心に", "centered on, focusing on", "Noun + を中心に",
   """を中心に means "centered on": 駅を中心に町が広がっている (the town spreads out around the station).""",
   r"を中心(?:に|として|と)", "駅を中心に町が広がっています。", after="n")
@@ -257,7 +261,10 @@ P("to_iu_yori", "〜というより", "rather than (say)", "Noun / plain form + 
 P("to_itte_mo", "〜といっても", "although I say", "Plain form / Noun + といっても",
   """といっても qualifies what you said: 料理ができるといっても、簡単なものだけだ (I can cook, though only simple
   things).""",
-  r"と(?:いっ|言っ)ても", "料理ができるといっても、簡単なものだけです。", after="any")
+  # not といっても過言ではない / といってもいい (one could say), 何といっても (after all)
+  r"(?<!何)(?<!なん)と(?:いっ|言っ)ても(?!過言|いい|良い|よい|よろし|大げさ|言い過ぎ)",
+  "料理ができるといっても、簡単なものだけです。", after="any",
+  neg=r"と(?:いっ|言っ)ても[^。]*(?:過言|大げさ|言い過ぎ)")
 P("kawari_ni", "〜かわりに", "instead of; in exchange for", "Noun + の / Verb + かわりに",
   """かわりに means "instead of" (父のかわりに行く, go in my father's place) or "in exchange for".""",
   r"(?:かわり|代わり)に", "父のかわりに私が行きます。", after="any")
@@ -294,11 +301,17 @@ P("kiru", "〜きる", "do completely", "Verb stem + きる",
 P("kakeru", "〜かける / 〜かけ", "half-done, about to", "Verb stem + かける",
   """かける after a verb stem means "start and not finish": 読みかけの本 (a half-read book), 言いかけて
   やめた (started to say something and stopped).""",
-  "", "読みかけの本が机の上にある。", custom=compound("掛け", "掛ける"))
+  "", "読みかけの本が机の上にある。",
+  # 見かけ (appearance); 話しかける / 微笑みかける ... (address someone) are not "half-done"
+  custom=compound("掛け", "掛ける", skip=("見かけ", "見掛け", "話す", "微笑む", "笑う", "呼ぶ", "問う", "語る",
+                                         "働く", "押す", "追う", "見る")))
 P("dasu", "〜出す", "suddenly start", "Verb stem + 出す",
   """出す (だす) after a verb stem means "suddenly start": 急に泣き出した (suddenly burst into tears).""",
   r"(?:出|だ)(?:す|し|さ|せ)", "赤ちゃんが急に泣き出した。", pre="v", tail=True,
-  check=lambda t, i, k: t[i].lemma == "出す" and i > 0 and t[i - 1].p1 == "動詞")
+  # 見つけ出す, 取り出す ... (出す = out) are not "suddenly start"
+  check=lambda t, i, k: t[i].lemma == "出す" and i > 0 and t[i - 1].p1 == "動詞"
+  and t[i - 1].lemma not in ("見付ける", "見つける", "取る", "引く", "追う", "探す", "持つ", "連れる", "思う",
+                             "作る", "生む", "考える", "抜く", "差す", "呼ぶ", "締める", "放る", "投げる"))
 P("ppanashi", "〜っぱなし", "left (undone), continuously", "Verb stem + っぱなし",
   """っぱなし means leaving something in a state that should have changed: 電気がつけっぱなしだ (the light was
   left on).""",
