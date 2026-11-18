@@ -580,7 +580,7 @@ export component AppWindow inherits Window {
                             Text { text: item.num; width: 28px; color: Theme.muted; vertical-alignment: center; }
                             VerticalLayout {
                                 horizontal-stretch: 1;
-                                Text { text: item.title; font-size: 20px; color: Theme.fg; }
+                                Text { text: item.title; font-size: 20px; color: Theme.fg; wrap: word-wrap; } // long titles wrap instead of pushing the stage label off
                                 Text { text: item.meaning; font-size: 13px; color: Theme.muted; wrap: word-wrap; }
                             }
                             Pill { text: item.level; y: (parent.height - self.height) / 2; }

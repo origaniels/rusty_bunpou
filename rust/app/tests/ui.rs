@@ -625,7 +625,7 @@ fn grammar_levels_fold_and_unfold() {
 
 // ------------------------------------------------------------------ layout (English and French)
 
-/// Every visible button, text and list row must lie inside the window horizontally: a label that
+/// Every button, text and list row must lie inside the window horizontally: a label that
 /// is too long for its row pushes something off the side (as the quiz buttons once did in French).
 fn assert_fits(t: &T, ctx: &str) {
     use i_slint_backend_testing::{AccessibleRole, ElementQuery};
@@ -658,7 +658,9 @@ fn check_every_screen(width: f32, french: bool) {
     let mut p = Progress::in_memory();
     p.settings.language = if french { "fr" } else { "en" }.into();
     let t = setup_with(p);
-    t.app.ui.window().set_size(slint::LogicalSize::new(width, 860.0));
+    // tall enough that long screens (settings, grammar points) are laid out completely: the
+    // element search only sees what is inside the window, not what is scrolled away
+    t.app.ui.window().set_size(slint::LogicalSize::new(width, 4000.0));
     let lang = if french { "fr" } else { "en" };
     let check = |what: &str| assert_fits(&t, &format!("[{lang}] {what}"));
     check("home");
