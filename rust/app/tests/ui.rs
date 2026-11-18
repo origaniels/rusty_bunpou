@@ -622,3 +622,120 @@ fn grammar_levels_fold_and_unfold() {
     t.press("だ");
     assert_eq!(t.screen(), SCREEN_DETAIL);
 }
+
+// ------------------------------------------------------------------ layout (English and French)
+
+/// Every visible button, text and list row must lie inside the window horizontally: a label that
+/// is too long for its row pushes something off the side (as the quiz buttons once did in French).
+fn assert_fits(t: &T, ctx: &str) {
+    use i_slint_backend_testing::{AccessibleRole, ElementQuery};
+    let width = t.app.ui.window().size().to_logical(t.app.ui.window().scale_factor()).width;
+    let mut bad = vec![];
+    for e in ElementQuery::from_root(&t.app.ui).find_all() {
+        let role = e.accessible_role();
+        if !matches!(role, Some(AccessibleRole::Button | AccessibleRole::Text | AccessibleRole::ListItem)) {
+            continue;
+        }
+        let (pos, size) = (e.absolute_position(), e.size());
+        if size.width <= 0.0 || size.height <= 0.0 {
+            continue; // collapsed / hidden
+        }
+        if pos.x < -0.5 || pos.x + size.width > width + 0.5 {
+            bad.push(format!(
+                "{:?} {:?} at x={:.0}..{:.0}",
+                role.unwrap(),
+                e.accessible_label().unwrap_or_default(),
+                pos.x,
+                pos.x + size.width
+            ));
+        }
+    }
+    assert!(bad.is_empty(), "{ctx} (window {width}px wide): off-screen elements:\n  {}", bad.join("\n  "));
+}
+
+/// Visit every screen and state of the app at the given window width and language.
+fn check_every_screen(width: f32, french: bool) {
+    let mut p = Progress::in_memory();
+    p.settings.language = if french { "fr" } else { "en" }.into();
+    let t = setup_with(p);
+    t.app.ui.window().set_size(slint::LogicalSize::new(width, 860.0));
+    let lang = if french { "fr" } else { "en" };
+    let check = |what: &str| assert_fits(&t, &format!("[{lang}] {what}"));
+    check("home");
+
+    // a lesson: every page, then the quiz in every state
+    t.app.ui.invoke_start_learn();
+    let pages = t.app.ui.get_lesson_count();
+    for i in 0..pages {
+        check(&format!("lesson page {}", i + 1));
+        t.app.ui.invoke_lesson_next();
+    }
+    assert_eq!(t.screen(), SCREEN_QUIZ);
+    check("quiz, unanswered");
+    t.type_and_enter("ぜんぜんちがう");
+    check("quiz, wrong answer");
+    t.app.ui.set_show_notes(true);
+    check("quiz, grammar notes");
+    t.app.ui.set_show_notes(false);
+    t.app.ui.invoke_quiz_retry();
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    check("quiz, correct answer");
+    t.app.ui.invoke_quiz_submit();
+    t.finish_quiz(&[]);
+    check("quiz finished");
+    t.app.ui.invoke_go_home();
+    check("home after a lesson");
+
+    // reviews (some due a few hours later)
+    clock::advance(5 * HOUR);
+    t.app.ui.invoke_go_home();
+    check("home with reviews due");
+    t.app.ui.invoke_start_reviews();
+    check("reviews");
+    t.app.ui.invoke_go_home();
+
+    // tabs
+    t.app.ui.invoke_open_list();
+    check("grammar list");
+    let first = t.app.content.points[0].id.clone();
+    t.app.ui.invoke_open_detail(first.into());
+    check("grammar point");
+    t.app.ui.set_confirm_reset(true);
+    check("reset point dialog");
+    t.app.ui.set_confirm_reset(false);
+    t.app.ui.invoke_toggle_level("N5".into());
+    t.app.ui.invoke_open_list();
+    check("grammar list, N5 folded");
+    t.app.ui.invoke_open_stats();
+    check("stats");
+    t.app.ui.invoke_open_settings();
+    check("settings");
+    t.app.ui.set_confirm_reset(true);
+    check("reset all dialog");
+    t.app.ui.set_confirm_reset(false);
+    // start level above N5: the learn card gets its extra lines
+    t.app.ui.invoke_set_start_level(4);
+    t.app.ui.invoke_go_home();
+    check("home, lessons from N1");
+}
+
+#[test]
+fn every_screen_fits_pixel_8a_english() {
+    check_every_screen(411.0, false);
+}
+
+#[test]
+fn every_screen_fits_pixel_8a_french() {
+    check_every_screen(411.0, true);
+}
+
+#[test]
+fn every_screen_fits_narrow_phone_english() {
+    check_every_screen(360.0, false);
+}
+
+#[test]
+fn every_screen_fits_narrow_phone_french() {
+    check_every_screen(360.0, true);
+}
