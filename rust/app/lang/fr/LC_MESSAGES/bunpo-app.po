@@ -1,0 +1,187 @@
+# French translation of the app interface (strings marked @tr in ui/app.slint).
+# Grammar content is translated in pipeline/fr/; strings built in Rust in core/src/i18n.rs.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: fr\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "‹ Back"
+msgstr "‹ Retour"
+
+msgid "Structure"
+msgstr "Structure"
+
+msgid "Examples"
+msgstr "Exemples"
+
+msgid "Japanese grammar, one sentence at a time."
+msgstr "La grammaire japonaise, une phrase à la fois."
+
+msgid "Reviews"
+msgstr "Révisions"
+
+msgid "{} due"
+msgstr "{} à réviser"
+
+msgid "Next review {}"
+msgstr "Prochaine révision {}"
+
+msgid "Start reviews"
+msgstr "Commencer les révisions"
+
+msgid "Learn"
+msgstr "Apprendre"
+
+msgid "{} new grammar points available"
+msgstr "{} nouveaux points de grammaire disponibles"
+
+msgid "{} new grammar points from {} up"
+msgstr "{} nouveaux points de grammaire à partir du {}"
+
+msgid "Lower levels can still be learned: choose a lower start level in Settings."
+msgstr "Les niveaux inférieurs restent disponibles : choisissez un niveau de départ plus bas dans les Réglages."
+
+msgid "Next: {}"
+msgstr "Ensuite : {}"
+
+msgid "Grammar list"
+msgstr "Grammaire"
+
+msgid "Stats"
+msgstr "Stats"
+
+msgid "Settings"
+msgstr "Réglages"
+
+msgid "Example sentences: {}"
+msgstr "Phrases d'exemple : {}"
+
+msgid "Lesson {} / {}"
+msgstr "Leçon {} / {}"
+
+msgid "Previous"
+msgstr "Précédent"
+
+msgid "Next"
+msgstr "Suivant"
+
+msgid "Start quiz"
+msgstr "Commencer le quiz"
+
+msgid "Lesson complete!"
+msgstr "Leçon terminée !"
+
+msgid "Reviews done!"
+msgstr "Révisions terminées !"
+
+msgid "Home"
+msgstr "Accueil"
+
+msgid "Correct!"
+msgstr "Correct !"
+
+msgid "Not quite. You wrote: {}"
+msgstr "Pas tout à fait. Vous avez écrit : {}"
+
+msgid "Answer: {}"
+msgstr "Réponse : {}"
+
+msgid "Grammar notes"
+msgstr "Notes de grammaire"
+
+msgid "Typo"
+msgstr "Faute de frappe"
+
+msgid "Retry"
+msgstr "Réessayer"
+
+msgid "type in kana or romaji"
+msgstr "tapez en kana ou en romaji"
+
+msgid "type the answer"
+msgstr "tapez la réponse"
+
+msgid "Check"
+msgstr "Vérifier"
+
+msgid "Grammar"
+msgstr "Grammaire"
+
+msgid "Reset"
+msgstr "Réinitialiser"
+
+msgid "Progress: {} / {} learned"
+msgstr "Progression : {} / {} appris"
+
+msgid "New"
+msgstr "Nouveau"
+
+msgid "Beginner"
+msgstr "Débutant"
+
+msgid "Adept"
+msgstr "Apprenti"
+
+msgid "Seasoned"
+msgstr "Confirmé"
+
+msgid "Expert"
+msgstr "Expert"
+
+msgid "Mastered"
+msgstr "Maîtrisé"
+
+msgid "By level"
+msgstr "Par niveau"
+
+msgid "Reviews in the last 24 h: {}"
+msgstr "Révisions ces dernières 24 h : {}"
+
+msgid "Furigana (readings above kanji)"
+msgstr "Furigana (lecture au-dessus des kanji)"
+
+msgid "Show the translation before answering"
+msgstr "Afficher la traduction avant de répondre"
+
+msgid "Convert romaji to kana"
+msgstr "Convertir les romaji en kana"
+
+msgid "Remind me when reviews are due"
+msgstr "Me prévenir quand des révisions sont prêtes"
+
+msgid "New points per lesson"
+msgstr "Nouveaux points par leçon"
+
+msgid "Start lessons at"
+msgstr "Commencer les leçons au"
+
+msgid "Lessons teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again."
+msgstr "Les leçons enseignent ce niveau, puis les suivants. Les niveaux inférieurs restent non appris (et ne sont pas révisés) jusqu'à ce que vous les choisissiez de nouveau."
+
+msgid "Target retention (FSRS)"
+msgstr "Rétention visée (FSRS)"
+
+msgid "Higher retention = more frequent reviews. 90% is a good default."
+msgstr "Rétention plus élevée = révisions plus fréquentes. 90 % est un bon choix par défaut."
+
+msgid "Reset all progress"
+msgstr "Tout réinitialiser"
+
+msgid "Most example sentences come from Tatoeba (tatoeba.org), licensed CC-BY 2.0 FR, and show their Tatoeba number and contributor. A few were written for this app and are marked as such."
+msgstr "La plupart des phrases d'exemple viennent de Tatoeba (tatoeba.org), sous licence CC-BY 2.0 FR, et affichent leur numéro Tatoeba et leur auteur, ainsi que ceux de leur traduction française. Les phrases et traductions écrites pour cette appli sont signalées comme telles."
+
+msgid "Close"
+msgstr "Fermer"
+
+msgid "Move \"{}\" back to unlearned?"
+msgstr "Remettre « {} » dans les points non appris ?"
+
+msgid "Delete all SRS progress and review history?"
+msgstr "Effacer toute la progression et l'historique des révisions ?"
+
+msgid "Cancel"
+msgstr "Annuler"
+
+msgid "Language"
+msgstr "Langue"

@@ -19,7 +19,7 @@ const DAY: i64 = 24 * HOUR;
 #[derive(Default)]
 struct Recorder(RefCell<Vec<String>>);
 impl Platform for Recorder {
-    fn schedule_reminder(&self, at_ms: i64, count: usize) {
+    fn schedule_reminder(&self, at_ms: i64, count: usize, _text: &str, _channel: &str) {
         self.0.borrow_mut().push(format!("schedule {at_ms} {count}"));
     }
     fn cancel_reminder(&self) {
@@ -419,7 +419,7 @@ fn original_sentences_are_not_credited_to_tatoeba() {
     let t = setup();
     let mut originals = 0;
     for s in t.app.content.points.iter().flat_map(|p| &p.sentences) {
-        let a = s.attribution();
+        let a = s.attribution(bunpo_core::i18n::Lang::En);
         if s.src == "app" {
             originals += 1;
             assert_eq!(a, "Example written for this app");
@@ -496,4 +496,78 @@ fn nothing_left_from_chosen_level_shows_hint() {
     let h = t.app.ui.get_home();
     assert_eq!(h.new_count, 0, "no wrap-around to lower levels");
     assert!(!t.find("Learn 0 new").accessible_enabled().unwrap());
+}
+
+#[test]
+fn switching_to_french_translates_the_ui_and_is_remembered() {
+    let t = setup();
+    t.press("Settings");
+    t.press("Français");
+    assert_eq!(t.app.state.borrow().progress.settings.language, "fr");
+    assert_eq!(t.app.ui.get_language_index(), 1);
+    // @tr strings come from the bundled .po, Rust-built ones from the app
+    assert!(t.exists("‹ Retour"), "Slint strings are translated");
+    assert!(!t.exists("‹ Back"));
+    t.app.ui.invoke_go_home();
+    assert!(t.exists("Réglages") && t.exists("Grammaire"));
+    assert!(t.exists("Apprendre 5 nouveaux"), "Rust-built label is translated");
+    // stage names in the grammar list
+    t.press("Grammaire");
+    let list = t.app.ui.get_grammar_list();
+    use slint::Model;
+    assert_eq!(list.row_data(0).unwrap().level, "Nouveau");
+
+    // the setting survives a restart
+    let progress = std::mem::replace(&mut t.app.state.borrow_mut().progress, Progress::in_memory());
+    let rec = t.rec.clone();
+    drop(t);
+    let app = build(progress, rec.clone()).expect("rebuild ui");
+    app.ui.show().unwrap();
+    let t = T { app, rec };
+    assert!(t.exists("Réglages"));
+    t.press("Réglages");
+    t.press("English");
+    assert!(t.exists("‹ Back") && !t.exists("‹ Retour"));
+}
+
+#[test]
+fn reminder_text_and_relative_times_in_french() {
+    use bunpo_core::i18n::Lang;
+    assert_eq!(reminder_text(Lang::Fr, 1), "1 révision de grammaire vous attend");
+    assert_eq!(reminder_text(Lang::Fr, 3), "3 révisions de grammaire vous attendent");
+    assert_eq!(reminder_text(Lang::En, 3), "3 grammar reviews are waiting");
+    let h = 3_600_000;
+    assert_eq!(rel_time(Lang::Fr, 3 * h + 5 * 60_000, 0), "dans 3 h 5 min");
+    assert_eq!(rel_time(Lang::Fr, 72 * h, 0), "dans 3 jours");
+    assert_eq!(rel_time(Lang::En, 72 * h, 0), "in 3 days");
+}
+
+#[test]
+fn every_ui_string_has_a_french_translation() {
+    // every @tr("...") in the .slint must have a non-empty msgstr in the French catalog
+    let slint = include_str!("../ui/app.slint");
+    let po = include_str!("../lang/fr/LC_MESSAGES/bunpo-app.po");
+    let unescape = |s: &str| s.replace("\\\"", "\"");
+    let mut catalog = std::collections::HashMap::new();
+    let mut id = None;
+    for line in po.lines() {
+        if let Some(rest) = line.strip_prefix("msgid \"") {
+            id = Some(unescape(rest.trim_end_matches('"')));
+        } else if let Some(rest) = line.strip_prefix("msgstr \"") {
+            catalog.insert(id.take().unwrap(), unescape(rest.trim_end_matches('"')));
+        }
+    }
+    let mut missing = vec![];
+    for part in slint.split("@tr(\"").skip(1) {
+        let mut end = 0;
+        let b = part.as_bytes();
+        while !(b[end] == b'"' && (end == 0 || b[end - 1] != b'\\')) {
+            end += 1;
+        }
+        let msgid = unescape(&part[..end]);
+        if catalog.get(&msgid).is_none_or(|s| s.is_empty()) {
+            missing.push(msgid);
+        }
+    }
+    assert!(missing.is_empty(), "no French for: {missing:?}");
 }

@@ -54,13 +54,21 @@ impl AndroidPlatform {
 }
 
 impl Platform for AndroidPlatform {
-    fn schedule_reminder(&self, at_ms: i64, count: usize) {
+    fn schedule_reminder(&self, at_ms: i64, count: usize, text: &str, channel: &str) {
         self.with_reminder(|env, act, cls| {
+            let text = env.new_string(text)?;
+            let channel = env.new_string(channel)?;
             env.call_static_method(
                 cls,
                 "schedule",
-                "(Landroid/content/Context;JI)V",
-                &[JValue::Object(act), JValue::Long(at_ms), JValue::Int(count as i32)],
+                "(Landroid/content/Context;JILjava/lang/String;Ljava/lang/String;)V",
+                &[
+                    JValue::Object(act),
+                    JValue::Long(at_ms),
+                    JValue::Int(count as i32),
+                    JValue::Object(&text),
+                    JValue::Object(&channel),
+                ],
             )
             .map(|_| ())
         });

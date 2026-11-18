@@ -55,11 +55,19 @@ pub struct Settings {
     pub notifications: bool,
     /// JLPT level new lessons start at ("N5" … "N1"); lower levels are skipped, not marked known.
     pub start_level: String,
+    /// Language of the app, translations and explanations: "en" or "fr".
+    pub language: String,
+}
+
+impl Settings {
+    pub fn lang(&self) -> crate::i18n::Lang {
+        crate::i18n::Lang::from_code(&self.language)
+    }
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into() }
+        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into(), language: "en".into() }
     }
 }
 

@@ -25,10 +25,14 @@ public class ReviewReminder extends BroadcastReceiver {
     private static final int NOTIFICATION_ID = 1;
     private static final long WINDOW_MS = 10 * 60 * 1000;
 
-    /** Schedule (or replace) the reminder at {@code atMillis} for {@code count} due reviews. */
-    public static void schedule(Context ctx, long atMillis, int count) {
+    /**
+     * Schedule (or replace) the reminder at {@code atMillis} for {@code count} due reviews.
+     * {@code text} and {@code channel} come translated from the app (its language setting).
+     */
+    public static void schedule(Context ctx, long atMillis, int count, String text, String channel) {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putLong("at", atMillis).putInt("count", count).apply();
+                .putLong("at", atMillis).putInt("count", count)
+                .putString("text", text).putString("channel", channel).apply();
         AlarmManager am = ctx.getSystemService(AlarmManager.class);
         // a 10-minute delivery window: punctual enough for a reminder, no exact-alarm permission needed
         am.setWindow(AlarmManager.RTC_WAKEUP, atMillis, WINDOW_MS, alarmIntent(ctx));
@@ -70,15 +74,17 @@ public class ReviewReminder extends BroadcastReceiver {
         String action = intent.getAction();
         if (Intent.ACTION_BOOT_COMPLETED.equals(action) || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
             // alarms don't survive a reboot/update: re-arm (or fire right away if it's already past)
-            schedule(ctx, Math.max(at, System.currentTimeMillis() + 60_000), count);
+            schedule(ctx, Math.max(at, System.currentTimeMillis() + 60_000), count,
+                    p.getString("text", null), p.getString("channel", null));
             return;
         }
         if (!ACTION.equals(action) || !hasPermission(ctx)) return;
         NotificationManager nm = ctx.getSystemService(NotificationManager.class);
-        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Review reminders", NotificationManager.IMPORTANCE_DEFAULT));
+        String channel = p.getString("channel", "Review reminders");
+        nm.createNotificationChannel(new NotificationChannel(CHANNEL, channel, NotificationManager.IMPORTANCE_DEFAULT));
         Intent open = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
         PendingIntent tap = PendingIntent.getActivity(ctx, 0, open, PendingIntent.FLAG_IMMUTABLE);
-        String text = count == 1 ? "1 grammar review is waiting" : count + " grammar reviews are waiting";
+        String text = p.getString("text", count == 1 ? "1 grammar review is waiting" : count + " grammar reviews are waiting");
         Notification n = new Notification.Builder(ctx, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notify)
                 .setContentTitle("文法 SRS")

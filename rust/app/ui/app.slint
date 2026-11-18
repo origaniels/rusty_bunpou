@@ -168,7 +168,7 @@ component TopBar {
     preferred-height: 56px;
     HorizontalLayout {
         padding-left: 4px; padding-right: 12px; spacing: 8px;
-        if show-back: Btn { text: "‹ Back"; horizontal-stretch: 0; clicked => { root.back(); } }
+        if show-back: Btn { text: @tr("‹ Back"); horizontal-stretch: 0; clicked => { root.back(); } }
         Text { text: root.title; font-size: 22px; color: Theme.fg; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
     }
 }
@@ -199,13 +199,13 @@ component GrammarBody {
         Card {
             VerticalLayout {
                 padding: 12px; spacing: 2px;
-                Text { text: "Structure"; font-size: 13px; color: Theme.muted; }
+                Text { text: @tr("Structure"); font-size: 13px; color: Theme.muted; }
                 Text { text: p.structure; font-size: 18px; color: Theme.fg; wrap: word-wrap; }
             }
         }
         Text { text: p.explanation; font-size: 17px; color: Theme.fg; wrap: word-wrap; }
         Rectangle { height: 1px; background: #4a4658; }
-        Text { text: "Examples"; font-size: 18px; font-weight: 600; color: Theme.fg; }
+        Text { text: @tr("Examples"); font-size: 18px; font-weight: 600; color: Theme.fg; }
         for ex[i] in p.examples: VerticalLayout {
             spacing: 6px;
             padding-bottom: 8px;
@@ -259,6 +259,7 @@ export component AppWindow inherits Window {
     in property <int> batch-size: 5;
     in property <int> retention-index: 1;
     in property <int> start-level-index: 0;
+    in property <int> language-index: 0; // 0 English, 1 French
     in-out property <bool> confirm-reset;
 
     callback start-learn();
@@ -284,6 +285,7 @@ export component AppWindow inherits Window {
     callback set-batch(int);
     callback set-retention(int);
     callback set-start-level(int);
+    callback set-language(int);
     callback reset-point();
     callback reset-all();
 
@@ -317,55 +319,55 @@ export component AppWindow inherits Window {
             // ---------------------------------------------------------- home
             if root.screen == 0: Scroller {
                 Text { text: "文法 SRS"; font-size: 34px; font-weight: 700; color: Theme.accent; }
-                Text { text: "Japanese grammar, one sentence at a time."; color: Theme.fg; }
+                Text { text: @tr("Japanese grammar, one sentence at a time."); color: Theme.fg; }
                 Card {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
-                        Text { text: "Reviews"; font-size: 17px; color: Theme.fg; }
-                        Text { text: root.home.due + " due"; font-size: 40px; font-weight: 700; color: Theme.fg; }
-                        if root.home.due == 0 && root.home.next-due != "": Text { text: "Next review " + root.home.next-due; color: Theme.fg; }
-                        Btn { text: "Start reviews"; primary: true; enabled: root.home.due > 0; clicked => { root.start-reviews(); } }
+                        Text { text: @tr("Reviews"); font-size: 17px; color: Theme.fg; }
+                        Text { text: @tr("{} due", root.home.due); font-size: 40px; font-weight: 700; color: Theme.fg; }
+                        if root.home.due == 0 && root.home.next-due != "": Text { text: @tr("Next review {}", root.home.next-due); color: Theme.fg; }
+                        Btn { text: @tr("Start reviews"); primary: true; enabled: root.home.due > 0; clicked => { root.start-reviews(); } }
                     }
                 }
                 Card {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
-                        Text { text: "Learn"; font-size: 17px; color: Theme.fg; }
+                        Text { text: @tr("Learn"); font-size: 17px; color: Theme.fg; }
                         Text {
                             text: root.home.start-level == "N5"
-                                ? root.home.new-count + " new grammar points available"
-                                : root.home.new-count + " new grammar points from " + root.home.start-level + " up";
+                                ? @tr("{} new grammar points available", root.home.new-count)
+                                : @tr("{} new grammar points from {} up", root.home.new-count, root.home.start-level);
                             color: Theme.fg; wrap: word-wrap;
                         }
                         if root.home.new-count == 0 && root.home.start-level != "N5": Text {
-                            text: "Lower levels can still be learned: choose a lower start level in Settings.";
+                            text: @tr("Lower levels can still be learned: choose a lower start level in Settings.");
                             font-size: 14px; color: Theme.muted; wrap: word-wrap;
                         }
-                        if root.home.next-titles != "": Text { text: "Next: " + root.home.next-titles; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
+                        if root.home.next-titles != "": Text { text: @tr("Next: {}", root.home.next-titles); font-size: 14px; color: Theme.muted; wrap: word-wrap; }
                         Btn { text: root.home.learn-label; primary: true; enabled: root.home.new-count > 0; clicked => { root.start-learn(); } }
                     }
                 }
                 HorizontalLayout {
                     spacing: 12px;
-                    Btn { text: "Grammar list"; clicked => { root.open-list(); } }
-                    Btn { text: "Stats"; clicked => { root.open-stats(); } }
-                    Btn { text: "Settings"; clicked => { root.open-settings(); } }
+                    Btn { text: @tr("Grammar list"); clicked => { root.open-list(); } }
+                    Btn { text: @tr("Stats"); clicked => { root.open-stats(); } }
+                    Btn { text: @tr("Settings"); clicked => { root.open-settings(); } }
                 }
-                Text { text: "Example sentences: " + root.home.source; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
+                Text { text: @tr("Example sentences: {}", root.home.source); font-size: 12px; color: Theme.muted; wrap: word-wrap; }
             }
 
             // ---------------------------------------------------------- lesson
             if root.screen == 1: VerticalLayout {
-                TopBar { title: "Lesson " + (root.lesson-index + 1) + " / " + root.lesson-count; back => { root.go-back(); } }
+                TopBar { title: @tr("Lesson {} / {}", root.lesson-index + 1, root.lesson-count); back => { root.go-back(); } }
                 Scroller {
                     vertical-stretch: 1;
                     GrammarBody { p: root.lesson-point; furigana: root.furigana; max-examples: 4; }
                 }
                 HorizontalLayout {
                     padding: 16px; spacing: 12px;
-                    Btn { text: "Previous"; enabled: root.lesson-index > 0; clicked => { root.lesson-prev(); } }
+                    Btn { text: @tr("Previous"); enabled: root.lesson-index > 0; clicked => { root.lesson-prev(); } }
                     Btn {
-                        text: root.lesson-index < root.lesson-count - 1 ? "Next" : "Start quiz";
+                        text: root.lesson-index < root.lesson-count - 1 ? @tr("Next") : @tr("Start quiz");
                         primary: true;
                         clicked => { root.lesson-next(); }
                     }
@@ -375,9 +377,9 @@ export component AppWindow inherits Window {
             // ---------------------------------------------------------- quiz
             if root.screen == 2 && root.quiz.finished: VerticalLayout {
                 padding: 24px; spacing: 16px; alignment: start;
-                Text { text: root.quiz.lesson ? "Lesson complete!" : "Reviews done!"; font-size: 30px; font-weight: 700; color: Theme.fg; }
+                Text { text: root.quiz.lesson ? @tr("Lesson complete!") : @tr("Reviews done!"); font-size: 30px; font-weight: 700; color: Theme.fg; }
                 Text { text: root.quiz.summary; color: Theme.fg; }
-                Btn { text: "Home"; primary: true; clicked => { root.go-home(); } }
+                Btn { text: @tr("Home"); primary: true; clicked => { root.go-home(); } }
             }
             if root.screen == 2 && !root.quiz.finished: VerticalLayout {
                 property <int> tick: root.focus-tick;
@@ -401,17 +403,17 @@ export component AppWindow inherits Window {
                     if root.quiz.verdict != 0: VerticalLayout {
                         spacing: 12px;
                         Text {
-                            text: root.quiz.verdict == 1 ? "Correct!" : "Not quite. You wrote: " + root.quiz.last-answer;
+                            text: root.quiz.verdict == 1 ? @tr("Correct!") : @tr("Not quite. You wrote: {}", root.quiz.last-answer);
                             color: root.quiz.verdict == 1 ? Theme.good : Theme.bad;
                             font-size: 20px; font-weight: 700; wrap: word-wrap;
                         }
-                        Text { text: "Answer: " + root.quiz.answer; font-size: 18px; color: Theme.fg; wrap: word-wrap; }
+                        Text { text: @tr("Answer: {}", root.quiz.answer); font-size: 18px; color: Theme.fg; wrap: word-wrap; }
                         Text { text: root.quiz.grammar-line; color: Theme.fg; wrap: word-wrap; }
                         HorizontalLayout {
                             spacing: 8px; alignment: start;
-                            Btn { text: "Grammar notes"; clicked => { answer.clear-focus(); root.open-notes(); } }
-                            if root.quiz.verdict == 2: Btn { text: "Typo"; clicked => { root.quiz-typo(); } }
-                            if root.quiz.verdict == 2: Btn { text: "Retry"; clicked => { root.quiz-retry(); answer.focus(); } }
+                            Btn { text: @tr("Grammar notes"); clicked => { answer.clear-focus(); root.open-notes(); } }
+                            if root.quiz.verdict == 2: Btn { text: @tr("Typo"); clicked => { root.quiz-typo(); } }
+                            if root.quiz.verdict == 2: Btn { text: @tr("Retry"); clicked => { root.quiz-retry(); answer.focus(); } }
                         }
                         Text { text: root.quiz.attribution; font-size: 12px; color: Theme.muted; }
                     }
@@ -423,7 +425,7 @@ export component AppWindow inherits Window {
                         font-size: 22px;
                         // no suggestions/autocorrect: the keyboard must not "fix" romaji we convert to kana
                         input-method-hints: { capitalization: CapitalizationMode.none, auto-correct: false, auto-complete: false };
-                        placeholder-text: root.romaji ? "type in kana or romaji" : "type the answer";
+                        placeholder-text: root.romaji ? @tr("type in kana or romaji") : @tr("type the answer");
                         // The field keeps exactly what was typed (rewriting it would fight the keyboard's
                         // composition); the romaji→kana preview is shown inside the blank instead.
                         edited(t) => {
@@ -433,7 +435,7 @@ export component AppWindow inherits Window {
                         accepted(t) => { root.quiz-submit(); }
                     }
                     Btn {
-                        text: root.quiz.verdict == 0 ? "Check" : "Next";
+                        text: root.quiz.verdict == 0 ? @tr("Check") : @tr("Next");
                         primary: true;
                         clicked => { root.quiz-submit(); }
                     }
@@ -442,7 +444,7 @@ export component AppWindow inherits Window {
 
             // ---------------------------------------------------------- grammar list
             if root.screen == 3: VerticalLayout {
-                TopBar { title: "Grammar"; back => { root.go-back(); } }
+                TopBar { title: @tr("Grammar"); back => { root.go-back(); } }
                 ListView {
                     vertical-stretch: 1;
                     for item in root.grammar-list: TouchArea {
@@ -483,7 +485,7 @@ export component AppWindow inherits Window {
                         HorizontalLayout {
                             padding: 12px; spacing: 8px;
                             Text { text: root.notes.status; color: Theme.fg; wrap: word-wrap; vertical-alignment: center; }
-                            if root.notes.can-reset: Btn { text: "Reset"; clicked => { root.confirm-reset = true; } }
+                            if root.notes.can-reset: Btn { text: @tr("Reset"); clicked => { root.confirm-reset = true; } }
                         }
                     }
                     GrammarBody { p: root.notes; furigana: root.furigana; }
@@ -492,13 +494,13 @@ export component AppWindow inherits Window {
 
             // ---------------------------------------------------------- stats
             if root.screen == 6: VerticalLayout {
-                TopBar { title: "Stats"; back => { root.go-back(); } }
+                TopBar { title: @tr("Stats"); back => { root.go-back(); } }
                 Scroller {
                     vertical-stretch: 1;
                     Card {
                         VerticalLayout {
                             padding: 16px; spacing: 14px;
-                            Text { text: "Progress: " + root.home.learned + " / " + root.home.total + " learned"; font-size: 17px; font-weight: 600; color: Theme.fg; }
+                            Text { text: @tr("Progress: {} / {} learned", root.home.learned, root.home.total); font-size: 17px; font-weight: 600; color: Theme.fg; }
                             HorizontalLayout {
                                 spacing: 4px;
                                 for pie in root.level-pies: VerticalLayout {
@@ -527,7 +529,7 @@ export component AppWindow inherits Window {
                                     // equal-width columns so both legend rows line up
                                     spacing: 6px; width: (parent.width - 16px) / 3;
                                     Rectangle { width: 12px; height: 12px; y: (parent.height - self.height) / 2; border-radius: 6px; background: root.stage-colors[i]; }
-                                    Text { text: ["New", "Beginner", "Adept", "Seasoned", "Expert", "Mastered"][i]; font-size: 13px; color: Theme.fg; vertical-alignment: center; }
+                                    Text { text: [@tr("New"), @tr("Beginner"), @tr("Adept"), @tr("Seasoned"), @tr("Expert"), @tr("Mastered")][i]; font-size: 13px; color: Theme.fg; vertical-alignment: center; }
                                 }
                             }
                         }
@@ -536,7 +538,7 @@ export component AppWindow inherits Window {
                     Card {
                         VerticalLayout {
                             padding: 16px; spacing: 14px;
-                            Text { text: "By level"; font-size: 17px; font-weight: 600; color: Theme.fg; }
+                            Text { text: @tr("By level"); font-size: 17px; font-weight: 600; color: Theme.fg; }
                             for pie in root.level-pies: VerticalLayout {
                                 spacing: 6px;
                                 Text { text: "JLPT " + pie.name; font-size: 15px; font-weight: 700; color: Theme.accent; }
@@ -547,12 +549,12 @@ export component AppWindow inherits Window {
                                         HorizontalLayout {
                                             alignment: center; spacing: 4px;
                                             Rectangle { width: 8px; height: 8px; y: (parent.height - self.height) / 2; border-radius: 4px; background: root.stage-colors[i]; }
-                                            Text { text: ["New", "Beginner", "Adept", "Seasoned", "Expert", "Mastered"][i]; font-size: 11px; color: Theme.muted; }
+                                            Text { text: [@tr("New"), @tr("Beginner"), @tr("Adept"), @tr("Seasoned"), @tr("Expert"), @tr("Mastered")][i]; font-size: 11px; color: Theme.muted; }
                                         }
                                     }
                                 }
                             }
-                            Text { text: "Reviews in the last 24 h: " + root.home.reviews-24h; font-size: 13px; color: Theme.muted; }
+                            Text { text: @tr("Reviews in the last 24 h: {}", root.home.reviews-24h); font-size: 13px; color: Theme.muted; }
                         }
                     }
                 }
@@ -560,36 +562,42 @@ export component AppWindow inherits Window {
 
             // ---------------------------------------------------------- settings
             if root.screen == 5: VerticalLayout {
-                TopBar { title: "Settings"; back => { root.go-back(); } }
+                TopBar { title: @tr("Settings"); back => { root.go-back(); } }
                 Scroller {
                     vertical-stretch: 1;
-                    ToggleRow { text: "Furigana (readings above kanji)"; checked: root.furigana; toggled(v) => { root.set-furigana(v); } }
-                    ToggleRow { text: "Show English before answering"; checked: root.english; toggled(v) => { root.set-english(v); } }
-                    ToggleRow { text: "Convert romaji to kana"; checked: root.romaji; toggled(v) => { root.set-romaji(v); } }
-                    ToggleRow { text: "Remind me when reviews are due"; checked: root.notifications; toggled(v) => { root.set-notifications(v); } }
-                    Text { text: "New points per lesson"; font-size: 17px; color: Theme.fg; }
+                    Text { text: @tr("Language"); font-size: 17px; color: Theme.fg; }
+                    HorizontalLayout {
+                        spacing: 8px; alignment: start;
+                        // language names are never translated
+                        for name[i] in ["English", "Français"]: Btn { text: name; primary: root.language-index == i; clicked => { root.set-language(i); } }
+                    }
+                    ToggleRow { text: @tr("Furigana (readings above kanji)"); checked: root.furigana; toggled(v) => { root.set-furigana(v); } }
+                    ToggleRow { text: @tr("Show the translation before answering"); checked: root.english; toggled(v) => { root.set-english(v); } }
+                    ToggleRow { text: @tr("Convert romaji to kana"); checked: root.romaji; toggled(v) => { root.set-romaji(v); } }
+                    ToggleRow { text: @tr("Remind me when reviews are due"); checked: root.notifications; toggled(v) => { root.set-notifications(v); } }
+                    Text { text: @tr("New points per lesson"); font-size: 17px; color: Theme.fg; }
                     HorizontalLayout {
                         spacing: 8px; alignment: start;
                         for n in [3, 5, 10]: Btn { text: n; primary: root.batch-size == n; clicked => { root.set-batch(n); } }
                     }
-                    Text { text: "Start lessons at"; font-size: 17px; color: Theme.fg; }
+                    Text { text: @tr("Start lessons at"); font-size: 17px; color: Theme.fg; }
                     HorizontalLayout {
                         spacing: 8px; alignment: start;
                         for name[i] in ["N5", "N4", "N3", "N2", "N1"]: Btn { text: name; primary: root.start-level-index == i; clicked => { root.set-start-level(i); } }
                     }
                     Text {
-                        text: "Lessons teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again.";
+                        text: @tr("Lessons teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again.");
                         font-size: 13px; color: Theme.muted; wrap: word-wrap;
                     }
-                    Text { text: "Target retention (FSRS)"; font-size: 17px; color: Theme.fg; }
+                    Text { text: @tr("Target retention (FSRS)"); font-size: 17px; color: Theme.fg; }
                     HorizontalLayout {
                         spacing: 8px; alignment: start;
                         for label[i] in ["85%", "90%", "95%"]: Btn { text: label; primary: root.retention-index == i; clicked => { root.set-retention(i); } }
                     }
-                    Text { text: "Higher retention = more frequent reviews. 90% is a good default."; font-size: 13px; color: Theme.muted; wrap: word-wrap; }
-                    HorizontalLayout { alignment: start; Btn { text: "Reset all progress"; clicked => { root.confirm-reset = true; } } }
+                    Text { text: @tr("Higher retention = more frequent reviews. 90% is a good default."); font-size: 13px; color: Theme.muted; wrap: word-wrap; }
+                    HorizontalLayout { alignment: start; Btn { text: @tr("Reset all progress"); clicked => { root.confirm-reset = true; } } }
                     Text {
-                        text: "Most example sentences come from Tatoeba (tatoeba.org), licensed CC-BY 2.0 FR, and show their Tatoeba number and contributor. A few were written for this app and are marked as such.";
+                        text: @tr("Most example sentences come from Tatoeba (tatoeba.org), licensed CC-BY 2.0 FR, and show their Tatoeba number and contributor. A few were written for this app and are marked as such.");
                         font-size: 13px; color: Theme.muted; wrap: word-wrap;
                     }
                 }
@@ -609,7 +617,7 @@ export component AppWindow inherits Window {
                 VerticalLayout {
                     padding-top: 12px;
                     Scroller { vertical-stretch: 1; GrammarBody { p: root.notes; furigana: root.furigana; max-examples: 3; } }
-                    HorizontalLayout { padding: 12px; alignment: end; Btn { text: "Close"; clicked => { root.show-notes = false; } } }
+                    HorizontalLayout { padding: 12px; alignment: end; Btn { text: @tr("Close"); clicked => { root.show-notes = false; } } }
                 }
             }
         }
@@ -623,14 +631,14 @@ export component AppWindow inherits Window {
                 box := VerticalLayout {
                     padding: 20px; spacing: 16px;
                     Text {
-                        text: root.screen == 4 ? "Move \"" + root.notes.title + "\" back to unlearned?" : "Delete all SRS progress and review history?";
+                        text: root.screen == 4 ? @tr("Move \"{}\" back to unlearned?", root.notes.title) : @tr("Delete all SRS progress and review history?");
                         color: Theme.fg; wrap: word-wrap;
                     }
                     HorizontalLayout {
                         spacing: 8px; alignment: end;
-                        Btn { text: "Cancel"; clicked => { root.confirm-reset = false; } }
+                        Btn { text: @tr("Cancel"); clicked => { root.confirm-reset = false; } }
                         Btn {
-                            text: "Reset"; primary: true;
+                            text: @tr("Reset"); primary: true;
                             clicked => {
                                 root.confirm-reset = false;
                                 if (root.screen == 4) { root.reset-point(); } else { root.reset-all(); }

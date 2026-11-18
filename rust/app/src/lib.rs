@@ -3,6 +3,7 @@
 //! UI can be driven headlessly in tests (see `tests/ui.rs`).
 
 use bunpo_core::content::Content;
+use bunpo_core::i18n::{tr, Lang};
 use bunpo_core::layout::{self, ClozeMode, Metrics};
 use bunpo_core::lessons::{lesson_queue, LEVELS as JLPT_LEVELS};
 use bunpo_core::reminder::next_reminder;
@@ -68,8 +69,9 @@ const LEVELS: [&str; 5] = ["Beginner", "Adept", "Seasoned", "Expert", "Mastered"
 
 /// Things only the host OS can do.
 pub trait Platform {
-    /// Arm (or replace) the review reminder.
-    fn schedule_reminder(&self, at_ms: i64, count: usize);
+    /// Arm (or replace) the review reminder; `text` is the notification text (already translated:
+    /// the notification is shown by the OS while the app may not be running).
+    fn schedule_reminder(&self, at_ms: i64, count: usize, text: &str, channel: &str);
     fn cancel_reminder(&self);
     /// Remove a reminder notification that is currently shown.
     fn dismiss_reminder(&self) {}
@@ -81,7 +83,7 @@ pub trait Platform {
 /// Desktop/test platform: does nothing.
 pub struct NoPlatform;
 impl Platform for NoPlatform {
-    fn schedule_reminder(&self, _: i64, _: usize) {}
+    fn schedule_reminder(&self, _: i64, _: usize, _: &str, _: &str) {}
     fn cancel_reminder(&self) {}
 }
 
@@ -130,16 +132,37 @@ fn model<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
     ModelRc::new(VecModel::from(v))
 }
 
-pub fn rel_time(due: i64, now: i64) -> String {
+pub fn rel_time(lang: Lang, due: i64, now: i64) -> String {
     let d = due - now;
+    let fr = lang == Lang::Fr;
     if d <= 0 {
-        return "now".into();
+        return if fr { "maintenant" } else { "now" }.into();
     }
     let m = d / 60_000;
-    match m {
-        _ if m < 60 => format!("in {} min", m + 1),
-        _ if m < 60 * 24 => format!("in {} h {} min", m / 60, m % 60),
-        _ => format!("in {} days", (m + 60 * 12) / (60 * 24)),
+    let days = (m + 60 * 12) / (60 * 24);
+    match (m, fr) {
+        _ if m < 60 => format!("{} {} min", if fr { "dans" } else { "in" }, m + 1),
+        _ if m < 60 * 24 => format!("{} {} h {} min", if fr { "dans" } else { "in" }, m / 60, m % 60),
+        (_, false) => format!("in {days} days"),
+        (_, true) => format!("dans {days} jours"),
+    }
+}
+
+/// Text of the review reminder notification.
+pub fn reminder_text(lang: Lang, count: usize) -> String {
+    match (lang, count) {
+        (Lang::En, 1) => "1 grammar review is waiting".into(),
+        (Lang::En, n) => format!("{n} grammar reviews are waiting"),
+        (Lang::Fr, 1) => "1 révision de grammaire vous attend".into(),
+        (Lang::Fr, n) => format!("{n} révisions de grammaire vous attendent"),
+    }
+}
+
+/// Switch the Slint UI strings (@tr) to `lang`; "" is the untranslated (English) source.
+fn apply_language(lang: Lang) {
+    let code = if lang == Lang::Fr { "fr" } else { "" };
+    if let Err(e) = slint::select_bundled_translation(code) {
+        event(&format!("translation {code:?} not available: {e:?}"));
     }
 }
 
@@ -150,30 +173,38 @@ fn sentence_key(point: &str, sid: u64) -> SharedString {
 fn point_data(content: &Content, st: &State, id: &str) -> PointData {
     let p = content.get(id).expect("known point");
     let card = st.progress.card(id);
-    let status = if card.is_new() {
-        "Status: not learned yet".to_string()
-    } else {
-        format!(
+    let lang = st.progress.settings.lang();
+    let status = match (card.is_new(), lang) {
+        (true, Lang::En) => "Status: not learned yet".to_string(),
+        (true, Lang::Fr) => "Statut : pas encore appris".to_string(),
+        (false, Lang::En) => format!(
             "Status: {} · next review {} · reviews {} · lapses {}",
             card.level_name(),
-            rel_time(card.due, now_ms()),
+            rel_time(lang, card.due, now_ms()),
             card.reps,
             card.lapses
-        )
+        ),
+        (false, Lang::Fr) => format!(
+            "Statut : {} · prochaine révision {} · révisions {} · oublis {}",
+            tr(lang, card.level_name()),
+            rel_time(lang, card.due, now_ms()),
+            card.reps,
+            card.lapses
+        ),
     };
     PointData {
         id: p.id.as_str().into(),
-        title: p.title.as_str().into(),
+        title: p.title_in(lang).into(),
         level: p.level.as_str().into(),
-        meaning: p.meaning.as_str().into(),
-        structure: p.structure.as_str().into(),
-        explanation: p.explanation.replace('\n', " ").into(),
+        meaning: p.meaning_in(lang).into(),
+        structure: p.structure_in(lang).into(),
+        explanation: p.explanation_in(lang).replace('\n', " ").into(),
         status: status.into(),
         can_reset: !card.is_new(),
         examples: model(
             p.sentences
                 .iter()
-                .map(|s| Example { key: sentence_key(&p.id, s.id), en: s.en.as_str().into() })
+                .map(|s| Example { key: sentence_key(&p.id, s.id), en: s.translation(lang).into() })
                 .collect(),
         ),
     }
@@ -206,8 +237,9 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
             levels[i] += 1;
         }
     }
+    let lang = st.progress.settings.lang();
     let next_titles: Vec<&str> =
-        queue.iter().take(batch).filter_map(|id| content.get(id)).map(|p| p.title.as_str()).collect();
+        queue.iter().take(batch).filter_map(|id| content.get(id)).map(|p| p.title_in(lang)).collect();
     event(&format!("home due={due} learned={}", content.points.len() - new.len()));
     ui.set_home(HomeData {
         due,
@@ -215,12 +247,16 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
         start_level: st.progress.settings.start_level.as_str().into(),
         learned: (content.points.len() - new.len()) as i32,
         total: content.points.len() as i32,
-        next_due: next_due.map(|d| rel_time(d, now)).unwrap_or_default().into(),
+        next_due: next_due.map(|d| rel_time(lang, d, now)).unwrap_or_default().into(),
         next_titles: next_titles.join("  ·  ").into(),
-        learn_label: format!("Learn {} new", batch.min(queue.len())).into(),
+        learn_label: match lang {
+            Lang::En => format!("Learn {} new", batch.min(queue.len())),
+            Lang::Fr => format!("Apprendre {} nouveaux", batch.min(queue.len())),
+        }
+        .into(),
         levels: model(levels.to_vec()),
         reviews_24h: st.progress.reviews_since(now - 86_400_000) as i32,
-        source: content.source.as_str().into(),
+        source: content.source_in(lang).into(),
         level_rows: model(level_rows(content, &st.progress)),
     });
     ui.set_level_pies(model(level_pies(content, &st.progress)));
@@ -246,6 +282,7 @@ fn refresh_list(ui: &AppWindow, content: &Content, st: &State) {
     let mut items = vec![];
     let mut level = "";
     let mut n = 0;
+    let lang = st.progress.settings.lang();
     for p in &content.points {
         let header = if p.level != level {
             level = &p.level;
@@ -258,9 +295,9 @@ fn refresh_list(ui: &AppWindow, content: &Content, st: &State) {
         items.push(ListItem {
             id: p.id.as_str().into(),
             num: n.to_string().into(),
-            title: p.title.as_str().into(),
-            meaning: p.meaning.as_str().into(),
-            level: st.progress.card(&p.id).level_name().into(),
+            title: p.title_in(lang).into(),
+            meaning: p.meaning_in(lang).into(),
+            level: tr(lang, st.progress.card(&p.id).level_name()).into(),
             header: header.into(),
         });
     }
@@ -278,17 +315,31 @@ fn refresh_settings(ui: &AppWindow, st: &State) {
     ui.set_start_level_index(li as i32);
     let ri = RETENTIONS.iter().position(|r| (r - s.retention).abs() < 1e-6).unwrap_or(1);
     ui.set_retention_index(ri as i32);
+    ui.set_language_index(if s.lang() == Lang::Fr { 1 } else { 0 });
 }
 
 fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
     let Some(sess) = &st.session else { return };
+    let lang = st.progress.settings.lang();
+    let fr = lang == Lang::Fr;
     let mut q = QuizData {
-        title: if sess.lesson { "Lesson quiz" } else { "Reviews" }.into(),
+        title: match (sess.lesson, fr) {
+            (true, false) => "Lesson quiz",
+            (false, false) => "Reviews",
+            (true, true) => "Quiz de la leçon",
+            (false, true) => "Révisions",
+        }
+        .into(),
         done: sess.done as i32,
         total: sess.total as i32,
         lesson: sess.lesson,
         finished: sess.finished(),
-        summary: format!("{} / {} correct on the first try.", sess.correct_first_try, sess.total).into(),
+        summary: if fr {
+            format!("{} / {} justes du premier coup.", sess.correct_first_try, sess.total)
+        } else {
+            format!("{} / {} correct on the first try.", sess.correct_first_try, sess.total)
+        }
+        .into(),
         ..Default::default()
     };
     if let Some((p, s)) = sess.current(content) {
@@ -296,8 +347,8 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
             event(&format!("item point={} sentence={}", p.id, s.id));
         }
         q.key = sentence_key(&p.id, s.id);
-        q.en = s.en.as_str().into();
-        q.hint = s.hint.clone().unwrap_or_else(|| p.meaning.clone()).into();
+        q.en = s.translation(lang).into();
+        q.hint = s.hint(lang).unwrap_or_else(|| p.meaning_in(lang).to_string()).into();
         q.verdict = match sess.verdict {
             None => 0,
             Some(Verdict::Correct) => 1,
@@ -305,8 +356,13 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         };
         q.last_answer = sess.last_answer.as_str().into();
         q.answer = s.answers.iter().take(2).cloned().collect::<Vec<_>>().join("  /  ").into();
-        q.grammar_line = format!("Grammar: {} — {}", p.title, p.meaning).into();
-        q.attribution = s.attribution().into();
+        q.grammar_line = if fr {
+            format!("Grammaire : {} — {}", p.title_in(lang), p.meaning_in(lang))
+        } else {
+            format!("Grammar: {} — {}", p.title, p.meaning)
+        }
+        .into();
+        q.attribution = s.attribution(lang).into();
         ui.set_notes(point_data(content, st, &p.id));
     }
     ui.set_quiz(q);
@@ -337,7 +393,9 @@ fn sync_reminder(platform: &dyn Platform, progress: &Progress) {
     match next_reminder(progress.cards.values(), now_ms()) {
         Some((at, count)) => {
             event(&format!("reminder at={at} count={count}"));
-            platform.schedule_reminder(at, count)
+            let lang = progress.settings.lang();
+            let channel = if lang == Lang::Fr { "Rappels de révision" } else { "Review reminders" };
+            platform.schedule_reminder(at, count, &reminder_text(lang, count), channel)
         }
         None => platform.cancel_reminder(),
     }
@@ -627,6 +685,24 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
     setting!(on_set_retention, i32, |s, v| s.retention = RETENTIONS[(v as usize).min(2)]);
     setting!(on_set_start_level, i32, |s, v| s.start_level = JLPT_LEVELS[(v.max(0) as usize).min(4)].into());
     {
+        let w = ui.as_weak();
+        let st = st.clone();
+        let c = content.clone();
+        let p = platform.clone();
+        ui.on_set_language(move |v| {
+            let Some(ui) = w.upgrade() else { return };
+            let mut st = st.borrow_mut();
+            st.progress.settings.language = if v == 1 { "fr" } else { "en" }.into();
+            st.progress.save();
+            apply_language(st.progress.settings.lang());
+            event(&format!("language={}", st.progress.settings.language));
+            refresh_settings(&ui, &st);
+            refresh_home(&ui, &c, &st);
+            refresh_list(&ui, &c, &st);
+            sync_reminder(&*p, &st.progress);
+        });
+    }
+    {
         let p = platform.clone();
         setting!(on_set_notifications, bool, |s, v| {
             s.notifications = v;
@@ -654,6 +730,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
 
     {
         let s = st.borrow();
+        apply_language(s.progress.settings.lang());
         refresh_settings(&ui, &s);
         refresh_home(&ui, &content, &s);
         refresh_list(&ui, &content, &s);
