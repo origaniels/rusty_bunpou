@@ -131,7 +131,7 @@ P("sei_de", "〜せいで", "because of (blame)", "Noun + の / plain form + せ
   r"せい(?:で|だ|です|か)", "雨のせいで試合が中止になった。", after="any", check=first_lemma("所為"))
 P("kuse_ni", "〜くせに", "even though (critical)", "Plain form / Noun + の + くせに",
   """くせに is a critical "even though": 知っているくせに教えてくれない (he knows, yet won't tell me).""",
-  r"くせに|癖に", "知っているくせに教えてくれない。", after="any")
+  r"くせに(?!な)|癖に(?!な)", "知っているくせに教えてくれない。", after="any")  # 癖になる = become a habit
 P("noni_wish", "〜ばいい / 〜たらいい", "it would be good if, should", "Verb (ば / たら) + いい",
   """ばいい / たらいい suggest what to do: どうすればいいですか (what should I do?).""",
   r"(?:ば|たら)(?:いい|良い|よい)", "どうすればいいですか。", pre="va")
@@ -146,7 +146,7 @@ P("ni_totte", "〜にとって", "for, to (someone's view)", "Noun + にとっ�
 P("ni_yotte", "〜によって / による", "by, depending on, due to", "Noun + によって",
   """によって marks the agent (in passives), a means, a cause, or variation: 国によって習慣が違う (customs
   differ depending on the country).""",
-  r"によって|による|により", "国によって習慣が違います。", after="n")
+  r"によって|による|により(?!かか|掛)", "国によって習慣が違います。", after="n")  # 寄り掛かる = lean
 P("ni_yoru_to", "〜によると", "according to", "Noun + によると / によれば",
   """によると gives the source of information: 天気予報によると明日は雨だ (according to the forecast, it'll
   rain tomorrow).""",
@@ -169,10 +169,12 @@ P("ni_shitagatte", "〜に従って", "as (A changes, B changes); following", "N
 P("ni_tsurete", "〜につれて", "as (gradually)", "Verb (dictionary) / Noun + につれて",
   """につれて describes two things changing together: 時間がたつにつれて、悲しみも薄れた (as time passed,
   the sadness faded too).""",
-  r"につれ(?:て)?", "時間がたつにつれて、悲しみも薄れていった。", after="nv")
+  # not 連れて来る / 行く (bring someone along)
+  r"につれ(?!て?[きく来行いっ])(?:て)?", "時間がたつにつれて、悲しみも薄れていった。", after="nv")
 P("ni_shite_wa", "〜にしては", "for (considering)", "Noun / plain form + にしては",
   """にしては says something is unexpected given a standard: 子供にしては上手だ (pretty good, for a child).""",
-  r"にしては", "初めてにしては上手ですね。", after="any")
+  # 人のせいにしてはいけない is にする + てはいけない (must not blame others)
+  r"にしては(?![^、。]*(?:いけ|だめ|駄目|ならな))", "初めてにしては上手ですね。", after="any")
 P("ni_shite_mo", "〜にしても", "even if, even granting", "Noun / plain form + にしても",
   """にしても concedes a point: 忙しいにしても電話くらいできるだろう (even if you're busy, you could at least
   call).""",

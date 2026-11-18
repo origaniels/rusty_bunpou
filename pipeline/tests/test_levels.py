@@ -73,6 +73,10 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("kuse_ni", "彼はポケットに手を入れるのが癖になっている。"),  # habit
+    ("ni_yotte", "壁により掛かるな。"),  # lean against
+    ("ni_tsurete", "母は彼を私の部屋につれてきた。"),  # bring along
+    ("ni_shite_wa", "自分の誤りを人のせいにしてはいけない。"),  # must not
     ("koto_ni_natte_iru", "あなた、困ったことになっているんでしょう？"),  # be in trouble
     ("koto_wa_nai", "私はこんなに早く目覚めたことはない。"),  # have never
     ("koto_da", "盗むのはいけないことだ。"),  # not advice
