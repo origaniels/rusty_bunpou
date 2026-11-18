@@ -203,3 +203,39 @@ msgstr "Remplacer votre progression par un fichier exporté ? La progression ac
 
 msgid "Choose a file"
 msgstr "Choisir un fichier"
+
+msgid "Report"
+msgstr "Signaler"
+
+msgid "Reported"
+msgstr "Signalée"
+
+msgid "Export reports ({})"
+msgstr "Exporter les signalements ({})"
+
+msgid "Report this sentence"
+msgstr "Signaler cette phrase"
+
+msgid "It doesn't use this grammar point"
+msgstr "Elle n'utilise pas ce point de grammaire"
+
+msgid "The translation is wrong"
+msgstr "La traduction est fausse"
+
+msgid "The reading (furigana) is wrong"
+msgstr "La lecture (furigana) est fausse"
+
+msgid "My answer should have been accepted"
+msgstr "Ma réponse aurait dû être acceptée"
+
+msgid "Something else"
+msgstr "Autre chose"
+
+msgid "Note (optional)"
+msgstr "Remarque (facultatif)"
+
+msgid "Reports stay on this phone. Export them from Settings to send them."
+msgstr "Les signalements restent sur ce téléphone. Exportez-les depuis les Réglages pour les envoyer."
+
+msgid "Save report"
+msgstr "Enregistrer"

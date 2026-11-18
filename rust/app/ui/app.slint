@@ -33,6 +33,7 @@ export struct QuizData {
     verdict: int, // 0 = unanswered, 1 = correct, 2 = wrong
     last-answer: string, answer: string, grammar-line: string, attribution: string,
     finished: bool, summary: string, lesson: bool,
+    reported: bool, // this sentence was already reported
 }
 
 export struct HomeData {
@@ -366,6 +367,12 @@ export component AppWindow inherits Window {
     in-out property <bool> confirm-import;
     /// result of the last export / import, shown under the backup buttons
     in property <string> backup-status;
+    /// sentence report dialog
+    in-out property <bool> show-report;
+    in-out property <int> report-reason: -1;
+    in-out property <string> report-note;
+    in property <string> report-sentence;
+    in property <int> report-count;
 
     callback start-learn();
     callback lesson-prev();
@@ -396,6 +403,9 @@ export component AppWindow inherits Window {
     callback reset-all();
     callback export-progress();
     callback import-progress();
+    callback open-report();
+    callback save-report(int, string);
+    callback export-reports();
 
     /// Rust bumps this to move keyboard focus into the answer field.
     in property <int> focus-tick;
@@ -407,6 +417,7 @@ export component AppWindow inherits Window {
     forward-focus: scope;
     changed screen => { if (self.screen != 2) { scope.focus(); } }
     changed show-notes => { if (self.show-notes) { scope.focus(); } }
+    changed show-report => { if (self.show-report) { scope.focus(); } }
 
     scope := FocusScope {
         key-pressed(event) => {
@@ -414,6 +425,7 @@ export component AppWindow inherits Window {
                 if (root.show-notes) { root.show-notes = false; return accept; }
                 if (root.confirm-reset) { root.confirm-reset = false; return accept; }
                 if (root.confirm-import) { root.confirm-import = false; return accept; }
+                if (root.show-report) { root.show-report = false; return accept; }
                 return root.go-back() ? accept : reject;
             }
             reject
@@ -521,8 +533,13 @@ export component AppWindow inherits Window {
                             Btn { text: @tr("Retry"); horizontal-stretch: 1; clicked => { root.quiz-retry(); answer.focus(); } }
                         }
                         HorizontalLayout {
-                            alignment: start;
+                            alignment: start; spacing: 8px;
                             Btn { text: @tr("Grammar notes"); clicked => { answer.clear-focus(); root.open-notes(); } }
+                            Btn {
+                                text: root.quiz.reported ? @tr("Reported") : @tr("Report");
+                                enabled: !root.quiz.reported;
+                                clicked => { answer.clear-focus(); root.open-report(); }
+                            }
                         }
                         Text { text: root.quiz.attribution; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
                     }
@@ -720,6 +737,10 @@ export component AppWindow inherits Window {
                             : @tr("Your progress is only stored on this phone: export it now and then (Drive, email, …) to keep a copy.");
                         font-size: 13px; color: root.backup-status != "" ? Theme.fg : Theme.muted; wrap: word-wrap;
                     }
+                    if root.report-count > 0: HorizontalLayout {
+                        alignment: start;
+                        Btn { text: @tr("Export reports ({})", root.report-count); clicked => { root.export-reports(); } }
+                    }
                     HorizontalLayout { alignment: start; Btn { text: @tr("Reset all progress"); clicked => { root.confirm-reset = true; } } }
                     Text {
                         text: @tr("Most example sentences come from Tatoeba (tatoeba.org), licensed CC-BY 2.0 FR, and show their Tatoeba number and contributor. A few were written for this app and are marked as such.");
@@ -801,6 +822,69 @@ export component AppWindow inherits Window {
                         Btn {
                             text: @tr("Choose a file"); primary: true;
                             clicked => { root.confirm-import = false; root.import-progress(); }
+                        }
+                    }
+                }
+            }
+        }
+        if root.show-report: Rectangle {
+            background: #000000a0;
+            TouchArea { clicked => { root.show-report = false; } }
+            Rectangle {
+                // near the top, and moved up while the keyboard (for the note) is open so the
+                // buttons stay above it
+                x: 16px; width: parent.width - 32px; height: rbox.preferred-height;
+                y: root.kb-height > 0 ? max(8px, min(48px, parent.height - root.kb-height - self.height - 8px)) : 48px;
+                background: Theme.card; border-radius: 20px;
+                TouchArea { }
+                rbox := VerticalLayout {
+                    padding: 20px; spacing: 10px;
+                    Text { text: @tr("Report this sentence"); font-size: 20px; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
+                    Text { text: root.report-sentence; font-size: 16px; color: Theme.muted; wrap: word-wrap; }
+                    for r[i] in [
+                        @tr("It doesn't use this grammar point"),
+                        @tr("The translation is wrong"),
+                        @tr("The reading (furigana) is wrong"),
+                        @tr("My answer should have been accepted"),
+                        @tr("Something else"),
+                    ]: Rectangle {
+                        border-radius: 10px;
+                        background: i == root.report-reason ? #ff8a7a26 : (rt.pressed ? #ffffff14 : transparent);
+                        border-width: 1px;
+                        border-color: i == root.report-reason ? Theme.accent : #3e3b4a;
+                        HorizontalLayout {
+                            padding: 10px; spacing: 10px;
+                            Rectangle {
+                                width: 18px; height: 18px; y: (parent.height - self.height) / 2;
+                                border-radius: 9px; border-width: 2px;
+                                border-color: i == root.report-reason ? Theme.accent : #77748a;
+                                Rectangle {
+                                    width: 8px; height: 8px; border-radius: 4px;
+                                    background: i == root.report-reason ? Theme.accent : transparent;
+                                }
+                            }
+                            Text { text: r; color: Theme.fg; wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1; }
+                        }
+                        rt := TouchArea { clicked => { root.report-reason = i; } }
+                        accessible-role: button;
+                        accessible-label: r;
+                        accessible-action-default => { root.report-reason = i; }
+                    }
+                    LineEdit {
+                        text <=> root.report-note;
+                        font-size: 16px;
+                        placeholder-text: @tr("Note (optional)");
+                    }
+                    if root.kb-height == 0: Text {
+                        text: @tr("Reports stay on this phone. Export them from Settings to send them.");
+                        font-size: 13px; color: Theme.muted; wrap: word-wrap;
+                    }
+                    HorizontalLayout {
+                        spacing: 8px; alignment: end;
+                        Btn { text: @tr("Cancel"); clicked => { root.show-report = false; } }
+                        Btn {
+                            text: @tr("Save report"); primary: true; enabled: root.report-reason >= 0;
+                            clicked => { root.save-report(root.report-reason, root.report-note); }
                         }
                     }
                 }

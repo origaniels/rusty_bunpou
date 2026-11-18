@@ -6,9 +6,10 @@ use bunpo_core::content::Content;
 use bunpo_core::i18n::{tr, Lang};
 use bunpo_core::layout::{self, ClozeMode, Metrics};
 use bunpo_core::lessons::{lesson_queue, LEVELS as JLPT_LEVELS};
+use bunpo_core::clock::date_string;
 use bunpo_core::reminder::next_reminder;
 use bunpo_core::session::{find_sentence, now_ms, Session, Verdict};
-use bunpo_core::store::Progress;
+use bunpo_core::store::{Progress, Report, REPORT_REASONS};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -126,6 +127,10 @@ pub struct State {
     detail: Option<String>,
     /// JLPT levels folded in the grammar list (for this run of the app)
     collapsed: std::collections::HashSet<String>,
+    /// the sentence the open report dialog is about
+    report_target: Option<Report>,
+    /// what the last export was ("progress" or "reports"), for its result message
+    exporting: &'static str,
 }
 
 /// The running app: UI + state. Keep it alive while the UI runs.
@@ -166,21 +171,6 @@ pub fn reminder_text(lang: Lang, count: usize) -> String {
     }
 }
 
-/// Date as YYYY-MM-DD (UTC) for file names.
-fn date_string(ms: i64) -> String {
-    // days since 1970-01-01 → civil date (Howard Hinnant's algorithm)
-    let z = ms.div_euclid(86_400_000) + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + if m <= 2 { 1 } else { 0 };
-    format!("{y:04}-{m:02}-{d:02}")
-}
-
 /// Pick up what the file picker left behind (see [`Platform::export_progress`] / `pick_import`):
 /// an imported file to load, or the outcome of an export. Returns a message for the user.
 pub fn check_backup_files(st: &mut State) -> Option<String> {
@@ -210,6 +200,8 @@ pub fn check_backup_files(st: &mut State) -> Option<String> {
     event(&format!("backup {outcome}"));
     Some(
         match (outcome.trim(), fr) {
+            ("exported", false) if st.exporting == "reports" => "Reports exported.",
+            ("exported", true) if st.exporting == "reports" => "Signalements exportés.",
             ("exported", false) => "Progress exported.",
             ("exported", true) => "Progression exportée.",
             ("cancelled", false) => "Cancelled.",
@@ -219,6 +211,34 @@ pub fn check_backup_files(st: &mut State) -> Option<String> {
         }
         .into(),
     )
+}
+
+/// The reports as a JSON file meant to be read (by a person or Claude): each one with the
+/// sentence text, its translations and the grammar point, not only ids.
+pub fn reports_json(content: &Content, progress: &Progress) -> String {
+    let items: Vec<serde_json::Value> = progress
+        .reports
+        .iter()
+        .map(|r| {
+            let p = content.get(&r.point);
+            let s = p.and_then(|p| find_sentence(p, r.sentence));
+            serde_json::json!({
+                "date": date_string(r.ts),
+                "point": r.point,
+                "point_title": p.map(|p| p.title.as_str()).unwrap_or(""),
+                "sentence": r.sentence,
+                "japanese": s.map(|s| s.ja.as_str()).unwrap_or(""),
+                "english": s.map(|s| s.en.as_str()).unwrap_or(""),
+                "french": s.map(|s| s.fr.as_str()).unwrap_or(""),
+                "answers": s.map(|s| s.answers.clone()).unwrap_or_default(),
+                "reason": r.reason,
+                "note": r.note,
+                "typed": r.answer,
+                "app_language": r.lang,
+            })
+        })
+        .collect();
+    serde_json::to_string_pretty(&serde_json::json!({ "reports": items })).unwrap()
 }
 
 /// Switch the Slint UI strings (@tr) to `lang`; "" is the untranslated (English) source.
@@ -384,6 +404,7 @@ fn refresh_settings(ui: &AppWindow, st: &State) {
     let ri = RETENTIONS.iter().position(|r| (r - s.retention).abs() < 1e-6).unwrap_or(1);
     ui.set_retention_index(ri as i32);
     ui.set_language_index(if s.lang() == Lang::Fr { 1 } else { 0 });
+    ui.set_report_count(st.progress.reports.len() as i32);
 }
 
 fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
@@ -431,6 +452,7 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         }
         .into();
         q.attribution = s.attribution(lang).into();
+        q.reported = st.progress.reports.iter().any(|r| r.point == p.id && r.sentence == s.id);
         ui.set_notes(point_data(content, st, &p.id));
     }
     ui.set_quiz(q);
@@ -521,6 +543,8 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         session: None,
         detail: None,
         collapsed: Default::default(),
+        report_target: None,
+        exporting: "progress",
     }));
     let ui = AppWindow::new()?;
     ui.set_stage_colors(model((0..6).map(stage_color).collect()));
@@ -803,8 +827,55 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         st.progress.save();
         let Some(path) = st.progress.path().map(|p| p.to_string_lossy().to_string()) else { return };
         ui.set_backup_status("".into());
+        st.exporting = "progress";
         p.export_progress(&path, &format!("bunpo-progress-{}.json", date_string(now_ms())));
     }));
+
+    ui.on_export_reports(cb!(|ui, c, st, p| {
+        let Some(dir) = st.progress.path().and_then(|p| p.parent()).map(|d| d.to_path_buf()) else { return };
+        let file = dir.join("reports-export.json");
+        if std::fs::write(&file, reports_json(&c, &st.progress)).is_err() {
+            return;
+        }
+        ui.set_backup_status("".into());
+        st.exporting = "reports";
+        p.export_progress(&file.to_string_lossy(), &format!("bunpo-reports-{}.json", date_string(now_ms())));
+    }));
+
+    ui.on_open_report(cb!(|ui, c, st| {
+        let Some(sess) = &st.session else { return };
+        let Some((point, sentence)) = sess.current(&c) else { return };
+        ui.set_report_sentence(sentence.ja.as_str().into());
+        ui.set_report_reason(-1);
+        ui.set_report_note("".into());
+        st.report_target = Some(Report {
+            point: point.id.clone(),
+            sentence: sentence.id,
+            answer: sess.last_answer.clone(),
+            lang: st.progress.settings.language.clone(),
+            ..Default::default()
+        });
+        ui.set_show_report(true);
+        event(&format!("report-open point={} sentence={}", point.id, sentence.id));
+    }));
+
+    ui.on_save_report({
+        let (w, c, st) = (ui.as_weak(), content.clone(), st.clone());
+        move |reason, note| {
+            let Some(ui) = w.upgrade() else { return };
+            let mut st = st.borrow_mut();
+            let Some(mut r) = st.report_target.take() else { return };
+            let Some(reason) = REPORT_REASONS.get(reason as usize) else { return };
+            r.reason = reason.to_string();
+            r.note = note.trim().to_string();
+            r.ts = now_ms();
+            event(&format!("report point={} sentence={} reason={}", r.point, r.sentence, r.reason));
+            st.progress.add_report(r);
+            ui.set_show_report(false);
+            refresh_quiz(&ui, &c, &st);
+            refresh_settings(&ui, &st);
+        }
+    });
 
     ui.on_import_progress(cb!(|ui, c, st, p| {
         let _ = (&ui, &st);

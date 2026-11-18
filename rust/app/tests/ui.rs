@@ -685,6 +685,10 @@ fn check_every_screen(width: f32, french: bool) {
     t.app.ui.set_show_notes(true);
     check("quiz, grammar notes");
     t.app.ui.set_show_notes(false);
+    t.app.ui.invoke_open_report();
+    t.app.ui.set_report_reason(3);
+    check("quiz, report dialog");
+    t.app.ui.set_show_report(false);
     t.app.ui.invoke_quiz_retry();
     let a = t.correct_answer();
     t.type_and_enter(&a);
@@ -824,3 +828,61 @@ fn importing_a_wrong_file_changes_nothing() {
     assert!(!dir.join("progress.import.json").exists());
 }
 
+
+// ------------------------------------------------------------------ sentence reports
+
+#[test]
+fn report_a_sentence_then_export_the_reports() {
+    let dir = tmp_dir("report");
+    let t = setup_with(Progress::load(&dir.join("progress.json")));
+    t.press("Learn 5 new");
+    for _ in 0..4 {
+        t.press("Next");
+    }
+    t.press("Start quiz");
+    assert!(!t.exists("Report"), "only after answering");
+    t.type_and_enter("ぜんぜんちがう");
+    t.press("Report");
+    assert!(t.app.ui.get_show_report());
+    let (point, sentence) = {
+        let st = t.app.state.borrow();
+        let (p, s) = st.session.as_ref().unwrap().current(&t.app.content).unwrap();
+        (p.id.clone(), s.clone())
+    };
+    assert_eq!(t.app.ui.get_report_sentence(), sentence.ja.as_str());
+    assert!(!t.find("Save report").accessible_enabled().unwrap_or(true), "a reason is needed first");
+    t.press("My answer should have been accepted");
+    t.app.ui.set_report_note("  maybe a valid variant  ".into());
+    t.press("Save report");
+    assert!(!t.app.ui.get_show_report());
+    assert!(t.exists("Reported") && !t.exists("Report"), "can't report the same sentence twice");
+
+    let r = t.app.state.borrow().progress.reports[0].clone();
+    assert_eq!((r.point.as_str(), r.sentence), (point.as_str(), sentence.id));
+    assert_eq!((r.reason.as_str(), r.note.as_str(), r.answer.as_str()), ("answer-rejected", "maybe a valid variant", "ぜんぜんちがう"));
+    assert_eq!(Progress::load(&dir.join("progress.json")).reports.len(), 1, "saved at once");
+
+    t.app.ui.invoke_go_home();
+    t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0));
+    t.press("Settings");
+    t.press("Export reports (1)");
+    let last = t.rec.last();
+    assert!(last.contains("reports-export.json bunpo-reports-20"), "{last}");
+    let json: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("reports-export.json")).unwrap()).unwrap();
+    let item = &json["reports"][0];
+    assert_eq!(item["japanese"], sentence.ja.as_str());
+    assert_eq!(item["reason"], "answer-rejected");
+    assert!(item["point_title"].as_str().unwrap().len() > 0);
+    std::fs::write(dir.join("backup-result.txt"), "exported").unwrap();
+    on_resume();
+    assert_eq!(t.app.ui.get_backup_status(), "Reports exported.");
+}
+
+#[test]
+fn no_export_reports_button_without_reports() {
+    let t = setup();
+    t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0));
+    t.press("Settings");
+    assert!(t.exists("Export progress"));
+    assert!(!t.exists("Export reports (0)"));
+}
