@@ -535,7 +535,8 @@ FR = {
         meaning="il ne faut pas, ça ne se fait pas",
         structure="Verbe (forme du dictionnaire) + ものではない",
         explanation="""ものではない donne un conseil de bienséance : 人の悪口を言うものではない (on ne
-        dit pas du mal des autres).""",
+        dit pas du mal des autres). Il nie aussi une idée générale : 努力は必ずしも報われるものではない
+        (l'effort n'est pas toujours récompensé).""",
     ),
     "koto_ka": dict(
         meaning="combien … !",

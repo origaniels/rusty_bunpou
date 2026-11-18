@@ -73,6 +73,11 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("mono_dakara", "結果は望ましいものではなかった。"),
+    ("mono_ga_aru", "何か必要なものがあったら、遠慮なく言ってください。"),
+    ("koto_ka", "なるほど、そういうことか。"),
+    ("koto_dakara", "よくあることだから、気にしてないわ。"),
+    ("mono_nara", "選んでいただいたものなら何でも結構です。"),
     ("wo_tooshite", "道を開けて子どもを通してください。"),
     ("wo_hajime", "それから、彼は、ケンブリッジで研究を始め、宇宙の本質について考えた。"),
     ("ni_kakete", "彼は礼儀にかけている。"),

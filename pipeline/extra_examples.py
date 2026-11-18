@@ -38,6 +38,14 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("校長先生をはじめとして、先生方が全員集まった。", "All the teachers gathered, starting with the principal."),
         ("京都をはじめ、奈良や大阪にも行った。", "I went to Kyoto, and also to Nara and Osaka."),
     ],
+    "koto_dakara": [
+        ("彼のことだから、きっとまた遅刻するだろう。", "Knowing him, he'll be late again for sure."),
+        ("真面目な田中さんのことだから、約束は必ず守るはずだ。", "Serious as Tanaka is, he'll certainly keep his promise."),
+        ("あの子のことだから、心配いらないよ。", "Knowing that kid, there's no need to worry."),
+        ("母のことだから、もう全部準備してあると思う。", "Knowing my mother, I think she's already got everything ready."),
+        ("優しい彼女のことだから、許してくれるでしょう。", "Kind as she is, she'll probably forgive you."),
+        ("忘れっぽい父のことだから、また傘を忘れてくるに違いない。", "Forgetful as my father is, he's bound to come back without his umbrella again."),
+    ],
     "ni_shitara": [
         ("親にしたら、子供はいつまでも子供だ。", "To parents, a child is always a child."),
         ("子供にしたら、毎日塾に通うのはつらいだろう。", "For a child, going to cram school every day must be hard."),

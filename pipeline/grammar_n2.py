@@ -375,25 +375,37 @@ P("you_dewa_nai_ka", "〜ようではないか", "let's (appeal)", "Verb (voliti
 # ---------------------------------------------------------------- mono / koto expressions
 P("mono_nara", "〜ものなら", "if (it were possible)", "Verb (potential / volitional) + ものなら",
   """ものなら means "if (unlikely) ...": できるものなら、もう一度やり直したい (if only I could, I'd do it over).""",
-  r"ものなら|もんなら", "できるものなら、もう一度やり直したい。", after="v")
+  # after a potential (できる, 解ける) or volitional (言おう) verb, not もの + なら (さっぱりしたものなら)
+  r"ものなら|もんなら", "できるものなら、もう一度やり直したい。", after="v",
+  check=lambda t, i, k: i > 0 and (t[i - 1].s.endswith("う") and t[i - 1].p1 == "助動詞"
+                                   or t[i - 1].lemma in ("出来る", "れる", "られる")
+                                   or (t[i - 1].p1 == "動詞" and t[i - 1].s.endswith("る") and t[i - 1].kana[-2:-1] in "えけげせぜてでねべぺめれ")))
 P("mono_ka", "〜ものか", "no way (I'll ...)", "Plain form + ものか",
   """ものか (もんか) is an emphatic "never!": 二度と行くものか (I'll never go there again!).""",
   r"ものか|もんか", "あんな店、二度と行くものか。", after="va")
 P("mono_dakara", "〜ものだから", "because (excuse)", "Plain form + ものだから",
   """ものだから gives a reason, often as an excuse: 道が混んでいたものだから、遅れてしまった (the roads were jammed, you see, so I was late). In casual speech it becomes もんだから or もので.""",
-  r"ものだから|もんだから|もので", "道が混んでいたものだから、遅れてしまいました。", after="va")
+  # もので only as a reason (〜もので、 / 〜もので。), not ものではない / ものである
+  r"ものだから|もんだから|もので(?=。)", "道が混んでいたものだから、遅れてしまいました。", after="va")
 P("mono_ga_aru", "〜ものがある", "there is something (feeling)", "Plain form + ものがある",
   """ものがある expresses an impression: 彼の歌には人を感動させるものがある (there's something moving in his songs).""",
-  r"ものが" + ARU, "彼の歌には人の心を動かすものがある。", after="va", tail=True)
+  r"ものが" + ARU, "彼の歌には人の心を動かすものがある。", after="va", tail=True,
+  # an impression (Xには…ものがある), not "there is a thing (to eat, to declare ...)"
+  # (中には…ものがある = "some of them are", 失望というもの, 買いたいもの are literal "things")
+  req=r"には[^。]*ものが", neg=r"何|なに|いろいろ|色々|他に|ほかに|いい(?:もの)|必要な|中には|というもの|たいもの|以下の|ものと")
 P("mono_dewa_nai", "〜ものではない", "you shouldn't", "Verb (dictionary) + ものではない",
-  """ものではない gives social advice: 人の悪口を言うものではない (you shouldn't speak ill of others).""",
+  """ものではない gives social advice: 人の悪口を言うものではない (you shouldn't speak ill of others). It also denies a general expectation: 努力は必ずしも報われるものではない (effort is not
+  always rewarded).""",
   r"もの(?:では|じゃ)(?:ない|ありません)", "人の悪口を言うものではない。", after="v")
 P("koto_ka", "〜ことか", "how (very)!", "Question word ... + ことか",
   """ことか expresses strong emotion: どんなに心配したことか (how worried I was!).""",
-  r"ことか(?=[。！])", "どんなに心配したことか。", after="va")
+  # an exclamation (どんなに / なんと … ことか), not そういうことか or 知ったことか
+  r"ことか(?=[。！])", "どんなに心配したことか。", after="va", req=r"どんな|なんと|何と|なんて|どれほど|どれだけ|いかに")
 P("koto_dakara", "〜ことだから", "knowing (him), since it's", "Noun + の + ことだから",
   """ことだから gives a reason based on someone's character: 彼のことだから、また遅れるだろう.""",
-  r"ことだから", "あの人のことだから、また遅れて来るだろう。", after="any")
+  # 〜のことだから about someone (knowing him), not よくあることだから
+  r"ことだから", "あの人のことだから、また遅れて来るだろう。", after="any",
+  check=lambda t, i, k: i > 1 and t[i - 1].s == "の" and is_person(t[i - 2]))
 P("koto_naku", "〜ことなく", "without (ever) doing", "Verb (dictionary) + ことなく",
   """ことなく means "without": 休むことなく働き続けた (worked on without a break).""",
   r"ことなく", "彼は休むことなく働き続けた。", after="v")
