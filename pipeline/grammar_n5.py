@@ -327,7 +327,8 @@ def m_ya(toks):
     return [(i, i + 1, None) for i, t in enumerate(toks)
             if t.s == "や" and t.p1 == "助詞" and at(toks, i - 1) and toks[i - 1].p1 in ("名詞", "代名詞", "接尾辞")
             # 今や (nowadays) and 〜やそこら (or so) are not lists
-            and toks[i - 1].s != "今" and not (at(toks, i + 1) and toks[i + 1].s == "そこ")]
+            and toks[i - 1].s != "今" and not (at(toks, i + 1) and toks[i + 1].s == "そこ")
+            and not (at(toks, i + 1) and toks[i + 1].s.startswith("ぶ"))]  # やぶ医者 (quack)
 
 
 @point("kara_from", "から (from)", "from (starting point)", "Noun + から",
@@ -1085,9 +1086,12 @@ def m_toki(toks):
 @point("to_iu", "という", "called, named", "Name + という + Noun",
        """
 X という Y means "a Y called X": 田中という人 (a person named Tanaka),
-「こころ」という本 (a book called "Kokoro").
+「こころ」という本 (a book called "Kokoro"). It also links a whole statement to a noun
+that sums it up: 結婚したといううわさ (the rumor that she got married).
 """)
 def m_to_iu(toks):
     return [(i, i + 2, None) for i, t in enumerate(toks)
             if t.s == "と" and at(toks, i + 1) and toks[i + 1].s in ("いう", "言う") and toks[i + 1].cf.startswith("連体形")
-            and at(toks, i + 2) and toks[i + 2].p1 == "名詞"]
+            and at(toks, i + 2) and toks[i + 2].p1 == "名詞"
+            # ということ / というもの / というの are other points (N3, N2), not "called"
+            and toks[i + 2].lemma not in ("事", "物", "の", "訳")]  # というわけ: N3

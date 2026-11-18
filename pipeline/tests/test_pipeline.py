@@ -90,7 +90,9 @@ POSITIVE = [
 NEGATIVE = [
     ("ya", "今や有名店ですね。"),  # 今や = nowadays
     ("ya", "外国語は１年やそこらで身につけられるものではない。"),  # やそこら = or so
+    ("ya", "母はその先生のことやぶ医者だって思ってる。"),  # やぶ医者 = quack doctor
     ("kute", "遅くても来ないよりまし。"),  # くても = even if
+    ("to_iu", "問題はお金がないということです。"),  # ということ = the fact that (N3)
     ("mo", "食べてもいい。"),             # ても is not "also"
     ("mo", "何も食べない。"),             # 何も is its own expression
     ("wa", "ここで泳いではいけない。"),    # ては is not the topic marker
