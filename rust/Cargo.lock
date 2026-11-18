@@ -413,6 +413,7 @@ name = "bunpo-core"
 version = "0.1.0"
 dependencies = [
  "fastrand",
+ "libc",
  "serde",
  "serde_json",
 ]
