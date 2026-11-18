@@ -27,7 +27,8 @@ P("ikan", "〜いかんで / いかんによって", "depending on", "Noun + (�
 P("ni_itaru", "〜に至る / 〜に至って", "reach, come to; only when", "Noun / Verb + に至る",
   """に至る (いたる) means "reach (a serious point)": 事故は大事件に至った. に至って means "only when it came to".
   に至っては = as for (an extreme case).""",
-  r"に(?:至|いた)(?:る|り|ら|って|った|っては)", "話し合いは結論に至らなかった。", after="nv", tail=True)
+  # in kana, にいたら / にいたって are usually に + いる (そこにいたら, if I were there): only 至 or いたる / いたり
+  r"に(?:至(?:る|り|ら|って|った|っては)|いた(?:る|り))", "話し合いは結論に至らなかった。", after="nv", tail=True)
 P("ni_itaru_made", "〜に至るまで", "even, down to", "Noun + に至るまで",
   """に至るまで means "all the way to (even the smallest)": 子供からお年寄りに至るまで.""",
   r"に(?:至|いた)るまで", "子供からお年寄りに至るまで、みんな参加した。", after="n")
@@ -39,7 +40,10 @@ P("katagata", "〜かたがた", "while also, as well as", "Noun + かたがた"
   r"かたがた", "お礼かたがた、ご挨拶に伺いました。", after="n")
 P("katawara", "〜かたわら", "while (also doing, on the side)", "Noun + の / Verb + かたわら",
   """かたわら means doing one thing on the side while mainly doing another: 会社に勤めるかたわら、小説を書いている (alongside working at a company, he writes novels). It describes long-term activities, not momentary ones.""",
-  r"かたわら|傍ら", "会社に勤めるかたわら、小説を書いている。", after="any")
+  r"かたわら|傍ら", "会社に勤めるかたわら、小説を書いている。", after="any",
+  # "while also doing", not the place "beside" (猫がかたわらで眠る, その傍らに)
+  check=lambda t, i, k: i > 0 and t[i - 1].s not in ("その", "が", "は", "を")
+  and not (k < len(t) and t[k].s == "に") and not (k < len(t) and t[k].s == "で" and k + 1 < len(t) and t[k + 1].p1 == "動詞"))
 P("gatera", "〜がてら", "while, on the way (also)", "Noun / Verb stem + がてら",
   """がてら means "while (also), as a side purpose": 散歩がてら、買い物をした (I went shopping while out for a walk). The first part is the main reason for going out; the second is done on the way.""",
   r"がてら", "散歩がてら、パンを買いに行った。", after="any")
@@ -88,16 +92,22 @@ P("tada_de_sae", "ただでさえ", "even at the best of times", "ただでさ�
   r"ただでさえ", "ただでさえ忙しいのに、仕事が増えた。")
 P("dani", "〜だに", "even (just)", "Noun / Verb + だに",
   """だに is a literary "even": 想像するだに恐ろしい (frightening even to imagine).""",
-  r"だに", "想像するだに恐ろしい。", after="any")
+  # 予想だに / 想像するだに / 微動だに, not だ + に (盗んだに違いない, 今だに)
+  r"だに", "想像するだに恐ろしい。", after="any",
+  check=lambda t, i, k: i > 0 and (t[i - 1].lemma in ("予想", "想像", "微動", "夢", "考える", "聞く", "思う", "為る")
+                                   or t[i - 1].s.endswith(("する", "える", "く"))))
 P("tari_tomo", "〜たりとも", "not even (one)", "One + counter + たりとも",
   """たりとも + negative means "not even (one)": 一円たりとも無駄にできない (I can't waste even a single yen). It follows the smallest unit (一円, 一日, 一人) to stress that none at all is allowed.""",
   r"たりとも", "一円たりとも無駄にはできない。", after="any")
 P("taru", "〜たる", "as a (proper)", "Noun + たる + Noun",
   """たる is a formal "being (as one should be)": 教師たる者 (anyone who is a teacher).""",
-  r"たる(?=者|もの)", "教師たる者、学生の手本にならなければならない。", after="n")
+  r"(?<!最)たる(?=者|もの)", "教師たる者、学生の手本にならなければならない。", after="n",
+  # not 飢えたる者 (classical verb form, tagged as a noun), 最たるもの
+  check=lambda t, i, k: i > 0 and t[i - 1].p1 == "名詞" and t[i - 1].s not in ("飢え", "渇き", "生き", "死せ"))
 P("de_are", "〜であれ", "whatever, even if", "Noun + であれ",
   """であれ means "whoever / whatever it is": 誰であれ、規則は守るべきだ (whoever you are, you should follow the rules). Repeated, AであれBであれ means "whether A or B". であろうと is a close variant.""",
-  r"であれ(?!ば)|であろうと", "誰であれ、規則は守るべきだ。", after="any")
+  # not であれが (de + あれ "that"), 誠実であろうとはしてる (try to be)
+  r"であれ(?![ばがをはも])|であろうと(?!は|し|す)", "誰であれ、規則は守るべきだ。", after="any")
 P("te_kara_to_iu_mono", "〜てからというもの", "ever since", "Verb (て) + からというもの",
   """てからというもの means "ever since (a big change)": 子供が生まれてからというもの、生活が一変した.""",
   r"[てで]からというもの", "子供が生まれてからというもの、生活が一変した。", pre="v")
