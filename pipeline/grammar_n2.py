@@ -412,10 +412,15 @@ P("koto_naku", "〜ことなく", "without (ever) doing", "Verb (dictionary) + �
 P("koto_ni", "〜ことに", "(I find it) ... that", "Adj / Verb (た) + ことに",
   """ことに expresses the speaker's feeling about a fact: 残念なことに、雨が降ってきた (unfortunately, it started
   to rain).""",
-  r"ことに(?=、)", "残念なことに、雨が降ってきた。", after="va")
+  r"ことに(?=、)", "残念なことに、雨が降ってきた。", after="va",
+  # the speaker's feeling (残念な / 驚いた ことに), not 掃除することに (時間を費やす), つまらないことに首を突っ込む
+  check=lambda t, i, k: i > 0 and (t[i - 1].s == "な" or t[i - 1].lemma == "た" or t[i - 1].p1 == "形容詞"),
+  neg=r"ことに、[^。]*(?:首を|時間を|費や)")
 P("koto_kara", "〜ことから", "from the fact that", "Plain form + ことから",
   """ことから gives the basis of a judgment or name: 富士山が見えることから、この町は富士見と呼ばれる.""",
-  r"ことから", "富士山が見えることから、この町は富士見と呼ばれている。", after="any")
+  # "from the fact that", not 〜ことから始める (start by), 立ち直る (recover from), 喜びを得る
+  r"ことから(?!始|はじ|より)", "富士山が見えることから、この町は富士見と呼ばれている。", after="any",
+  neg=r"ことから[^。]*(?:始め|はじめ|立ち直|喜び|逃れ|遠ざか|得る|得た|ところ)")
 P("to_iu_mono_da", "〜というものだ", "that's what (it is)", "Plain form + というものだ",
   """というものだ gives a general verdict about how something is: それが人生というものだ (that's life). It often sounds like a conclusion or mild lecture; というものではない denies such a generalization.""",
   r"というもの(?:だ|です)", "それが人生というものだ。", after="any")
@@ -425,7 +430,7 @@ P("to_iu_koto_da", "〜ということだ (hearsay)", "I hear that; that means",
   r"ということ(?:だ|です)|とのこと(?:だ|です)", "会議は中止になったということです。", after="any")
 P("to_itta", "〜といった", "such as", "Noun + といった + Noun",
   """といった lists examples: 寿司や天ぷらといった日本料理 (Japanese food such as sushi and tempura).""",
-  r"といった", "寿司や天ぷらといった日本料理が好きです。", after="any",
+  r"(?<!だ)といった", "寿司や天ぷらといった日本料理が好きです。", after="any",
   check=lambda t, i, k: k < len(t) and t[k].p1 in ("名詞", "接頭辞"))  # + noun; 病気だといったが = "said"
 P("ka_no_you", "〜かのように", "as if", "Plain form + かのように",
   """かのように means "as if (but not really)": 何もなかったかのように笑った (laughed as if nothing had happened).""",
