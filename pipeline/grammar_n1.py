@@ -9,6 +9,11 @@ def m_you_ga(toks):
             if b + 1 < len(toks) and toks[b].s in ("が", "と") and toks[b + 1].s == "、"]
 
 
+# nouns for a situation or position someone is in (〜にあって)
+SITUATIONS = {"状況", "立場", "地位", "時代", "社会", "世界", "環境", "場", "事態", "時期", "現代", "非常時", "国", "最中",
+              "職", "任", "境遇", "逆境", "困難", "危機", "混乱", "戦時", "不況", "競争", "組織", "現場", "業界", "身"}
+
+
 def P(*a, **k):
     point("N1", *a, **k)
 
@@ -125,7 +130,7 @@ P("to_aimatte", "〜と相まって", "combined with", "Noun + と相まって",
   r"(?:相|あい)まって", "才能と努力が相まって、彼は成功した。", after="any", req=r"と")
 P("to_atte", "〜とあって", "because (special situation)", "Noun / plain form + とあって",
   """とあって gives a special reason: 連休とあって、どこも混んでいる (it's a long weekend, so everywhere is crowded).""",
-  r"とあって", "連休とあって、どこも混んでいる。", after="any")
+  r"とあって(?![いる])", "連休とあって、どこも混んでいる。", after="any")  # 靴とあっている = matches
 P("to_areba", "〜とあれば", "if (it's for)", "Noun / plain form + とあれば",
   """とあれば means "if it's (for this special reason)": 子供のためとあれば、何でもする.""",
   r"とあれば", "子供のためとあれば、何でもします。", after="any")
@@ -150,7 +155,8 @@ P("to_wa_surprise", "〜とは (surprise)", "who would have thought", "Plain for
   r"とは(?=[。！]|！)", "まさか彼が犯人だったとは。", after="any")
 P("to_bakari_ni", "〜とばかりに", "as if to say", "Quote + とばかりに",
   """とばかりに means "as if to say": 待ってましたとばかりに飛びついた (he jumped at it as if to say "I've been waiting for this"). It describes someone's attitude, not actual words.""",
-  r"とばかり(?:に)?", "彼は待ってましたとばかりに飛びついた。", after="any")
+  # とばかりに / とばかりの (as if to say), not とばかり思っていた (was sure that) or 〜のことばかり
+  r"とばかり(?:に|の)", "彼は待ってましたとばかりに飛びついた。", after="any")
 P("tomo_naru_to", "〜ともなると", "once it comes to (a higher level)", "Noun + ともなると",
   """ともなると means "when it comes to (that level)": 大学生ともなると、自分で考えなければならない.""",
   r"とも(?:なると|なれば)", "大学生ともなると、自分で考えなければならない。", after="n")
@@ -171,19 +177,22 @@ P("nara_dewa", "〜ならでは", "unique to, only (a ...) could", "Noun + な�
   r"ならでは(?:の)?", "これは京都ならではの景色です。", after="n")
 P("nari", "〜なり", "as soon as", "Verb (dictionary) + なり",
   """なり means "the moment (and then something unexpected)": 部屋に入るなり、泣き出した.""",
-  r"なり(?=、)", "彼女は部屋に入るなり、泣き出した。", after="v", check=first_pos("助詞"))
+  r"なり(?=、)", "彼女は部屋に入るなり、泣き出した。", after="v", check=first_pos("助詞"),
+  neg=r"なり[^。]*なり")  # 煮るなり焼くなり = either ... or
 P("nari_ni", "〜なりに", "in one's own way", "Noun / plain form + なりに",
   """なりに means "in one's own way (within limits)": 私なりに頑張った (I did my best in my own way).""",
-  r"なり(?:に|の)", "私なりに頑張ってみました。", after="any", check=first_pos("接尾辞"))
+  r"(?<!道)(?<!言い)なり(?:に|の)", "私なりに頑張ってみました。", after="any", check=first_pos("接尾辞"))  # 道なり, 言いなり
 P("ni_atai_suru", "〜に値する", "be worth", "Noun / Verb + に値する",
   """に値する (あたいする) means "deserve": 尊敬に値する人 (a person worthy of respect).""",
   r"に(?:値|あたい)(?:する|しない|します)", "彼は尊敬に値する人物だ。", after="nv")
 P("ni_atte", "〜にあって", "in (a situation)", "Noun + にあって",
   """にあって means "being in (a special situation or position)": 非常時にあって、冷静さを保つ (keep calm in an emergency). It is formal; にあっては and にあっても add contrast.""",
-  r"にあって(?:は|も)?", "困難な状況にあって、彼は冷静だった。", after="n")
+  r"にあって(?:は|も)?", "困難な状況にあって、彼は冷静だった。", after="n",
+  # being in a situation or position, not 雨にあう (遭う, caught in), 近くにある, 君に会って
+  check=lambda t, i, k: i > 0 and (t[i - 1].lemma in SITUATIONS or t[i - 1].s.endswith(("時", "下", "中", "期", "代"))))
 P("ni_kakawaru", "〜にかかわる", "affect, concerning (serious)", "Noun + にかかわる",
   """にかかわる means "be related to / affect (something serious)": 命にかかわる病気.""",
-  r"に(?:かかわ|関わ|係わ)(?:る|り)", "これは命にかかわる問題だ。", after="n")
+  r"に(?:かかわ|関わ|係わ)(?:る|り(?!の|合|あ))", "これは命にかかわる問題だ。", after="n")  # not the noun 関わり
 P("ni_kataku_nai", "〜に難くない", "it's not hard to", "Noun / Verb + に難くない",
   """に難くない (かたくない) means "it is not hard to": 想像に難くない (it's easy to imagine). It is used with a few verbs of understanding: 想像, 理解, 察する.""",
   r"に(?:難|かた)くない", "彼の苦労は想像に難くない。", after="nv")

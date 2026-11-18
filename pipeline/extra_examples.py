@@ -111,6 +111,14 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("彼がそう言うなら、よほど困っているのだろう。", "If he says so, he must be in real trouble."),
     ],
     # ------------------------------------------------------------------ N1
+    "to_bakari_ni": [
+        ("彼は「待ってました」とばかりに立ち上がった。", "He stood up as if to say \"I've been waiting for this.\""),
+        ("犬は散歩だとばかりに、玄関で尻尾を振っている。", "The dog is wagging its tail at the door as if to say \"walk time!\""),
+        ("彼女は「もう話したくない」とばかりに横を向いた。", "She turned away as if to say \"I don't want to talk any more.\""),
+        ("子供たちはチャンスとばかりに、お菓子に手を伸ばした。", "The children reached for the sweets as if to say \"now's our chance.\""),
+        ("店は今が稼ぎ時とばかりに値段を上げた。", "The shop raised its prices as if to say \"now's the time to make money.\""),
+        ("彼はうるさいとばかりに、ドアを強く閉めた。", "He slammed the door as if to say \"you're too noisy.\""),
+    ],
     "katawara": [
         ("彼は会社に勤めるかたわら、小説を書いている。", "Alongside his office job, he writes novels."),
         ("彼女は大学で教えるかたわら、翻訳の仕事もしている。", "Besides teaching at a university, she also works as a translator."),
