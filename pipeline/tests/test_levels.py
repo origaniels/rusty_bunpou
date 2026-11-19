@@ -70,6 +70,7 @@ POSITIVE = [
     ("zaru_wo_enai", "雨のため、試合を中止せざるを得ない。", "せざるを得ない"),
     ("to_ii_to_ii", "味といい値段といい、申し分ない。", "といい"),
     ("shimatsu_da", "道に迷って、最後には警察に助けを求める始末だった。", "始末だった"),  # longest ending first
+    ("mono_nara", "そんなことを言おうものなら、怒られる。", "ものなら"),  # volitional as one token
 ]
 
 # (point, sentence) — false positives seen in real Tatoeba sentences

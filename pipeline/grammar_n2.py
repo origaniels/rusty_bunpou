@@ -378,6 +378,7 @@ P("mono_nara", "〜ものなら", "if (it were possible)", "Verb (potential / vo
   # after a potential (できる, 解ける) or volitional (言おう) verb, not もの + なら (さっぱりしたものなら)
   r"ものなら|もんなら", "できるものなら、もう一度やり直したい。", after="v",
   check=lambda t, i, k: i > 0 and (t[i - 1].s.endswith("う") and t[i - 1].p1 == "助動詞"
+                                   or t[i - 1].cf.startswith("意志推量形")  # 言おう is one token
                                    or t[i - 1].lemma in ("出来る", "れる", "られる")
                                    or (t[i - 1].p1 == "動詞" and t[i - 1].s.endswith("る") and t[i - 1].kana[-2:-1] in "えけげせぜてでねべぺめれ")))
 P("mono_ka", "〜ものか", "no way (I'll ...)", "Plain form + ものか",
