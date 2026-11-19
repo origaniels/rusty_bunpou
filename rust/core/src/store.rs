@@ -60,6 +60,8 @@ pub struct Settings {
     pub start_level: String,
     /// Language of the app, translations and explanations: "en" or "fr".
     pub language: String,
+    /// Vibrate briefly when an answer is checked (different for right and wrong).
+    pub haptics: bool,
 }
 
 impl Settings {
@@ -70,7 +72,7 @@ impl Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into(), language: "en".into() }
+        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into(), language: "en".into(), haptics: true }
     }
 }
 
