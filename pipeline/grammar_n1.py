@@ -95,7 +95,7 @@ P("koto_nashi_ni", "〜ことなしに", "without", "Verb (dictionary) + こと�
   r"ことなし(?:に|には)", "努力することなしに、成功はない。", after="v")
 P("shimatsu_da", "〜始末だ", "ended up (bad result)", "Verb (dictionary) + 始末だ",
   """始末だ (しまつだ) describes a bad end result after things go wrong: 遅刻ばかりして、ついにクビになる始末だ (always late, he ended up getting fired). It often follows ついに or とうとう and sounds exasperated.""",
-  r"(?:始末|しまつ)(?:だ|です|だった|でした)", "彼は遅刻を繰り返し、ついには解雇される始末だ。", after="v")
+  r"(?:始末|しまつ)(?:だった|でした|だ|です)", "彼は遅刻を繰り返し、ついには解雇される始末だ。", after="v")
 P("zukume", "〜ずくめ", "entirely, full of", "Noun + ずくめ",
   """ずくめ means "nothing but": 黒ずくめの服 (dressed all in black), いいことずくめ.""",
   r"ずくめ", "今年はいいことずくめの一年だった。", after="n")
