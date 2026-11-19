@@ -155,6 +155,22 @@ def span_tags(span):
     return tags
 
 
+def answer_parts(span):
+    """The answer's tokens in kana, each marked p (particle), v (conjugating: verb, adjective,
+    auxiliary, て/ば) or o (other). The app uses it to tell a missing or wrong particle, or the
+    right word in the wrong form, from a plain wrong answer."""
+    out = []
+    for t in span:
+        if t.p1 == "助詞" and t.p2 in ("格助詞", "係助詞", "副助詞") and t.lemma not in ("たり", "だり"):
+            kind = "p"
+        elif t.p1 in ("動詞", "形容詞", "助動詞") or (t.p1 == "助詞" and t.p2 == "接続助詞"):
+            kind = "v"
+        else:
+            kind = "o"
+        out.append([t.kana, kind])
+    return out
+
+
 def answers_for(span):
     surf = "".join(t.s for t in span)
     reading = "".join(t.kana for t in span)
@@ -361,6 +377,8 @@ def to_sentence(sid, a, b, h, cands, toks):
         furi=furigana(ts), cloze=[span[0].start, span[-1].end],
         answers=answers_for(span), hint=hint, words=dictionary_words(ts),
     )
+    if len(span) > 1:
+        d["parts"] = answer_parts(span)
     if c.get("src"):
         d["src"] = c["src"]
     if c.get("fr"):

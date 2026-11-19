@@ -204,3 +204,15 @@ def test_dictionary_words_for_lookups():
     }
     for ja, words in cases.items():
         assert dictionary_words(tokenize(ja)) == words, ja
+
+
+def test_answer_parts_mark_particles_and_conjugations():
+    from build import answer_parts
+    ts = tokenize("学校には行きませんでした。")
+    parts = answer_parts(ts[1:-1])  # に は 行き ませ ん でし た
+    assert ["に", "p"] in parts and ["は", "p"] in parts
+    assert all(k == "v" for kana, k in parts if kana not in ("に", "は"))
+    # でした is a conjugation, not the particle で
+    parts = answer_parts(tokenize("元気でした")[1:])
+    assert all(k == "v" for _, k in parts), parts
+
