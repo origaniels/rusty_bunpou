@@ -29,6 +29,7 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("寝坊したばかりに、大事な試験を受けられなかった。", "Simply because I overslept, I couldn't take an important exam."),
         ("安いと思って買ったばかりに、すぐ壊れて損をした。", "Just because I bought it thinking it was cheap, it broke right away and I lost out."),
         ("彼の言葉を信じたばかりに、ひどい目にあった。", "Just because I believed what he said, I had a terrible time."),
+        ("ちょっと油断したばかりに、試合に負けてしまった。", "Just because I let my guard down for a moment, I lost the match."),
     ],
     "wo_hajime": [
         ("社長をはじめ、社員全員がパーティーに参加した。", "Everyone in the company, starting with the president, came to the party."),
@@ -37,6 +38,7 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("両親をはじめ、多くの人に助けてもらった。", "Many people helped me, my parents first of all."),
         ("校長先生をはじめとして、先生方が全員集まった。", "All the teachers gathered, starting with the principal."),
         ("京都をはじめ、奈良や大阪にも行った。", "I went to Kyoto, and also to Nara and Osaka."),
+        ("京都をはじめ、日本には古い町がたくさんある。", "Japan has many old towns, Kyoto being the best known."),
     ],
     "koto_dakara": [
         ("彼のことだから、きっとまた遅刻するだろう。", "Knowing him, he'll be late again for sure."),
@@ -53,10 +55,14 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("お客さんにしたら、待たされるのは嫌なものだ。", "From the customer's side, nobody likes being kept waiting."),
         ("先生にすれば、生徒の成長が一番うれしいのだろう。", "For a teacher, seeing students grow is probably the greatest joy."),
         ("犬にしたら、毎日同じ散歩コースは退屈かもしれない。", "For the dog, the same walk every day might be boring."),
+        ("親にしたら、子供が遠くに住むのは心配だろう。", "For parents, having their child live far away must be worrying."),
     ],
     "ageku": [
         ("さんざん待たされたあげく、会議は中止になった。", "After being kept waiting for ages, the meeting was cancelled."),
         ("悩んだあげく、彼は会社を辞めた。", "After agonizing over it, he quit the company."),
+        ("何時間も話し合ったあげく、結論は出なかった。", "After hours of discussion, we still didn't reach a conclusion."),
+        ("道に迷ったあげく、元の場所に戻ってしまった。", "After getting lost, we ended up back where we started."),
+        ("さんざん待たされたあげく、店は閉まってしまった。", "After making us wait for ages, the shop ended up closing."),
     ],
     "mo_kamawazu": [
         ("彼は雨に濡れるのもかまわず走り続けた。", "He kept running without caring that he was getting wet."),
@@ -64,20 +70,32 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("彼女は人目もかまわず大声で泣いた。", "She cried loudly, not caring who saw."),
         ("周りの迷惑もかまわず、彼は電話で話していた。", "He talked on the phone without minding the trouble to those around him."),
         ("値段もかまわず、彼は一番高いワインを注文した。", "Without caring about the price, he ordered the most expensive wine."),
+        ("父は医者の注意もかまわず、毎晩お酒を飲んでいる。", "My father drinks every night, never mind the doctor's warnings."),
+        ("彼は値段もかまわず、好きな物を次々と買った。", "He bought one thing he liked after another, regardless of the price."),
+        ("彼女は周りの目もかまわず、大きな声で歌った。", "She sang loudly, not caring what the people around her thought."),
     ],
     "ni_kagirazu": [
         ("この店は週末に限らず、平日も混んでいる。", "This shop is crowded not only on weekends but on weekdays too."),
         ("この歌は子供に限らず、大人にも人気がある。", "This song is popular not only with children but with adults too."),
         ("日本に限らず、多くの国で少子化が進んでいる。", "Not only in Japan, but in many countries the birthrate is falling."),
+        ("このアプリは仕事に限らず、勉強にも役立つ。", "This app is useful not only for work but also for studying."),
+        ("スポーツに限らず、何でも練習が大切だ。", "Not just in sport, practice is important in everything."),
+        ("この問題は東京に限らず、どの町にもある。", "This problem exists not only in Tokyo but in every town."),
     ],
     "ni_saishite": [
         ("帰国に際して、お世話になった人に挨拶をした。", "On returning home, I said goodbye to the people who had helped me."),
         ("契約に際して、印鑑が必要です。", "A seal is required when signing the contract."),
         ("入学に際して、いくつかの書類を提出してください。", "Please submit several documents upon enrolment."),
+        ("結婚に際して、両親に感謝の手紙を書いた。", "When I got married, I wrote my parents a letter of thanks."),
+        ("工事に際し、ご迷惑をおかけします。", "We apologise for the inconvenience during the construction work."),
+        ("引っ越しに際し、近所の人に挨拶をして回った。", "When I moved, I went round saying goodbye to the neighbours."),
     ],
     "ni_tomonatte": [
         ("経済の発展に伴って、生活も便利になった。", "Along with economic development, life has become more convenient."),
         ("年齢に伴って、体力が落ちてくる。", "Physical strength declines with age."),
+        ("気温の上昇に伴って、アイスクリームがよく売れるようになった。", "As temperatures rose, ice cream started selling well."),
+        ("技術の進歩に伴い、生活が便利になった。", "With the progress of technology, life has become more convenient."),
+        ("駅の開業に伴って、この辺りに店が増えた。", "With the opening of the station, more shops have appeared around here."),
     ],
     "tsutsu_mo": [
         ("悪いと知りつつも、嘘をついてしまった。", "Although I knew it was wrong, I ended up lying."),
@@ -85,12 +103,19 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("彼は文句を言いつつも、最後まで手伝ってくれた。", "Although he complained, he helped me until the end."),
         ("体に悪いと分かりつつも、甘いものを食べてしまう。", "Even though I know it's bad for me, I eat sweets."),
         ("返事をしなければと思いつつも、一週間が過ぎた。", "Although I kept thinking I had to reply, a week went by."),
+        ("早く寝なければと思いつつも、ついゲームをしてしまう。", "Even though I know I should go to bed early, I end up playing games."),
+        ("悪いと分かりつつも、彼に嘘をついた。", "Even though I knew it was wrong, I lied to him."),
+        ("返事を書こうと思いつつも、もう一か月が過ぎた。", "I kept meaning to write back, but a month has already gone by."),
     ],
     "ue_wa": [
         ("試合に出る上は、絶対に勝ちたい。", "Now that I'm playing in the match, I absolutely want to win."),
         ("引き受けた上は、責任を持ってやります。", "Now that I've accepted it, I'll take responsibility for it."),
         ("決めた上は、もう迷わない。", "Now that I've decided, I won't hesitate any more."),
         ("留学する上は、しっかり勉強するつもりだ。", "Since I'm going to study abroad, I intend to study hard."),
+        ("一度引き受けた上は、途中でやめるわけにはいかない。", "Once I've taken it on, I can't give up halfway."),
+        ("留学すると決めた上は、しっかり準備をしよう。", "Now that I've decided to study abroad, I'll prepare properly."),
+        ("試合に出る上は、勝つつもりで戦います。", "Since I'm playing in the match, I'll fight to win."),
+        ("契約書にサインした上は、ルールを守ってもらいます。", "Now that you've signed the contract, you'll have to follow the rules."),
     ],
     "wa_motoyori": [
         ("この本は学生はもとより、先生にも役に立つ。", "This book is useful not only for students but for teachers too."),
@@ -98,17 +123,101 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("平日はもとより、週末も働いている。", "I work on weekends, not to mention weekdays."),
         ("この公園は子供はもとより、お年寄りにも人気だ。", "This park is popular with the elderly, not to mention children."),
         ("経験はもとより、やる気も大切だ。", "Motivation matters too, not to mention experience."),
+        ("この歌は日本はもとより、アジア中で知られている。", "This song is known not only in Japan but all over Asia."),
+        ("この料理は、味はもとより、栄養のバランスもいい。", "This dish is well balanced nutritionally, not to mention tasty."),
+        ("週末はもとより、平日もこの公園は人が多い。", "This park is crowded on weekdays, let alone at weekends."),
     ],
     "wa_tomokaku": [
         ("見た目はともかく、この料理はおいしい。", "Looks aside, this dish is tasty."),
         ("結果はともかく、最後まで頑張ったことが大切だ。", "Whatever the result, what matters is that you tried your best."),
         ("値段はともかく、品質はいい。", "Price aside, the quality is good."),
+        ("見た目はともかく、この車はよく走る。", "Never mind how it looks, this car runs well."),
+        ("冗談はともかく、そろそろ本題に入りましょう。", "Joking aside, let's get down to business."),
+        ("値段はともかくとして、まずデザインを決めよう。", "Leaving the price aside for now, let's decide on the design first."),
     ],
     "wo_kikkake_ni": [
         ("病気をきっかけに、タバコをやめた。", "Getting sick made me quit smoking."),
+        ("引っ越しをきっかけに、部屋の物を半分に減らした。", "Moving house was the push I needed to get rid of half my things."),
+        ("病気をきっかけに、食生活を見直した。", "My illness made me rethink the way I eat."),
+        ("ある映画をきっかけにして、日本に興味を持った。", "A certain film got me interested in Japan."),
     ],
     "yohodo": [
         ("彼がそう言うなら、よほど困っているのだろう。", "If he says so, he must be in real trouble."),
+        ("彼がそんなに怒るなんて、よほどのことがあったのだろう。", "For him to get that angry, something serious must have happened."),
+        ("よほど急いでいたのか、彼は傘を忘れていった。", "He must have been in a real hurry: he left his umbrella behind."),
+        ("あの子はよほどお腹が空いていたらしく、全部食べた。", "That child must have been really hungry, he ate everything."),
+    ],
+    "dake_ni": [
+        ("有名な店だけに、週末はいつも行列ができる。", "Being a famous shop, it always has a queue at the weekend."),
+        ("一生懸命練習しただけに、負けたときは本当に悔しかった。", "Because I had practised so hard, losing really hurt."),
+        ("彼は経験が長いだけに、判断が早い。", "As you'd expect from his long experience, he decides quickly."),
+        ("楽しみにしていた旅行だけに、中止になって残念だ。", "It's a shame it was cancelled, all the more since I'd been looking forward to the trip."),
+        ("値段が高いだけに、品質はとてもいい。", "As you'd expect at that price, the quality is very good."),
+    ],
+    "ni_atatte": [
+        ("会社を作るにあたって、多くの人に相談した。", "When setting up the company, I asked many people for advice."),
+        ("開会にあたり、一言ご挨拶申し上げます。", "On the opening of this meeting, I would like to say a few words."),
+        ("家を買うにあたって、銀行でローンの説明を聞いた。", "Before buying the house, I had the loan explained at the bank."),
+    ],
+    "kara_koso": [
+        ("今だからこそ、言えることがある。", "There are things I can say precisely because it's now."),
+        ("失敗したからこそ、学べたことも多い。", "It's precisely because I failed that I learned so much."),
+        ("家族だからこそ、本当のことを話してほしい。", "It's because we're family that I want you to tell me the truth."),
+    ],
+    "kara_shite": [
+        ("この料理は匂いからしておいしそうだ。", "Even the smell of this dish makes it look delicious."),
+        ("彼の話し方からして、怒っているのが分かる。", "You can tell from the very way he talks that he's angry."),
+        ("あの人は服装からして、普通の会社員ではなさそうだ。", "Judging just by his clothes, he doesn't seem to be an ordinary office worker."),
+    ],
+    "ippou": [
+        ("この町は観光客が増える一方で、住む人は減っている。", "While tourists to this town are increasing, the number of residents is falling."),
+        ("彼は厳しい一方で、優しいところもある。", "He's strict, but he also has a kind side."),
+        ("ネットは便利な一方で、危険も多い。", "The internet is convenient, but it also has many dangers."),
+    ],
+    "ni_sakidatte": [
+        ("映画の公開に先立って、記者会見が開かれた。", "A press conference was held ahead of the film's release."),
+        ("工事の開始に先立ち、近所に説明会を行った。", "Before the work started, an information meeting was held for the neighbours."),
+        ("出発に先立って、全員で荷物を確認した。", "Before setting off, we all checked our luggage."),
+    ],
+    "ni_kakete": [
+        ("先週から今週にかけて、仕事がとても忙しかった。", "From last week through this week, work has been very busy."),
+        ("関東から東北にかけて、大雪が降った。", "Heavy snow fell from the Kanto region through Tohoku."),
+        ("この花は春から夏にかけて咲く。", "This flower blooms from spring into summer."),
+    ],
+    "nai_koto_ni_wa": [
+        ("本人に聞かないことには、本当の理由は分からない。", "Unless we ask him, we won't know the real reason."),
+        ("毎日練習しないことには、上手にはならない。", "Unless you practise every day, you won't get good."),
+        ("やってみないことには、できるかどうか分からない。", "You can't know whether you can do it until you try."),
+    ],
+    "ijou_wa": [
+        ("約束した以上は、守らなければならない。", "Now that you've promised, you have to keep your word."),
+        ("学生である以上、勉強を第一に考えるべきだ。", "As long as you're a student, studying should come first."),
+    ],
+    "hanmen": [
+        ("一人暮らしは自由な反面、寂しいこともある。", "Living alone is free, but it can also be lonely."),
+        ("この薬はよく効く反面、副作用もある。", "This medicine works well, but it also has side effects."),
+    ],
+    "wo_towazu": [
+        ("このイベントは年齢を問わず、誰でも参加できる。", "Anyone can take part in this event, whatever their age."),
+        ("この店は季節を問わず、いつも新鮮な魚がある。", "Whatever the season, this shop always has fresh fish."),
+    ],
+    "ta_tokoro_de": [
+        ("今さら謝ったところで、彼女は許してくれないだろう。", "Even if I apologise now, she probably won't forgive me."),
+    ],
+    "wo_moto_ni": [
+        ("この映画は実際の事件をもとに作られた。", "This film was based on a real incident."),
+    ],
+    "mono_ga_aru": [
+        ("この写真には見る人を引きつけるものがある。", "There's something about this photo that draws people in."),
+    ],
+    "to_iu_mono_da": [
+        ("困っている人を助けるのが、友達というものだ。", "Helping someone in trouble is what friends are for."),
+    ],
+    "dake_atte": [
+        ("十年も住んでいただけあって、彼はこの町に詳しい。", "Having lived here for ten years, he knows this town well."),
+    ],
+    "amari_excess": [
+        ("嬉しさのあまり、彼女は泣き出した。", "She was so happy that she burst into tears."),
     ],
     # ------------------------------------------------------------------ N1
     "to_bakari_ni": [
