@@ -135,6 +135,8 @@ pub struct State {
     report_target: Option<Report>,
     /// what the last export was ("progress" or "reports"), for its result message
     exporting: &'static str,
+    /// the keyboard's composition in the answer field (not confirmed yet) and where it goes
+    composing: (String, usize),
 }
 
 /// The running app: UI + state. Keep it alive while the UI runs.
@@ -327,6 +329,18 @@ pub fn due_ids(content: &Content, progress: &Progress, now: i64) -> Vec<String> 
 
 fn new_ids(content: &Content, progress: &Progress) -> Vec<String> {
     content.points.iter().filter(|p| progress.card(&p.id).is_new()).map(|p| p.id.clone()).collect()
+}
+
+/// The answer field's text with the keyboard's composition inserted at `at` (a byte offset).
+pub fn with_composition(text: &str, (preedit, at): &(String, usize)) -> String {
+    if preedit.is_empty() {
+        return text.to_string();
+    }
+    let mut at = (*at).min(text.len());
+    while !text.is_char_boundary(at) {
+        at -= 1;
+    }
+    format!("{}{}{}", &text[..at], preedit, &text[at..])
 }
 
 /// Items left in the saved (unfinished) lesson quiz or review session, 0 if there is none.
@@ -577,6 +591,7 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         lesson: sess.lesson,
         answered: sess.answered() as i32,
         practising: sess.practising() && sess.verdict.is_none(),
+        fixing_typo: sess.fixing_typo && sess.verdict.is_none(),
         finished: sess.finished(),
         summary: if fr {
             format!("{} / {} justes du premier coup.", sess.correct_first_try, sess.total)
@@ -697,6 +712,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         lesson_ids: vec![],
         lesson_idx: 0,
         session: None,
+        composing: (String::new(), 0),
         detail: None,
         collapsed: Default::default(),
         report_target: None,
@@ -789,19 +805,56 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
     {
         let w = ui.as_weak();
         let st = st.clone();
+        let c = content.clone();
         ui.on_quiz_edited(move |text| {
             let mut st = st.borrow_mut();
+            let st = &mut *st;
             let romaji = st.progress.settings.romaji;
             let Some(sess) = st.session.as_mut() else { return text };
-            if sess.verdict.is_some() {
+            let mut switched = false;
+            if sess.verdict == Some(Verdict::Wrong) && text.as_str() != sess.raw {
+                // editing a wrong answer (e.g. deleting a character): fixing a typo
+                switched = sess.edit_after_wrong();
+            } else if sess.verdict.is_some() {
                 // answer already checked: keep showing what was submitted
                 return sess.raw.as_str().into();
             }
-            sess.on_input(&text, romaji);
+            let full = with_composition(&text, &st.composing);
+            sess.on_input_composing(&text, &full, romaji);
             if let Some(ui) = w.upgrade() {
                 ui.set_quiz_preview(sess.input.as_str().into());
+                if switched {
+                    refresh_quiz(&ui, &c, st);
+                }
             }
             text
+        });
+    }
+
+    {
+        let w = ui.as_weak();
+        let st = st.clone();
+        let c = content.clone();
+        ui.on_quiz_composing(move |text, preedit, cursor| {
+            let mut st = st.borrow_mut();
+            let st = &mut *st;
+            st.composing = (preedit.to_string(), cursor.max(0) as usize);
+            let romaji = st.progress.settings.romaji;
+            let Some(sess) = st.session.as_mut() else { return };
+            let mut switched = false;
+            if sess.verdict == Some(Verdict::Wrong) && !preedit.is_empty() {
+                switched = sess.edit_after_wrong();
+            } else if sess.verdict.is_some() {
+                return;
+            }
+            let full = with_composition(&text, &st.composing);
+            sess.on_input_composing(&text, &full, romaji);
+            if let Some(ui) = w.upgrade() {
+                ui.set_quiz_preview(sess.input.as_str().into());
+                if switched {
+                    refresh_quiz(&ui, &c, st);
+                }
+            }
         });
     }
 
@@ -809,9 +862,11 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         let st = &mut *st;
         let Some(sess) = st.session.as_mut() else { return };
         if sess.verdict.is_none() {
-            // pick up the final text (e.g. typed with an IME, no `edited` for the last commit)
+            // pick up the final text (e.g. typed with an IME, no `edited` for the last commit),
+            // with what the keyboard is still composing
             let raw = ui.get_quiz_input();
-            sess.on_input(&raw, st.progress.settings.romaji);
+            let full = with_composition(&raw, &st.composing);
+            sess.on_input_composing(&raw, &full, st.progress.settings.romaji);
             if sess.submit(&c) {
                 if st.progress.settings.haptics {
                     p.haptic(sess.verdict == Some(Verdict::Correct));

@@ -40,6 +40,7 @@ export struct QuizData {
     finished: bool, summary: string, lesson: bool,
     answered: int, // points answered at least once (graded)
     practising: bool, // the current point was missed earlier in this session
+    fixing-typo: bool, // a wrong answer is being edited
     reported: bool, // this sentence was already reported
     words: [string], // dictionary forms, shown as lookup chips after answering
 }
@@ -173,6 +174,77 @@ component Icon inherits Path {
     commands: d;
     fill: transparent;
     stroke-width: 2px;
+}
+
+// The quiz answer field. Unlike the std LineEdit it exposes the IME composition (preedit), so the
+// blank can show kana being composed on a Japanese keyboard before they are confirmed.
+component AnswerField inherits Rectangle {
+    in-out property <string> text <=> ti.text;
+    in property <string> placeholder-text;
+    out property <string> preedit: ti.preedit-text;
+    out property <int> cursor: ti.cursor-position-byte-offset;
+    out property <bool> has-focus: ti.has-focus;
+    callback edited(text: string);
+    callback accepted(text: string);
+    /// the composition changed (text, composition, cursor byte offset)
+    callback composing(text: string, preedit: string, cursor: int);
+    public function focus-field() { ti.focus(); }
+    public function unfocus() { ti.clear-focus(); }
+    /// Confirm what the IME is composing (on Android, losing focus commits it), keep the keyboard.
+    public function commit-composition() {
+        if (ti.preedit-text != "") {
+            ti.clear-focus();
+            ti.focus();
+        }
+    }
+    min-height: 56px;
+    // takes the room left next to the button (the placeholder must not make it wider)
+    horizontal-stretch: 1;
+    min-width: 80px;
+    preferred-width: 80px;
+    border-radius: 12px;
+    border-width: ti.has-focus ? 2px : 1px;
+    border-color: ti.has-focus ? Theme.accent : #5c596c;
+    forward-focus: ti;
+    HorizontalLayout {
+        padding-left: 16px; padding-right: 8px; spacing: 4px;
+        Rectangle {
+            horizontal-stretch: 1;
+            clip: true;
+            placeholder := Text {
+                width: 100%; height: 100%;
+                vertical-alignment: center;
+                text: (ti.text == "" && ti.preedit-text == "") ? root.placeholder-text : "";
+                font-size: ti.font-size;
+                color: Theme.muted;
+                accessible-role: none;
+            }
+            ti := TextInput {
+                width: 100%; height: 100%;
+                vertical-alignment: center;
+                single-line: true;
+                font-size: 22px;
+                color: Theme.fg;
+                // no suggestions/autocorrect: the keyboard must not "fix" romaji we convert to kana
+                input-method-hints: { capitalization: CapitalizationMode.none, auto-correct: false, auto-complete: false };
+                edited => { root.edited(self.text); }
+                accepted => { root.accepted(self.text); }
+                changed preedit-text => { root.composing(self.text, self.preedit-text, self.cursor-position-byte-offset); }
+                accessible-role: text-input;
+                accessible-placeholder-text: root.placeholder-text;
+            }
+        }
+        if ti.text != "": Rectangle {
+            width: 40px;
+            Icon { d: "M 6 6 L 18 18 M 18 6 L 6 18"; stroke: Theme.fg; x: 8px; y: (parent.height - 24px) / 2; }
+            TouchArea {
+                clicked => { ti.text = ""; ti.focus(); root.edited(""); }
+            }
+            accessible-role: button;
+            accessible-label: @tr("Clear");
+            accessible-action-default => { ti.text = ""; root.edited(""); }
+        }
+    }
 }
 
 // compact "‹" back button
@@ -416,6 +488,8 @@ export component AppWindow inherits Window {
     callback resume();
     /// returns the text the field should show (only differs after the answer was checked)
     callback quiz-edited(string) -> string;
+    /// the IME composition changed: (field text, composition, cursor byte offset)
+    callback quiz-composing(string, string, int);
     callback quiz-submit();
     callback quiz-typo();
     callback quiz-retry();
@@ -540,8 +614,8 @@ export component AppWindow inherits Window {
             }
             if root.screen == 2 && !root.quiz.finished: VerticalLayout {
                 property <int> tick: root.focus-tick;
-                changed tick => { answer.focus(); }
-                init => { answer.focus(); }
+                changed tick => { answer.focus-field(); }
+                init => { answer.focus-field(); }
                 TopBar { title: root.quiz.title + "  " + root.quiz.answered + " / " + root.quiz.total; back => { root.go-home(); } }
                 HorizontalLayout { padding-left: 16px; padding-right: 16px; ProgressBar { progress: root.quiz.total > 0 ? root.quiz.answered / root.quiz.total : 0; } }
                 Scroller {
@@ -557,6 +631,10 @@ export component AppWindow inherits Window {
                     }
                     if root.english || root.quiz.verdict != 0: Text { text: root.quiz.en; font-size: 18px; color: Theme.muted; wrap: word-wrap; }
                     HorizontalLayout { alignment: start; Pill { text: root.quiz.hint; } }
+                    if root.quiz.fixing-typo: Text {
+                        text: @tr("Fixing a typo: if the answer is right now, it counts as right.");
+                        font-size: 14px; color: Theme.muted; wrap: word-wrap;
+                    }
                     if root.quiz.practising: Text {
                         text: @tr("Missed earlier: practice only, not graded again.");
                         font-size: 14px; color: Theme.muted; wrap: word-wrap;
@@ -574,15 +652,15 @@ export component AppWindow inherits Window {
                         if root.quiz.verdict == 2: HorizontalLayout {
                             spacing: 8px;
                             Btn { text: @tr("Typo"); horizontal-stretch: 1; clicked => { root.quiz-typo(); } }
-                            Btn { text: @tr("Retry"); horizontal-stretch: 1; clicked => { root.quiz-retry(); answer.focus(); } }
+                            Btn { text: @tr("Retry"); horizontal-stretch: 1; clicked => { root.quiz-retry(); answer.focus-field(); } }
                         }
                         HorizontalLayout {
                             alignment: start; spacing: 8px;
-                            Btn { text: @tr("Grammar notes"); clicked => { answer.clear-focus(); root.open-notes(); } }
+                            Btn { text: @tr("Grammar notes"); clicked => { answer.unfocus(); root.open-notes(); } }
                             Btn {
                                 text: root.quiz.reported ? @tr("Reported") : @tr("Report");
                                 enabled: !root.quiz.reported;
-                                clicked => { answer.clear-focus(); root.open-report(); }
+                                clicked => { answer.unfocus(); root.open-report(); }
                             }
                         }
                         if root.quiz.words.length > 0: VerticalLayout {
@@ -591,7 +669,7 @@ export component AppWindow inherits Window {
                             // the scroller's content is the window width minus its padding
                             for row in Logic.chip-rows(root.quiz.words, (root.width - 48px) / 1px, 16): HorizontalLayout {
                                 spacing: 8px; alignment: start;
-                                for w in row.words: Chip { text: w; clicked => { answer.clear-focus(); root.lookup(w); } }
+                                for w in row.words: Chip { text: w; clicked => { answer.unfocus(); root.lookup(w); } }
                             }
                         }
                         Text { text: root.quiz.attribution; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
@@ -599,11 +677,8 @@ export component AppWindow inherits Window {
                 }
                 HorizontalLayout {
                     padding: 16px; spacing: 8px;
-                    answer := LineEdit {
+                    answer := AnswerField {
                         text <=> root.quiz-input;
-                        font-size: 22px;
-                        // no suggestions/autocorrect: the keyboard must not "fix" romaji we convert to kana
-                        input-method-hints: { capitalization: CapitalizationMode.none, auto-correct: false, auto-complete: false };
                         placeholder-text: root.romaji ? @tr("type in kana or romaji") : @tr("type the answer");
                         // The field keeps exactly what was typed (rewriting it would fight the keyboard's
                         // composition); the romaji→kana preview is shown inside the blank instead.
@@ -611,12 +686,13 @@ export component AppWindow inherits Window {
                             let n = root.quiz-edited(t);
                             if (n != t) { self.text = n; }
                         }
+                        composing(t, p, c) => { root.quiz-composing(t, p, c); }
                         accepted(t) => { root.quiz-submit(); }
                     }
                     Btn {
                         text: root.quiz.verdict == 0 ? @tr("Check") : @tr("Next");
                         primary: true;
-                        clicked => { root.quiz-submit(); }
+                        clicked => { answer.commit-composition(); root.quiz-submit(); }
                     }
                 }
             }

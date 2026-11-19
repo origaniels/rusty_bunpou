@@ -275,3 +275,9 @@ msgstr "Reprendre le quiz de la leçon (encore {})"
 
 msgid "Missed earlier: practice only, not graded again."
 msgstr "Raté plus tôt : simple entraînement, pas noté une deuxième fois."
+
+msgid "Fixing a typo: if the answer is right now, it counts as right."
+msgstr "Correction d'une faute de frappe : si la réponse est juste maintenant, elle compte comme juste."
+
+msgid "Clear"
+msgstr "Effacer"

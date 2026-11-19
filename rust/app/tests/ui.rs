@@ -222,7 +222,7 @@ fn wrong_answer_typo_and_retry() {
 }
 
 #[test]
-fn romaji_preview_and_field_is_locked_after_checking() {
+fn romaji_preview_and_field_is_locked_after_a_right_answer() {
     let t = setup();
     t.press("Learn 5 new");
     for _ in 0..4 {
@@ -232,9 +232,90 @@ fn romaji_preview_and_field_is_locked_after_checking() {
     let shown = t.app.ui.invoke_quiz_edited("deshi".into());
     assert_eq!(shown, "deshi", "the field keeps the raw romaji");
     assert_eq!(t.app.ui.get_quiz_preview(), "でし", "the blank shows kana");
-    t.type_and_enter("zz");
-    // typing after the verdict is undone
-    assert_eq!(t.app.ui.invoke_quiz_edited("zzx".into()), "zz");
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    assert_eq!(t.app.ui.get_quiz().verdict, 1);
+    // typing after a right answer is undone
+    assert_eq!(t.app.ui.invoke_quiz_edited(format!("{a}x").into()), a.as_str());
+    assert_eq!(t.app.ui.get_quiz().verdict, 1);
+}
+
+fn start_lesson_quiz(t: &T) {
+    t.press("Learn 5 new");
+    for _ in 0..4 {
+        t.press("Next");
+    }
+    t.press("Start quiz");
+}
+
+fn last_grade(t: &T) -> u8 {
+    t.app.state.borrow().progress.log.last().unwrap().grade
+}
+
+#[test]
+fn editing_a_wrong_answer_is_a_typo_fix() {
+    let t = setup();
+    start_lesson_quiz(&t);
+    let a = t.correct_answer();
+    let typo = format!("{a}x");
+    t.type_and_enter(&typo);
+    assert_eq!(t.app.ui.get_quiz().verdict, 2);
+    // delete the extra character: back to answering, as a typo fix
+    assert_eq!(t.app.ui.invoke_quiz_edited(a.as_str().into()), a.as_str());
+    let q = t.app.ui.get_quiz();
+    assert_eq!(q.verdict, 0);
+    assert!(q.fixing_typo);
+    assert!(t.exists("Fixing a typo: if the answer is right now, it counts as right."));
+    t.app.ui.invoke_quiz_submit();
+    assert_eq!(t.app.ui.get_quiz().verdict, 1);
+    t.app.ui.invoke_quiz_submit();
+    assert_eq!(last_grade(&t), 3, "counted as right");
+}
+
+#[test]
+fn retry_after_a_wrong_answer_still_counts_as_missed() {
+    let t = setup();
+    start_lesson_quiz(&t);
+    let point = t.app.state.borrow().session.as_ref().unwrap().point.clone().unwrap();
+    t.type_and_enter("ぜんぜんちがう");
+    t.press("Retry");
+    assert_eq!(t.app.ui.get_quiz().verdict, 0);
+    assert_eq!(t.app.ui.get_quiz_input(), "");
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    assert_eq!(t.app.ui.get_quiz().verdict, 1);
+    t.app.ui.invoke_quiz_submit();
+    assert_eq!(last_grade(&t), 1, "missed");
+    assert_eq!(t.app.ui.get_quiz().done, 0, "it comes back later");
+    let st = t.app.state.borrow();
+    assert!(st.session.as_ref().unwrap().point.as_deref() != Some(point.as_str()));
+}
+
+#[test]
+fn text_being_composed_on_the_keyboard_shows_and_counts() {
+    let t = setup();
+    start_lesson_quiz(&t);
+    let a = t.correct_answer();
+    let split = a.char_indices().nth(1).map(|(i, _)| i).unwrap_or(a.len());
+    let (done, composing) = a.split_at(split);
+    // the first kana confirmed, the rest still being composed (underlined on the keyboard)
+    t.app.ui.set_quiz_input(done.into());
+    t.app.ui.invoke_quiz_edited(done.into());
+    t.app.ui.invoke_quiz_composing(done.into(), composing.into(), done.len() as i32);
+    assert_eq!(t.app.ui.get_quiz_preview(), a.as_str(), "the blank shows the composition too");
+    assert_eq!(t.app.ui.get_quiz_input(), done, "the field text itself is left alone");
+    t.app.ui.invoke_quiz_submit();
+    assert_eq!(t.app.ui.get_quiz().verdict, 1, "checked with the composition");
+}
+
+#[test]
+fn composition_goes_where_the_cursor_is() {
+    let at = |p: &str, i| (p.to_string(), i);
+    assert_eq!(with_composition("たべ", &at("", 3)), "たべ");
+    assert_eq!(with_composition("たべ", &at("ます", 6)), "たべます");
+    assert_eq!(with_composition("たべ", &at("ます", 3)), "たますべ");
+    assert_eq!(with_composition("たべ", &at("ます", 99)), "たべます");
+    assert_eq!(with_composition("たべ", &at("ま", 4)), "たまべ", "inside a character: before it");
 }
 
 #[test]
