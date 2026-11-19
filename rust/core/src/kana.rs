@@ -140,6 +140,11 @@ pub fn kata_to_hira(s: &str) -> String {
 
 const STRIP: &str = " 　。、．，！？!?.,・「」『』()（）~〜\t\n";
 
+/// Hiragana, katakana or the long-vowel mark.
+pub fn is_kana(c: char) -> bool {
+    matches!(c, '\u{3041}'..='\u{309F}' | '\u{30A0}'..='\u{30FF}')
+}
+
 pub fn normalize(s: &str) -> String {
     kata_to_hira(&romaji_to_hiragana(s.trim(), true)).chars().filter(|c| !STRIP.contains(*c)).collect()
 }

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Deserialize)]
 pub struct Seg(pub String, pub String);
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct Sentence {
     pub id: u64,
     pub ja: String,
@@ -37,6 +37,14 @@ pub struct Sentence {
     /// Dictionary forms of the sentence's content words (for dictionary lookups).
     #[serde(default)]
     pub words: Vec<String>,
+    /// The answer's tokens in kana, each marked "p" (particle), "v" (conjugating) or "o" (other);
+    /// only for answers of more than one token. Used for "almost" hints.
+    #[serde(default)]
+    pub parts: Vec<(String, String)>,
+    /// Answers (kana) using another grammar point that fits here too (から for ので ...): possible,
+    /// but not the point being practised.
+    #[serde(default)]
+    pub alts: Vec<String>,
 }
 
 impl Sentence {
@@ -103,6 +111,9 @@ pub struct GrammarPoint {
     /// French texts (written for this app).
     #[serde(default)]
     pub fr: Option<PointText>,
+    /// What this point adds compared with others that could take its place (English, French).
+    #[serde(default)]
+    pub nuance: Option<(String, String)>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

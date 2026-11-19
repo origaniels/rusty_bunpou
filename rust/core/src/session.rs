@@ -47,6 +47,12 @@ pub struct Session {
     /// Retry was used after a wrong answer: the item counts as missed whatever comes next.
     #[serde(skip)]
     pub missed: bool,
+    /// "Almost" hint shown for the last answer (not graded: try again).
+    #[serde(skip)]
+    pub nudge: Option<crate::hints::Nudge>,
+    /// The free retry of this item was used.
+    #[serde(skip)]
+    pub nudged: bool,
 }
 
 pub fn find_sentence<'a>(p: &'a GrammarPoint, id: u64) -> Option<&'a Sentence> {
@@ -79,6 +85,8 @@ impl Session {
             last_answer: String::new(),
             fixing_typo: false,
             missed: false,
+            nudge: None,
+            nudged: false,
         };
         s.advance(content, progress);
         s
@@ -123,6 +131,8 @@ impl Session {
         self.verdict = None;
         self.fixing_typo = false;
         self.missed = false;
+        self.nudge = None;
+        self.nudged = false;
         let Some(id) = self.queue.pop_front() else {
             self.point = None;
             self.sentence = None;
@@ -169,7 +179,8 @@ impl Session {
         false
     }
 
-    /// Check the answer; returns false if there was nothing to check.
+    /// Check the answer; returns false if there was nothing to check. An "almost" answer sets
+    /// `nudge` instead of a verdict (once per item).
     pub fn submit(&mut self, content: &Content) -> bool {
         if self.verdict.is_some() {
             return false;
@@ -181,6 +192,15 @@ impl Session {
         }
         self.last_answer = self.input.clone();
         let ok = s.answers.iter().any(|a| kana::normalize(a) == norm);
+        self.nudge = None;
+        if !ok && !self.nudged {
+            // almost right: say what to look at and let them try again, once per item
+            if let Some(n) = crate::hints::nudge(s, &self.input) {
+                self.nudge = Some(n);
+                self.nudged = true;
+                return true;
+            }
+        }
         self.verdict = Some(if ok { Verdict::Correct } else { Verdict::Wrong });
         true
     }

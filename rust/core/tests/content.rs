@@ -149,3 +149,34 @@ fn sentences_list_their_words_for_lookups() {
         }
     }
 }
+
+#[test]
+fn almost_hints_on_real_answers() {
+    use bunpo_core::hints::{nudge, Nudge};
+    let c = Content::bundled();
+    let (mut particle, mut form) = (0, 0);
+    for s in c.points.iter().flat_map(|p| &p.sentences) {
+        for a in &s.answers {
+            assert_eq!(nudge(s, a), None, "a right answer is not 'almost': {a} in {}", s.ja);
+        }
+        let ps = &s.parts;
+        if ps.iter().any(|(_, k)| k == "p") && ps.iter().any(|(_, k)| k != "p") {
+            let i = ps.iter().position(|(_, k)| k == "p").unwrap();
+            let typed: String = ps.iter().enumerate().filter(|(j, _)| *j != i).map(|(_, (k, _))| k.as_str()).collect();
+            if s.answers.iter().all(|a| normalize(a) != normalize(&typed)) {
+                assert_eq!(nudge(s, &typed), Some(Nudge::Particle), "{typed} for {}", s.ja);
+                particle += 1;
+            }
+        }
+        // the right verb, another ending
+        let kana = s.answers.iter().map(|a| normalize(a)).find(|a| a.chars().all(bunpo_core::kana::is_kana));
+        if let (Some(_), Some(k)) = (&s.hint, kana) {
+            let stem: String = k.chars().take(k.chars().count().saturating_sub(1)).collect();
+            if matches!(nudge(s, &format!("{stem}ました")), Some(Nudge::Form(_))) {
+                form += 1;
+            }
+        }
+    }
+    assert!(particle > 100, "only {particle} answers with a particle to drop");
+    assert!(form > 300, "only {form} verb answers get a form hint");
+}
