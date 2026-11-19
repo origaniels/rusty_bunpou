@@ -112,6 +112,8 @@ pub struct Progress {
     pub log: Vec<LogEntry>,
     /// sentence reports, kept across resets and merged on import
     pub reports: Vec<Report>,
+    /// the unfinished quiz (lesson or reviews), to resume it
+    pub paused: Option<crate::session::Session>,
     #[serde(skip)]
     path: Option<PathBuf>,
 }
@@ -174,6 +176,7 @@ impl Progress {
         self.cards = new.cards;
         self.settings = new.settings;
         self.log = new.log;
+        self.paused = None;
         for r in new.reports {
             if !self.reports.contains(&r) {
                 self.reports.push(r);
@@ -195,6 +198,7 @@ impl Progress {
     pub fn reset_all(&mut self) {
         self.cards.clear();
         self.log.clear();
+        self.paused = None;
         self.save();
     }
 
@@ -205,6 +209,7 @@ impl Progress {
 
     pub fn reset_point(&mut self, id: &str) {
         self.cards.remove(id);
+        self.paused = None;
         self.save();
     }
 }

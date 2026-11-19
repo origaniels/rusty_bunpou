@@ -4,11 +4,12 @@
 use crate::content::{Content, GrammarPoint, Sentence};
 use crate::kana;
 use crate::store::{scheduler, Progress};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashSet, VecDeque};
 
 pub const LESSON_EXAMPLES: usize = 4;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Verdict {
     Correct,
     Wrong,
@@ -16,6 +17,10 @@ pub enum Verdict {
 
 pub use crate::clock::now_ms;
 
+/// A session is saved with the progress (see `Progress::paused`) so it can be resumed;
+/// the answer being typed is not.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Session {
     pub lesson: bool,
     pub total: usize,
@@ -27,10 +32,14 @@ pub struct Session {
     pub point: Option<String>,
     pub sentence: Option<u64>,
     /// What the user typed into the field (may be romaji).
+    #[serde(skip)]
     pub raw: String,
     /// Kana preview of `raw` (shown inside the blank).
+    #[serde(skip)]
     pub input: String,
+    #[serde(skip)]
     pub verdict: Option<Verdict>,
+    #[serde(skip)]
     pub last_answer: String,
 }
 
@@ -69,6 +78,35 @@ impl Session {
 
     pub fn finished(&self) -> bool {
         self.point.is_none()
+    }
+
+    /// Points answered at least once (graded), out of `total`.
+    pub fn answered(&self) -> usize {
+        self.graded.len()
+    }
+
+    /// Items still to answer correctly, the current one included.
+    pub fn remaining(&self) -> usize {
+        self.queue.len() + usize::from(self.point.is_some())
+    }
+
+    /// The current item was already graded (missed earlier): this is practice, not graded again.
+    pub fn practising(&self) -> bool {
+        self.point.as_ref().is_some_and(|p| self.graded.contains(p))
+    }
+
+    /// A saved session can be resumed if all its points still exist (content may have changed).
+    pub fn resumable(&self, content: &Content) -> bool {
+        !self.finished()
+            && self.current(content).is_some()
+            && self.queue.iter().all(|id| content.get(id).is_some())
+    }
+
+    /// Leaving the quiz: an answer already checked counts, as if Next had been pressed.
+    pub fn commit_pending(&mut self, content: &Content, progress: &mut Progress) {
+        if self.verdict.is_some() {
+            self.next(content, progress);
+        }
     }
 
     fn advance(&mut self, content: &Content, progress: &Progress) {
