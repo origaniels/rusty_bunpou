@@ -345,6 +345,46 @@ fn new_ids(content: &Content, progress: &Progress) -> Vec<String> {
     content.points.iter().filter(|p| progress.card(&p.id).is_new()).map(|p| p.id.clone()).collect()
 }
 
+/// The "almost" hint for a nudge, in the UI language. Never says what the answer is.
+pub fn nudge_text(lang: Lang, n: &bunpo_core::hints::Nudge, point: &bunpo_core::content::GrammarPoint) -> String {
+    use bunpo_core::hints::{Aspect, Nudge};
+    let fr = lang == Lang::Fr;
+    match n {
+        Nudge::Nuance => match (&point.nuance, fr) {
+            (Some((_, f)), true) => format!("Ça pourrait aller, mais ici on cherche {f}."),
+            (Some((e, _)), false) => format!("That could work, but here we're looking for {e}."),
+            (None, true) => "Ça pourrait aller, mais ce n'est pas le point de grammaire travaillé ici.".to_string(),
+            (None, false) => "That could work, but it's not the grammar point practised here.".to_string(),
+        },
+        Nudge::Particle => {
+            if fr { "Presque ! Vérifie la particule." } else { "Almost! Check the particle." }.to_string()
+        }
+        Nudge::Form(aspects) if aspects.is_empty() => {
+            if fr { "Presque ! Le bon mot, mais vérifie sa forme." } else { "Almost! Right word, but check its form." }.to_string()
+        }
+        Nudge::Form(aspects) => {
+            let names: Vec<&str> = aspects
+                .iter()
+                .map(|a| match (a, fr) {
+                    (Aspect::Tense, false) => "tense",
+                    (Aspect::Tense, true) => "temps",
+                    (Aspect::Politeness, false) => "politeness",
+                    (Aspect::Politeness, true) => "politesse",
+                    (Aspect::TeForm, false) => "て-form",
+                    (Aspect::TeForm, true) => "forme en て",
+                    (Aspect::Negative, false) => "positive or negative",
+                    (Aspect::Negative, true) => "affirmatif ou négatif",
+                })
+                .collect();
+            if fr {
+                format!("Presque ! Le bon mot, vérifie la forme : {}.", names.join(", "))
+            } else {
+                format!("Almost! Right word, check the form: {}.", names.join(", "))
+            }
+        }
+    }
+}
+
 /// The answer field's text with the keyboard's composition inserted at `at` (a byte offset).
 pub fn with_composition(text: &str, (preedit, at): &(String, usize)) -> String {
     if preedit.is_empty() {
@@ -617,6 +657,10 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         answered: sess.answered() as i32,
         practising: sess.practising() && sess.verdict.is_none(),
         fixing_typo: sess.fixing_typo && sess.verdict.is_none(),
+        nudge: match (&sess.nudge, sess.current(content)) {
+            (Some(n), Some((p, _))) => nudge_text(lang, n, p).into(),
+            _ => Default::default(),
+        },
         finished: sess.finished(),
         summary: if fr {
             format!("{} / {} justes du premier coup.", sess.correct_first_try, sess.total)
@@ -892,7 +936,9 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             let raw = ui.get_quiz_input();
             let full = with_composition(&raw, &st.composing);
             sess.on_input_composing(&raw, &full, st.progress.settings.romaji);
-            if sess.submit(&c) {
+            if sess.submit(&c) && sess.verdict.is_none() {
+                event(&format!("nudge={:?} point={} kana={:?}", sess.nudge, sess.point.as_deref().unwrap_or(""), sess.input));
+            } else if sess.verdict.is_some() {
                 if st.progress.settings.haptics {
                     p.haptic(sess.verdict == Some(Verdict::Correct));
                 }

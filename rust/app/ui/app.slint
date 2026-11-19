@@ -41,6 +41,7 @@ export struct QuizData {
     answered: int, // points answered at least once (graded)
     practising: bool, // the current point was missed earlier in this session
     fixing-typo: bool, // a wrong answer is being edited
+    nudge: string, // "almost" hint after an answer that was nearly right (try again, not graded)
     reported: bool, // this sentence was already reported
     words: [string], // dictionary forms, shown as lookup chips after answering
 }
@@ -634,6 +635,10 @@ export component AppWindow inherits Window {
                     }
                     if root.english || root.quiz.verdict != 0: Text { text: root.quiz.en; font-size: 18px; color: Theme.muted; wrap: word-wrap; }
                     HorizontalLayout { alignment: start; Pill { text: root.quiz.hint; } }
+                    if root.quiz.nudge != "" && root.quiz.verdict == 0: Text {
+                        text: root.quiz.nudge;
+                        font-size: 17px; font-weight: 700; color: Theme.gold; wrap: word-wrap;
+                    }
                     if root.quiz.fixing-typo: Text {
                         text: @tr("Fixing a typo: if the answer is right now, it counts as right.");
                         font-size: 14px; color: Theme.muted; wrap: word-wrap;

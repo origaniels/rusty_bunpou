@@ -791,6 +791,16 @@ fn check_every_screen(width: f32, french: bool) {
     assert_eq!(t.screen(), SCREEN_QUIZ);
     t.type_and_enter("ぜんぜんちがう");
     check("quiz, wrong answer");
+    // the longest "almost" hint there is
+    {
+        let longest = t.app.content.points.iter().filter_map(|p| p.nuance.clone()).map(|(e, f)| if french { f } else { e }).max_by_key(|n| n.chars().count()).unwrap();
+        let mut q = t.app.ui.get_quiz();
+        q.verdict = 0;
+        q.nudge = format!("Ça pourrait aller, mais ici on cherche {longest}.").into();
+        t.app.ui.set_quiz(q);
+        check("quiz, longest nuance hint");
+        t.type_and_enter("ぜんぜんちがう");
+    }
     t.app.ui.set_show_notes(true);
     check("quiz, grammar notes");
     t.app.ui.set_show_notes(false);
@@ -1269,4 +1279,58 @@ fn lesson_size_is_a_daily_goal_then_extra_lessons() {
     // the next day the goal starts again
     t.wait(24 * HOUR);
     assert_eq!(t.app.ui.get_home().learn_label, "Learn 5 new");
+}
+
+// ------------------------------------------------------------------ "almost" hints
+
+/// Open a review of `pid` on the first of its sentences that `pick` accepts.
+fn quiz_on(t: &T, pid: &str, pick: impl Fn(&bunpo_core::content::Sentence) -> bool) -> bunpo_core::content::Sentence {
+    let p = t.app.content.get(pid).unwrap();
+    let s = p.sentences.iter().find(|s| pick(s)).unwrap_or_else(|| panic!("no fitting sentence for {pid}")).clone();
+    {
+        let mut st = t.app.state.borrow_mut();
+        let mut sess = bunpo_core::session::Session::new(&t.app.content, &st.progress, vec![pid.to_string()], false);
+        sess.sentence = Some(s.id);
+        st.progress.paused = Some(sess);
+    }
+    t.app.ui.invoke_resume();
+    assert_eq!(t.screen(), SCREEN_QUIZ);
+    s
+}
+
+#[test]
+fn another_point_that_fits_gets_a_nuance_hint_once() {
+    let t = setup();
+    let s = quiz_on(&t, "node", |s| !s.alts.is_empty());
+    t.type_and_enter(&s.alts[0]);
+    let q = t.app.ui.get_quiz();
+    assert_eq!(q.verdict, 0, "not graded: try again");
+    assert!(q.nudge.starts_with("That could work, but here we're looking for the softer"), "{}", q.nudge);
+    assert!(!q.nudge.contains("ので"), "the hint doesn't give the answer away");
+    // the free retry is used: the same answer again is wrong
+    t.type_and_enter(&s.alts[0]);
+    assert_eq!(t.app.ui.get_quiz().verdict, 2);
+}
+
+#[test]
+fn missing_particle_and_wrong_form_get_a_hint_then_count_if_right() {
+    let t = setup();
+    let s = quiz_on(&t, "temo_ii", |s| s.parts.iter().any(|(k, _)| k == "も"));
+    let without: String = s.parts.iter().filter(|(k, _)| k != "も").map(|(k, _)| k.as_str()).collect();
+    t.type_and_enter(&without);
+    let q = t.app.ui.get_quiz();
+    assert_eq!((q.verdict, q.nudge.as_str()), (0, "Almost! Check the particle."));
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    assert_eq!(t.app.ui.get_quiz().verdict, 1);
+    t.app.ui.invoke_quiz_submit();
+    assert_eq!(last_grade(&t), 3, "a free retry: right on the second try counts as right");
+
+    let t2 = &t;
+    // a verb long enough to recognise (み of 見る alone is too short to tell)
+    let s = quiz_on(t2, "mashita", |s| s.answers.iter().any(|a| a.ends_with("ました") && a.chars().count() >= 6 && a.chars().all(bunpo_core::kana::is_kana)));
+    let kana = s.answers.iter().find(|a| a.chars().all(bunpo_core::kana::is_kana)).unwrap();
+    let present = format!("{}ます", kana.strip_suffix("ました").unwrap());
+    t.type_and_enter(&present);
+    assert_eq!(t.app.ui.get_quiz().nudge, "Almost! Right word, check the form: tense.");
 }
