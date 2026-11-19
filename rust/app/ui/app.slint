@@ -384,6 +384,7 @@ export component AppWindow inherits Window {
     in property <bool> english: true;
     in property <bool> romaji: true;
     in property <bool> notifications: true;
+    in property <bool> haptics: true;
     in property <int> batch-size: 5;
     in property <int> retention-index: 1;
     in property <int> start-level-index: 0;
@@ -426,6 +427,7 @@ export component AppWindow inherits Window {
     callback set-english(bool);
     callback set-romaji(bool);
     callback set-notifications(bool);
+    callback set-haptics(bool);
     callback set-batch(int);
     callback set-retention(int);
     callback set-start-level(int);
@@ -841,6 +843,7 @@ export component AppWindow inherits Window {
                     ToggleRow { text: @tr("Show the translation before answering"); checked: root.english; toggled(v) => { root.set-english(v); } }
                     ToggleRow { text: @tr("Convert romaji to kana"); checked: root.romaji; toggled(v) => { root.set-romaji(v); } }
                     ToggleRow { text: @tr("Remind me when reviews are due"); checked: root.notifications; toggled(v) => { root.set-notifications(v); } }
+                    ToggleRow { text: @tr("Vibrate when an answer is checked"); checked: root.haptics; toggled(v) => { root.set-haptics(v); } }
                     Text { text: @tr("New points per lesson"); font-size: 17px; color: Theme.fg; }
                     Segmented {
                         options: ["3", "5", "10"];

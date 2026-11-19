@@ -85,6 +85,8 @@ pub trait Platform {
     fn pick_import(&self) {}
     /// Show `word` in the Takoboto dictionary (the app if installed, else its website).
     fn lookup_word(&self, _word: &str) {}
+    /// A short vibration for a checked answer (the system's "confirm" or "reject" feedback).
+    fn haptic(&self, _correct: bool) {}
     /// Called shortly after start-up.
     fn on_started(&self) {}
 }
@@ -521,6 +523,7 @@ fn refresh_settings(ui: &AppWindow, st: &State) {
     ui.set_english(s.english);
     ui.set_romaji(s.romaji);
     ui.set_notifications(s.notifications);
+    ui.set_haptics(s.haptics);
     ui.set_batch_size(s.batch_size as i32);
     let li = JLPT_LEVELS.iter().position(|l| *l == s.start_level).unwrap_or(0);
     ui.set_start_level_index(li as i32);
@@ -779,6 +782,9 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             let raw = ui.get_quiz_input();
             sess.on_input(&raw, st.progress.settings.romaji);
             if sess.submit(&c) {
+                if st.progress.settings.haptics {
+                    p.haptic(sess.verdict == Some(Verdict::Correct));
+                }
                 event(&format!(
                     "verdict={:?} point={} raw={:?} kana={:?}",
                     sess.verdict.unwrap(),
@@ -950,6 +956,8 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             }
         });
     }
+
+    setting!(on_set_haptics, bool, |s, v| s.haptics = v);
 
     ui.on_export_progress(cb!(|ui, c, st, p| {
         st.progress.save();

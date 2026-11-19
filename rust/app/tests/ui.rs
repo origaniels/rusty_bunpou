@@ -37,6 +37,9 @@ impl Platform for Recorder {
     fn lookup_word(&self, word: &str) {
         self.0.borrow_mut().push(format!("lookup {word}"));
     }
+    fn haptic(&self, correct: bool) {
+        self.0.borrow_mut().push(format!("haptic {correct}"));
+    }
 }
 impl Recorder {
     fn last(&self) -> String {
@@ -982,4 +985,31 @@ fn chip_rows_fit_the_width_and_keep_the_order() {
         }
     }
     assert_eq!(chip_rows(&words, 1000.0, 16.0).len(), 1);
+}
+
+// ------------------------------------------------------------------ haptics
+
+#[test]
+fn checked_answers_vibrate_unless_turned_off() {
+    let t = setup();
+    t.press("Learn 5 new");
+    for _ in 0..4 {
+        t.press("Next");
+    }
+    t.press("Start quiz");
+    t.type_and_enter("ぜんぜんちがう");
+    assert_eq!(t.rec.last(), "haptic false");
+    t.app.ui.invoke_quiz_retry();
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    assert_eq!(t.rec.last(), "haptic true");
+    t.app.ui.invoke_quiz_submit();
+
+    assert!(t.app.ui.get_haptics(), "on by default");
+    t.app.ui.invoke_set_haptics(false);
+    assert!(!t.app.state.borrow().progress.settings.haptics);
+    t.rec.clear();
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    assert!(!t.rec.0.borrow().iter().any(|e| e.starts_with("haptic")));
 }

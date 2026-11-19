@@ -9,6 +9,7 @@ use std::rc::Rc;
 const REMINDER_CLASS: &str = "dev.local.bunpo.rust.ReviewReminder";
 const BACKUP_CLASS: &str = "dev.local.bunpo.rust.Backup";
 const LOOKUP_CLASS: &str = "dev.local.bunpo.rust.Lookup";
+const HAPTICS_CLASS: &str = "dev.local.bunpo.rust.Haptics";
 
 pub fn log(msg: &str) {
     use std::ffi::CString;
@@ -122,6 +123,13 @@ impl Platform for AndroidPlatform {
         self.with_class(LOOKUP_CLASS, |env, act, cls| {
             let word = env.new_string(word)?;
             env.call_static_method(cls, "open", "(Landroid/app/Activity;Ljava/lang/String;)V", &[JValue::Object(act), JValue::Object(&word)])
+                .map(|_| ())
+        });
+    }
+
+    fn haptic(&self, correct: bool) {
+        self.with_class(HAPTICS_CLASS, |env, act, cls| {
+            env.call_static_method(cls, "answer", "(Landroid/app/Activity;Z)V", &[JValue::Object(act), JValue::Bool(correct.into())])
                 .map(|_| ())
         });
     }

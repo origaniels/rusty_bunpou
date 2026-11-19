@@ -150,6 +150,9 @@ msgstr "Convertir les romaji en kana"
 msgid "Remind me when reviews are due"
 msgstr "Me prévenir quand des révisions sont prêtes"
 
+msgid "Vibrate when an answer is checked"
+msgstr "Vibrer à la vérification d'une réponse"
+
 msgid "New points per lesson"
 msgstr "Nouveaux points par leçon"
 
