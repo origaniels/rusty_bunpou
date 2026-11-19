@@ -327,6 +327,20 @@ pub fn due_ids(content: &Content, progress: &Progress, now: i64) -> Vec<String> 
     v.into_iter().map(|(_, id)| id).collect()
 }
 
+/// Points first learned today (local time): counted against the daily goal.
+pub fn learned_today(progress: &Progress, now: i64) -> usize {
+    let today = bunpo_core::clock::local_day(now);
+    progress.cards.values().filter(|c| c.learned_at > 0 && bunpo_core::clock::local_day(c.learned_at) == today).count()
+}
+
+/// Size of the next lesson: what is left of today's goal, or a whole goal's worth once it is reached
+/// (an extra lesson). Returns (size, extra).
+fn next_lesson_size(progress: &Progress, now: i64) -> (usize, bool) {
+    let goal = progress.settings.batch_size as usize;
+    let left = goal.saturating_sub(learned_today(progress, now));
+    if left > 0 { (left, false) } else { (goal, true) }
+}
+
 fn new_ids(content: &Content, progress: &Progress) -> Vec<String> {
     content.points.iter().filter(|p| progress.card(&p.id).is_new()).map(|p| p.id.clone()).collect()
 }
@@ -373,7 +387,9 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
     let due = due_ids(content, &st.progress, now).len() as i32;
     let new = new_ids(content, &st.progress);
     let queue = lesson_queue(content, &st.progress);
-    let batch = st.progress.settings.batch_size as usize;
+    let (batch, extra) = next_lesson_size(&st.progress, now);
+    let goal = st.progress.settings.batch_size as usize;
+    let today = learned_today(&st.progress, now);
     let next_due = st.progress.cards.values().filter(|c| c.state > 0).map(|c| c.due).min();
     let mut levels = [0i32; 5];
     for c in st.progress.cards.values() {
@@ -393,9 +409,18 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
         total: content.points.len() as i32,
         next_due: next_due.map(|d| rel_time(lang, d, now)).unwrap_or_default().into(),
         next_titles: next_titles.join("  ·  ").into(),
-        learn_label: match lang {
-            Lang::En => format!("Learn {} new", batch.min(queue.len())),
-            Lang::Fr => format!("Apprendre {} nouveaux", batch.min(queue.len())),
+        learn_label: match (lang, extra) {
+            (Lang::En, false) => format!("Learn {} new", batch.min(queue.len())),
+            (Lang::En, true) => format!("Learn {} extra", batch.min(queue.len())),
+            (Lang::Fr, false) => format!("Apprendre {} nouveaux", batch.min(queue.len())),
+            (Lang::Fr, true) => format!("Apprendre {} de plus", batch.min(queue.len())),
+        }
+        .into(),
+        goal_line: match (lang, today >= goal) {
+            (Lang::En, false) => format!("Today: {today} / {goal} new points"),
+            (Lang::En, true) => format!("Daily goal reached ({today} / {goal}). Extra lessons mean more reviews in the next days."),
+            (Lang::Fr, false) => format!("Aujourd'hui : {today} / {goal} nouveaux points"),
+            (Lang::Fr, true) => format!("Objectif du jour atteint ({today} / {goal}). Des leçons en plus, ce sont plus de révisions les jours suivants."),
         }
         .into(),
         levels: model(levels.to_vec()),
@@ -750,8 +775,8 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
     }
 
     ui.on_start_learn(cb!(|ui, c, st| {
-        let ids: Vec<String> =
-            lesson_queue(&c, &st.progress).into_iter().take(st.progress.settings.batch_size as usize).collect();
+        let (size, _) = next_lesson_size(&st.progress, now_ms());
+        let ids: Vec<String> = lesson_queue(&c, &st.progress).into_iter().take(size).collect();
         if ids.is_empty() {
             return;
         }

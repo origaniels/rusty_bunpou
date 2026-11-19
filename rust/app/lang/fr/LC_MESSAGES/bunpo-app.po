@@ -153,8 +153,8 @@ msgstr "Me prévenir quand des révisions sont prêtes"
 msgid "Vibrate when an answer is checked"
 msgstr "Vibrer à la vérification d'une réponse"
 
-msgid "New points per lesson"
-msgstr "Nouveaux points par leçon"
+msgid "Daily goal (new points per day)"
+msgstr "Objectif quotidien (nouveaux points par jour)"
 
 msgid "Start lessons at"
 msgstr "Commencer les leçons au"

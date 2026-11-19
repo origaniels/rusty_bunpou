@@ -124,7 +124,8 @@ impl T {
     }
 
     fn learn_lesson(&self) {
-        self.press(&format!("Learn {} new", self.app.state.borrow().progress.settings.batch_size));
+        let label = self.app.ui.get_home().learn_label.to_string();
+        self.press(&label);
         assert_eq!(self.screen(), SCREEN_LESSON);
         for _ in 0..10 {
             if self.exists("Start quiz") {
@@ -397,7 +398,7 @@ fn settings_toggles_persist_and_control_reminders() {
     assert_eq!(saved.settings.retention, 0.95);
     assert_eq!(saved.cards.len(), 5);
     t.app.ui.invoke_go_home();
-    assert!(t.exists("Learn 3 new"));
+    assert!(t.exists("Learn 3 extra"), "5 learned today: the new goal of 3 is already reached");
 }
 
 #[test]
@@ -1232,4 +1233,40 @@ fn a_lesson_quiz_left_halfway_can_be_resumed() {
     t.press("Home");
     assert_eq!(t.app.ui.get_home().learned, 5);
     assert_eq!(t.app.ui.get_home().resume_lesson, 0);
+}
+
+// ------------------------------------------------------------------ daily goal
+
+#[test]
+fn lesson_size_is_a_daily_goal_then_extra_lessons() {
+    let t = setup();
+    let home = t.app.ui.get_home();
+    assert_eq!(home.learn_label, "Learn 5 new");
+    assert_eq!(home.goal_line, "Today: 0 / 5 new points");
+    // a lesson quiz left after 2 points: 3 left for today
+    t.press("Learn 5 new");
+    for _ in 0..4 {
+        t.press("Next");
+    }
+    t.press("Start quiz");
+    for _ in 0..2 {
+        let a = t.correct_answer();
+        t.type_and_enter(&a);
+        t.app.ui.invoke_quiz_submit();
+    }
+    t.app.ui.invoke_go_home();
+    t.app.state.borrow_mut().progress.paused = None; // not resumed: a new lesson
+    t.app.ui.invoke_go_home();
+    let home = t.app.ui.get_home();
+    assert_eq!((home.learn_label.as_str(), home.goal_line.as_str()), ("Learn 3 new", "Today: 2 / 5 new points"));
+    t.learn_lesson();
+    let home = t.app.ui.get_home();
+    assert_eq!(home.learn_label, "Learn 5 extra");
+    assert!(home.goal_line.starts_with("Daily goal reached (5 / 5)"), "{}", home.goal_line);
+    t.learn_lesson();
+    assert_eq!(t.app.ui.get_home().learned, 10);
+    assert!(t.app.ui.get_home().goal_line.starts_with("Daily goal reached (10 / 5)"));
+    // the next day the goal starts again
+    t.wait(24 * HOUR);
+    assert_eq!(t.app.ui.get_home().learn_label, "Learn 5 new");
 }

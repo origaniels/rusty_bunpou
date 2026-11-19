@@ -47,7 +47,7 @@ export struct QuizData {
 
 export struct HomeData {
     due: int, new-count: int, learned: int, total: int, next-due: string, next-titles: string,
-    learn-label: string, levels: [int], reviews-24h: int, source: string, level-rows: [LevelRow],
+    learn-label: string, goal-line: string, levels: [int], reviews-24h: int, source: string, level-rows: [LevelRow],
     start-level: string,
     resume-reviews: int, resume-lesson: int, // items left in a saved (unfinished) quiz, 0 = none
 }
@@ -582,6 +582,7 @@ export component AppWindow inherits Window {
                             font-size: 14px; color: Theme.muted; wrap: word-wrap;
                         }
                         if root.home.next-titles != "": Text { text: @tr("Next: {}", root.home.next-titles); font-size: 14px; color: Theme.muted; wrap: word-wrap; }
+                        Text { text: root.home.goal-line; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
                         if root.home.resume-lesson > 0: Btn { text: @tr("Resume the lesson quiz ({} left)", root.home.resume-lesson); primary: true; clicked => { root.resume(); } }
                         if root.home.resume-lesson == 0: Btn { text: root.home.learn-label; primary: true; enabled: root.home.new-count > 0; clicked => { root.start-learn(); } }
                     }
@@ -932,7 +933,7 @@ export component AppWindow inherits Window {
                     ToggleRow { text: @tr("Convert romaji to kana"); checked: root.romaji; toggled(v) => { root.set-romaji(v); } }
                     ToggleRow { text: @tr("Remind me when reviews are due"); checked: root.notifications; toggled(v) => { root.set-notifications(v); } }
                     ToggleRow { text: @tr("Vibrate when an answer is checked"); checked: root.haptics; toggled(v) => { root.set-haptics(v); } }
-                    Text { text: @tr("New points per lesson"); font-size: 17px; color: Theme.fg; }
+                    Text { text: @tr("Daily goal (new points per day)"); font-size: 17px; color: Theme.fg; }
                     Segmented {
                         options: ["3", "5", "10"];
                         selected: root.batch-size == 3 ? 0 : root.batch-size == 10 ? 2 : 1;
