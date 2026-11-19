@@ -122,6 +122,13 @@ pub fn on_resume() {
     });
 }
 
+/// The composition to add to `field`: only while the field is unchanged since the composition was
+/// reported (`with`). Once the keyboard commits it (e.g. when Check takes the focus), it is part of
+/// the field and must not be added a second time.
+fn composition_for(composing: &(String, usize), with: &str, field: &str) -> (String, usize) {
+    if field == with { composing.clone() } else { (String::new(), 0) }
+}
+
 pub struct State {
     pub progress: Progress,
     stack: Vec<i32>,
@@ -135,8 +142,10 @@ pub struct State {
     report_target: Option<Report>,
     /// what the last export was ("progress" or "reports"), for its result message
     exporting: &'static str,
-    /// the keyboard's composition in the answer field (not confirmed yet) and where it goes
+    /// the keyboard's composition in the answer field (not confirmed yet), where it goes, and the
+    /// field text it was reported with (see [`composition_for`])
     composing: (String, usize),
+    composing_with: String,
 }
 
 /// The running app: UI + state. Keep it alive while the UI runs.
@@ -782,6 +791,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         lesson_idx: 0,
         session: None,
         composing: (String::new(), 0),
+        composing_with: String::new(),
         detail: None,
         collapsed: Default::default(),
         report_target: None,
@@ -888,7 +898,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
                 // answer already checked: keep showing what was submitted
                 return sess.raw.as_str().into();
             }
-            let full = with_composition(&text, &st.composing);
+            let full = with_composition(&text, &composition_for(&st.composing, &st.composing_with, &text));
             sess.on_input_composing(&text, &full, romaji);
             if let Some(ui) = w.upgrade() {
                 ui.set_quiz_preview(sess.input.as_str().into());
@@ -908,6 +918,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             let mut st = st.borrow_mut();
             let st = &mut *st;
             st.composing = (preedit.to_string(), cursor.max(0) as usize);
+            st.composing_with = text.to_string();
             let romaji = st.progress.settings.romaji;
             let Some(sess) = st.session.as_mut() else { return };
             let mut switched = false;
@@ -916,7 +927,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             } else if sess.verdict.is_some() {
                 return;
             }
-            let full = with_composition(&text, &st.composing);
+            let full = with_composition(&text, &composition_for(&st.composing, &st.composing_with, &text));
             sess.on_input_composing(&text, &full, romaji);
             if let Some(ui) = w.upgrade() {
                 ui.set_quiz_preview(sess.input.as_str().into());
@@ -934,7 +945,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             // pick up the final text (e.g. typed with an IME, no `edited` for the last commit),
             // with what the keyboard is still composing
             let raw = ui.get_quiz_input();
-            let full = with_composition(&raw, &st.composing);
+            let full = with_composition(&raw, &composition_for(&st.composing, &st.composing_with, &raw));
             sess.on_input_composing(&raw, &full, st.progress.settings.romaji);
             if sess.submit(&c) && sess.verdict.is_none() {
                 event(&format!("nudge={:?} point={} kana={:?}", sess.nudge, sess.point.as_deref().unwrap_or(""), sess.input));

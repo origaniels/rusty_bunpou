@@ -309,6 +309,26 @@ fn text_being_composed_on_the_keyboard_shows_and_counts() {
     assert_eq!(t.app.ui.get_quiz().verdict, 1, "checked with the composition");
 }
 
+/// Regression: Check commits the composition into the field (Android does it when the field loses
+/// focus) and the answer was checked with the composition added a second time (だ → だだ).
+#[test]
+fn a_composition_committed_by_check_is_not_counted_twice() {
+    let t = setup();
+    start_lesson_quiz(&t);
+    let a = t.correct_answer();
+    // all of it still being composed, nothing confirmed
+    t.app.ui.invoke_quiz_composing("".into(), a.as_str().into(), 0);
+    assert_eq!(t.app.ui.get_quiz_preview(), a.as_str());
+    // Check: the keyboard's text lands in the field, then the answer is checked before the
+    // "composition is empty now" notice arrives
+    t.app.ui.set_quiz_input(a.as_str().into());
+    t.app.ui.invoke_quiz_edited(a.as_str().into());
+    assert_eq!(t.app.ui.get_quiz_preview(), a.as_str(), "not doubled in the blank either");
+    t.app.ui.invoke_quiz_submit();
+    let q = t.app.ui.get_quiz();
+    assert_eq!((q.verdict, q.last_answer.as_str()), (1, a.as_str()));
+}
+
 #[test]
 fn composition_goes_where_the_cursor_is() {
     let at = |p: &str, i| (p.to_string(), i);

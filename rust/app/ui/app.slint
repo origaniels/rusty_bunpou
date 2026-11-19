@@ -195,6 +195,9 @@ component AnswerField inherits Rectangle {
     public function commit-composition() {
         if (ti.preedit-text != "") {
             ti.clear-focus();
+            // the composition is now part of the text: say so right away (the `changed` handler
+            // would only run later, after the answer is checked)
+            root.composing(ti.text, ti.preedit-text, ti.cursor-position-byte-offset);
             ti.focus();
         }
     }
