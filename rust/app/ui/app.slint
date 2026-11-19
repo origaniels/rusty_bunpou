@@ -349,14 +349,16 @@ component ToggleRow {
     }
 }
 
+// rounded label; long text wraps inside it (never wider than the space it is given)
 component Pill inherits Rectangle {
     in property <string> text;
     in property <color> fill: #4a4658;
     background: fill;
-    border-radius: self.height / 2;
-    height: label.preferred-height + 12px;
-    width: label.preferred-width + 24px;
-    label := Text { text: root.text; color: Theme.fg; font-size: 15px; font-weight: 600; }
+    border-radius: min(self.height / 2, 18px);
+    HorizontalLayout {
+        padding-left: 12px; padding-right: 12px; padding-top: 6px; padding-bottom: 6px;
+        label := Text { text: root.text; color: Theme.fg; font-size: 15px; font-weight: 600; wrap: word-wrap; }
+    }
 }
 
 component Card inherits Rectangle {
@@ -395,7 +397,7 @@ component GrammarBody {
         spacing: 12px;
         HorizontalLayout {
             spacing: 10px; alignment: start;
-            Pill { text: p.level; y: (parent.height - self.height) / 2; }
+            VerticalLayout { alignment: center; Pill { text: p.level; } }
             Text { text: p.title; font-size: 30px; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
         }
         Text { text: p.meaning; font-size: 18px; color: Theme.accent; wrap: word-wrap; }
@@ -735,7 +737,7 @@ export component AppWindow inherits Window {
                                 Text { text: item.title; font-size: 20px; color: Theme.fg; wrap: word-wrap; } // long titles wrap instead of pushing the stage label off
                                 Text { text: item.meaning; font-size: 13px; color: Theme.muted; wrap: word-wrap; }
                             }
-                            Pill { text: item.level; y: (parent.height - self.height) / 2; }
+                            VerticalLayout { alignment: center; Pill { text: item.level; } }
                         }
                         }
                         Rectangle { y: parent.height - 1px; height: 1px; background: #3a3846; }

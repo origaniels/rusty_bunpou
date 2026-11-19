@@ -767,6 +767,23 @@ fn check_every_screen(width: f32, french: bool) {
     }
     assert_eq!(t.screen(), SCREEN_QUIZ);
     check("quiz, unanswered");
+    // the longest grammar hint there is, in the bubble under the translation
+    {
+        let lang = if french { bunpo_core::i18n::Lang::Fr } else { bunpo_core::i18n::Lang::En };
+        let c = &t.app.content;
+        let longest = c
+            .points
+            .iter()
+            .flat_map(|p| p.sentences.iter().map(move |s| s.hint(lang).unwrap_or_else(|| p.meaning_in(lang).to_string())))
+            .max_by_key(|h| h.chars().count())
+            .unwrap();
+        let mut q = t.app.ui.get_quiz();
+        q.hint = longest.as_str().into();
+        t.app.ui.set_quiz(q);
+        check("quiz, longest hint");
+        let text = ElementHandle::find_by_accessible_label(&t.app.ui, &longest).next().expect("hint text");
+        assert!(text.size().height > 25.0, "a hint this long wraps: {longest}");
+    }
     t.app.ui.invoke_go_home();
     check("home with a lesson quiz to resume");
     t.app.ui.invoke_resume();
