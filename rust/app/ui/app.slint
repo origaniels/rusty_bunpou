@@ -560,7 +560,7 @@ export component AppWindow inherits Window {
             // ---------------------------------------------------------- home
             if root.screen == 0: Scroller {
                 Text { text: "文法 SRS"; font-size: 24px; font-weight: 700; color: Theme.accent; }
-                Text { text: @tr("Japanese grammar, one sentence at a time."); color: Theme.fg; }
+                Text { text: @tr("Japanese grammar, one sentence at a time."); color: Theme.fg; wrap: word-wrap; }
                 Card {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
@@ -933,7 +933,7 @@ export component AppWindow inherits Window {
                 TopBar { title: @tr("Settings"); show-back: false; }
                 Scroller {
                     vertical-stretch: 1;
-                    Text { text: @tr("Language"); font-size: 17px; color: Theme.fg; }
+                    Text { text: @tr("Language"); font-size: 17px; color: Theme.fg; wrap: word-wrap; }
                     // language names are never translated
                     Segmented { options: ["English", "Français"]; selected: root.language-index; picked(i) => { root.set-language(i); } }
                     ToggleRow { text: @tr("Furigana (readings above kanji)"); checked: root.furigana; toggled(v) => { root.set-furigana(v); } }
@@ -941,22 +941,22 @@ export component AppWindow inherits Window {
                     ToggleRow { text: @tr("Convert romaji to kana"); checked: root.romaji; toggled(v) => { root.set-romaji(v); } }
                     ToggleRow { text: @tr("Remind me when reviews are due"); checked: root.notifications; toggled(v) => { root.set-notifications(v); } }
                     ToggleRow { text: @tr("Vibrate when an answer is checked"); checked: root.haptics; toggled(v) => { root.set-haptics(v); } }
-                    Text { text: @tr("Daily goal (new points per day)"); font-size: 17px; color: Theme.fg; }
+                    Text { text: @tr("Daily goal (new points per day)"); font-size: 17px; color: Theme.fg; wrap: word-wrap; }
                     Segmented {
                         options: ["3", "5", "10"];
                         selected: root.batch-size == 3 ? 0 : root.batch-size == 10 ? 2 : 1;
                         picked(i) => { root.set-batch([3, 5, 10][i]); }
                     }
-                    Text { text: @tr("Start lessons at"); font-size: 17px; color: Theme.fg; }
+                    Text { text: @tr("Start lessons at"); font-size: 17px; color: Theme.fg; wrap: word-wrap; }
                     Segmented { options: ["N5", "N4", "N3", "N2", "N1"]; selected: root.start-level-index; picked(i) => { root.set-start-level(i); } }
                     Text {
                         text: @tr("Lessons teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again.");
                         font-size: 13px; color: Theme.muted; wrap: word-wrap;
                     }
-                    Text { text: @tr("Target retention (FSRS)"); font-size: 17px; color: Theme.fg; }
+                    Text { text: @tr("Target retention (FSRS)"); font-size: 17px; color: Theme.fg; wrap: word-wrap; }
                     Segmented { options: ["85%", "90%", "95%"]; selected: root.retention-index; picked(i) => { root.set-retention(i); } }
                     Text { text: @tr("Higher retention = more frequent reviews. 90% is a good default."); font-size: 13px; color: Theme.muted; wrap: word-wrap; }
-                    Text { text: @tr("Backup"); font-size: 17px; color: Theme.fg; }
+                    Text { text: @tr("Backup"); font-size: 17px; color: Theme.fg; wrap: word-wrap; }
                     HorizontalLayout {
                         spacing: 8px;
                         Btn { text: @tr("Export progress"); horizontal-stretch: 1; clicked => { root.export-progress(); } }
