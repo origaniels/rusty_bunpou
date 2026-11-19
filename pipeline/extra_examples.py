@@ -145,7 +145,7 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
     ],
     "atte_no": [
         ("健康あっての人生だ。", "Life is only worth living if you have your health."),
-        ("家族の支えあっての今の私です。", "I am who I am today only thanks to my family's support."),
+        ("皆さんの応援あっての優勝です。", "This victory was only possible thanks to everyone's support."),
         ("選手あってのチームだ。", "A team is nothing without its players."),
     ],
     "ba_koso": [
@@ -217,7 +217,7 @@ EXTRA: dict[str, list[tuple[str, str]]] = {
         ("試験の点数もさることながら、毎日の努力が大切だ。", "Exam scores matter, but daily effort matters even more."),
     ],
     "n_ga_tame": [
-        ("彼は試験に合格せんがため、毎晩遅くまで勉強した。", "He studied late every night in order to pass the exam."),
+        ("彼は試験に受からんがため、毎晩遅くまで勉強した。", "He studied late every night in order to pass the exam."),
         ("真実を知らんがために、彼は世界中を旅した。", "He travelled the world in order to know the truth."),
         ("勝たんがために、手段を選ばない人もいる。", "Some people will stop at nothing in order to win."),
         ("生きんがために、必死で働いた。", "I worked desperately just to survive."),
