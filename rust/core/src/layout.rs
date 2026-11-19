@@ -126,7 +126,6 @@ struct Unit {
 pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: &str) -> Layout {
     let main_h = m.main_h();
     let ruby_h = m.ruby_h();
-    let line_h = ruby_h + main_h;
     let gap = m.font * 0.25;
     let pad = m.font * 0.15; // horizontal padding inside the cloze frame
 
@@ -139,6 +138,8 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
     // (leave room for one closing punctuation mark that sticks to the cloze)
     let keep_cloze_together = cloze_w + 2.0 * pad + m.font <= max_width;
     let has_ruby = |i: usize| m.furigana && ps.get(i).is_some_and(|p| !p.ruby.is_empty());
+    // a hidden answer with readings keeps its line's reading band, so revealing it doesn't move lines
+    let cloze_ruby = ps.iter().any(|p| p.cloze && !p.ruby.is_empty());
     for (i, Piece { text, ruby, cloze }) in ps.iter().enumerate() {
         let (text, ruby, cloze) = (text.clone(), ruby.clone(), *cloze);
         if cloze && mode == ClozeMode::Blank {
@@ -179,15 +180,16 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
         }
     }
 
-    // 2) place units, wrapping lines
+    // 2) place units, wrapping lines; `y` holds the line number until lines get their heights
     let framed = mode != ClozeMode::Highlight;
     let p = if framed { pad } else { 0.0 };
     let mut out = Layout { main_h, ruby_h, ..Default::default() };
-    let (mut x, mut y) = (0.0f32, 0.0f32);
+    let (mut x, mut line) = (0.0f32, 0usize);
+    let mut line_ruby = vec![false];
     // cloze frame: 0 = not reached, 1 = open, 2 = closed
     let mut frame = 0u8;
-    // per line: (y, min x, max x)
-    let mut segs: Vec<(f32, f32, f32)> = vec![];
+    // per line: (line, min x, max x)
+    let mut segs: Vec<(usize, f32, f32)> = vec![];
     for u in units {
         let has_cloze = u.is_blank || u.items.iter().any(|it| it.2);
         // padding of the cloze frame: both sides if the unit holds the cloze, the closing side
@@ -195,10 +197,12 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
         let extra = if has_cloze { 2.0 * p } else if frame == 1 { p } else { 0.0 };
         if x > 0.0 && x + u.width + extra > max_width {
             x = 0.0;
-            y += line_h + gap;
+            line += 1;
+            line_ruby.push(false);
         }
         if u.is_blank {
-            out.cloze = Rect { x, y: y + ruby_h, w: u.blank_w, h: main_h };
+            line_ruby[line] |= cloze_ruby;
+            out.cloze = Rect { x, y: line as f32, w: u.blank_w, h: main_h };
             out.cloze_rects.push(out.cloze);
             x += u.blank_w;
         }
@@ -210,31 +214,48 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
                 frame = 2;
                 x += p;
             }
-            let gy = y + ruby_h;
             if in_cloze {
                 match segs.last_mut() {
-                    Some(seg) if seg.0 == gy => seg.2 = x + w,
-                    _ => segs.push((gy, x, x + w)),
+                    Some(seg) if seg.0 == line => seg.2 = x + w,
+                    _ => segs.push((line, x, x + w)),
                 }
             }
-            out.glyphs.push(Glyph { x, y: gy, w, text, ruby, ruby_w, ruby_x, in_cloze });
+            line_ruby[line] |= !ruby.is_empty();
+            out.glyphs.push(Glyph { x, y: line as f32, w, text, ruby, ruby_w, ruby_x, in_cloze });
             x += w;
         }
     }
+
+    // 3) line heights: only lines with readings get the reading band above them
+    let mut tops = Vec::with_capacity(line_ruby.len());
+    let mut top = 0.0f32;
+    for &r in &line_ruby {
+        let main_top = top + if r { ruby_h } else { 0.0 };
+        tops.push(main_top);
+        top = main_top + main_h + gap;
+    }
+    let at = |y: f32| tops[y as usize];
+    for g in &mut out.glyphs {
+        g.y = at(g.y);
+    }
+    for r in &mut out.cloze_rects {
+        r.y = at(r.y);
+    }
+    out.cloze.y = at(out.cloze.y);
     if mode != ClozeMode::Blank && !segs.is_empty() {
         let n = segs.len();
         out.cloze_rects = segs
             .iter()
             .enumerate()
-            .map(|(k, &(sy, a, b))| {
+            .map(|(k, &(l, a, b))| {
                 let left = if k == 0 { p } else { 0.0 };
                 let right = if k == n - 1 { p } else { 0.0 };
-                Rect { x: a - left, y: sy, w: b - a + left + right, h: main_h }
+                Rect { x: a - left, y: tops[l], w: b - a + left + right, h: main_h }
             })
             .collect();
         out.cloze = out.cloze_rects[0];
     }
-    out.height = y + line_h;
+    out.height = tops[line] + main_h;
     out
 }
 
@@ -286,6 +307,44 @@ mod tests {
         let g = l.glyphs.iter().find(|g| g.text == "私").unwrap();
         assert_eq!(g.w, 24.0);
         assert!(g.ruby_w > g.w);
+    }
+
+    #[test]
+    fn lines_without_readings_get_no_reading_band() {
+        let c = Content::bundled();
+        let m = Metrics::new(24.0, true);
+        let mut seen = 0;
+        for s in c.points.iter().flat_map(|p| &p.sentences) {
+            let l = layout(s, 200.0, m, ClozeMode::Highlight, "");
+            let mut lines: Vec<(f32, bool)> = vec![];
+            for g in &l.glyphs {
+                match lines.last_mut() {
+                    Some(last) if last.0 == g.y => last.1 |= !g.ruby.is_empty(),
+                    _ => lines.push((g.y, !g.ruby.is_empty())),
+                }
+            }
+            let gap = m.font * 0.25;
+            for w in lines.windows(2) {
+                let band = if w[1].1 { m.ruby_h() } else { 0.0 };
+                assert!((w[1].0 - (w[0].0 + m.main_h() + gap + band)).abs() < 0.01, "{}", s.ja);
+                seen += usize::from(!w[1].1);
+            }
+            let first = lines[0];
+            assert!((first.0 - if first.1 { m.ruby_h() } else { 0.0 }).abs() < 0.01, "{}", s.ja);
+            assert!((l.height - (lines.last().unwrap().0 + m.main_h())).abs() < 0.01);
+        }
+        assert!(seen > 100, "only {seen} wrapped lines without readings");
+    }
+
+    #[test]
+    fn hiding_the_answer_keeps_the_line_heights() {
+        let c = Content::bundled();
+        let m = Metrics::new(24.0, true);
+        for s in c.points.iter().flat_map(|p| &p.sentences) {
+            let blank = layout(s, 2000.0, m, ClozeMode::Blank, "");
+            let shown = layout(s, 2000.0, m, ClozeMode::Revealed, "");
+            assert_eq!(blank.height, shown.height, "{}", s.ja);
+        }
     }
 
     #[test]
