@@ -281,3 +281,6 @@ msgstr "Correction d'une faute de frappe : si la réponse est juste maintenant, 
 
 msgid "Clear"
 msgstr "Effacer"
+
+msgid "Answer"
+msgstr "Réponse"

@@ -242,6 +242,7 @@ component AnswerField inherits Rectangle {
                 accepted => { root.accepted(self.text); }
                 changed preedit-text => { root.composing(self.text, self.preedit-text, self.cursor-position-byte-offset); }
                 accessible-role: text-input;
+                accessible-label: @tr("Answer");
                 accessible-placeholder-text: root.placeholder-text;
             }
         }
@@ -293,6 +294,8 @@ component Segmented inherits Rectangle {
             t := TouchArea { clicked => { root.picked(i); } }
             accessible-role: button;
             accessible-label: o;
+            accessible-checkable: true;
+            accessible-checked: i == root.selected;
             accessible-action-default => { root.picked(i); }
         }
     }
@@ -335,6 +338,8 @@ component NavBar inherits Rectangle {
     callback stats();
     callback settings();
     background: #1c1a22;
+    // a fixed bar: the layout audit ignores content scrolled under it
+    accessible-role: groupbox; accessible-label: "bar";
     Rectangle { y: 0; height: 1px; background: #2e2c36; }
     HorizontalLayout {
         padding-left: 8px; padding-right: 8px; padding-bottom: root.inset;
@@ -356,7 +361,7 @@ component ToggleRow {
     HorizontalLayout {
         spacing: 12px;
         Text { text: root.text; font-size: 17px; color: Theme.fg; wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1; }
-        Switch { checked: root.checked; toggled => { root.toggled(self.checked); } }
+        Switch { checked: root.checked; toggled => { root.toggled(self.checked); } accessible-label: root.text; }
     }
 }
 
@@ -377,11 +382,13 @@ component Card inherits Rectangle {
     border-radius: 18px;
 }
 
-component TopBar {
+component TopBar inherits Rectangle {
     in property <string> title;
     in property <bool> show-back: true;
     callback back();
     preferred-height: 56px;
+    // a fixed bar: the layout audit ignores content scrolled under it
+    accessible-role: groupbox; accessible-label: "bar";
     HorizontalLayout {
         padding-left: root.show-back ? 8px : 20px; padding-right: 16px; spacing: 6px;
         if show-back: VerticalLayout { alignment: center; BackBtn { clicked => { root.back(); } } }
@@ -608,13 +615,16 @@ export component AppWindow inherits Window {
                     vertical-stretch: 1;
                     GrammarBody { p: root.lesson-point; furigana: root.furigana; max-examples: 4; }
                 }
-                HorizontalLayout {
-                    padding: 16px; spacing: 12px;
-                    Btn { text: @tr("Previous"); enabled: root.lesson-index > 0; clicked => { root.lesson-prev(); } }
-                    Btn {
-                        text: root.lesson-index < root.lesson-count - 1 ? @tr("Next") : @tr("Start quiz");
-                        primary: true;
-                        clicked => { root.lesson-next(); }
+                Rectangle {
+                    accessible-role: groupbox; accessible-label: "bar";
+                    HorizontalLayout {
+                        padding: 16px; spacing: 12px;
+                        Btn { text: @tr("Previous"); enabled: root.lesson-index > 0; clicked => { root.lesson-prev(); } }
+                        Btn {
+                            text: root.lesson-index < root.lesson-count - 1 ? @tr("Next") : @tr("Start quiz");
+                            primary: true;
+                            clicked => { root.lesson-next(); }
+                        }
                     }
                 }
             }
@@ -693,24 +703,27 @@ export component AppWindow inherits Window {
                         Text { text: root.quiz.attribution; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
                     }
                 }
-                HorizontalLayout {
-                    padding: 16px; spacing: 8px;
-                    answer := AnswerField {
-                        text <=> root.quiz-input;
-                        placeholder-text: root.romaji ? @tr("type in kana or romaji") : @tr("type the answer");
-                        // The field keeps exactly what was typed (rewriting it would fight the keyboard's
-                        // composition); the romaji→kana preview is shown inside the blank instead.
-                        edited(t) => {
-                            let n = root.quiz-edited(t);
-                            if (n != t) { self.text = n; }
+                Rectangle {
+                    accessible-role: groupbox; accessible-label: "bar";
+                    HorizontalLayout {
+                        padding: 16px; spacing: 8px;
+                        answer := AnswerField {
+                            text <=> root.quiz-input;
+                            placeholder-text: root.romaji ? @tr("type in kana or romaji") : @tr("type the answer");
+                            // The field keeps exactly what was typed (rewriting it would fight the keyboard's
+                            // composition); the romaji→kana preview is shown inside the blank instead.
+                            edited(t) => {
+                                let n = root.quiz-edited(t);
+                                if (n != t) { self.text = n; }
+                            }
+                            composing(t, p, c) => { root.quiz-composing(t, p, c); }
+                            accepted(t) => { root.quiz-submit(); }
                         }
-                        composing(t, p, c) => { root.quiz-composing(t, p, c); }
-                        accepted(t) => { root.quiz-submit(); }
-                    }
-                    Btn {
-                        text: root.quiz.verdict == 0 ? @tr("Check") : @tr("Next");
-                        primary: true;
-                        clicked => { answer.commit-composition(); root.quiz-submit(); }
+                        Btn {
+                            text: root.quiz.verdict == 0 ? @tr("Check") : @tr("Next");
+                            primary: true;
+                            clicked => { answer.commit-composition(); root.quiz-submit(); }
+                        }
                     }
                 }
             }
