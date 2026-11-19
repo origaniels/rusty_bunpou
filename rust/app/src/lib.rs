@@ -17,6 +17,7 @@ use std::rc::Rc;
 
 #[cfg(target_os = "android")]
 mod android;
+pub mod audit;
 
 slint::include_modules!();
 

@@ -742,29 +742,14 @@ fn grammar_levels_fold_and_unfold() {
 /// Every button, text and list row must lie inside the window horizontally: a label that
 /// is too long for its row pushes something off the side (as the quiz buttons once did in French).
 fn assert_fits(t: &T, ctx: &str) {
-    use i_slint_backend_testing::{AccessibleRole, ElementQuery};
-    let width = t.app.ui.window().size().to_logical(t.app.ui.window().scale_factor()).width;
-    let mut bad = vec![];
-    for e in ElementQuery::from_root(&t.app.ui).find_all() {
-        let role = e.accessible_role();
-        if !matches!(role, Some(AccessibleRole::Button | AccessibleRole::Text | AccessibleRole::ListItem)) {
-            continue;
-        }
-        let (pos, size) = (e.absolute_position(), e.size());
-        if size.width <= 0.0 || size.height <= 0.0 {
-            continue; // collapsed / hidden
-        }
-        if pos.x < -0.5 || pos.x + size.width > width + 0.5 {
-            bad.push(format!(
-                "{:?} {:?} at x={:.0}..{:.0}",
-                role.unwrap(),
-                e.accessible_label().unwrap_or_default(),
-                pos.x,
-                pos.x + size.width
-            ));
-        }
-    }
-    assert!(bad.is_empty(), "{ctx} (window {width}px wide): off-screen elements:\n  {}", bad.join("\n  "));
+    audit_ok(t, ctx, false);
+}
+
+/// The layout audit (see `bunpo_app::audit`) finds nothing wrong on screen.
+fn audit_ok(t: &T, ctx: &str, strict_vertical: bool) {
+    let issues = audit::audit(&t.app.ui, audit::Options { strict_vertical });
+    let (w, h) = audit::window_size(&t.app.ui);
+    assert!(issues.is_empty(), "{ctx} (window {w}x{h}):\n  {}", issues.join("\n  "));
 }
 
 /// Visit every screen and state of the app at the given window width and language.
@@ -1353,4 +1338,42 @@ fn missing_particle_and_wrong_form_get_a_hint_then_count_if_right() {
     let present = format!("{}ます", kana.strip_suffix("ました").unwrap());
     t.type_and_enter(&present);
     assert_eq!(t.app.ui.get_quiz().nudge, "Almost! Right word, check the form: tense.");
+}
+
+// ------------------------------------------------------------------ layout audit and e2e hook
+
+#[test]
+fn e2e_commands_find_buttons_and_audit_the_screen() {
+    let t = setup();
+    let scale = t.app.ui.window().scale_factor();
+    let r = audit::command(&t.app.ui, "where Learn 5 new");
+    let parts: Vec<&str> = r.split(' ').collect();
+    assert_eq!(&parts[..2], ["where", "on"], "{r}");
+    let (x, y): (f32, f32) = (parts[2].parse().unwrap(), parts[3].parse().unwrap());
+    let (w, h) = audit::window_size(&t.app.ui);
+    assert!(x > 0.0 && x < w * scale && y > 0.0 && y < h * scale, "{r}");
+    assert_eq!(audit::command(&t.app.ui, "where Nothing like this"), "where none \"Nothing like this\"");
+    let b = audit::command(&t.app.ui, "buttons");
+    for l in ["Learn 5 new", "Home", "Grammar list", "Stats", "Settings"] {
+        assert!(b.contains(l), "{l} missing from {b}");
+    }
+    assert!(!b.contains("Start reviews"), "disabled buttons are not listed: {b}");
+    assert_eq!(audit::command(&t.app.ui, "audit home"), "audit home ok");
+    assert_eq!(audit::command(&t.app.ui, "audit home strict"), "audit home ok");
+}
+
+#[test]
+fn the_audit_catches_what_doesnt_fit() {
+    let t = setup();
+    // far too narrow: things stick out and texts don't fit
+    t.app.ui.window().set_size(slint::LogicalSize::new(150.0, 860.0));
+    let r = audit::command(&t.app.ui, "audit narrow");
+    assert!(r.starts_with("audit narrow FAIL") && r.contains("off-screen"), "{r}");
+    // the hint bubble of a quiz, open over the screen: only the dialog is checked
+    t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 860.0));
+    start_lesson_quiz(&t);
+    t.app.ui.set_show_notes(true);
+    let els = audit::elements(&t.app.ui);
+    assert!(els.iter().any(|e| e.label == "Close"));
+    assert!(!els.iter().any(|e| e.label == "Check"), "the quiz under the dialog is not checked");
 }

@@ -12,6 +12,8 @@ crate-type = ["cdylib", "rlib"]
 bunpo-core = { path = "../core" }
 fastrand = "2.5.0"
 serde_json = "1"
+# element search for the layout audit (tests and the emulator e2e hook)
+i-slint-backend-testing = "=1.19.0"
 slint = { version = "1.19", default-features = false, features = ["compat-1-2", "std", "backend-android-activity-06", "renderer-femtovg"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
@@ -21,5 +23,4 @@ jni = "0.21.1"
 slint-build = "1.19"
 
 [dev-dependencies]
-i-slint-backend-testing = "=1.19.0"
 i-slint-core = "=1.19.0"
