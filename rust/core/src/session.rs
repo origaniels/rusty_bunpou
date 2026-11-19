@@ -41,6 +41,12 @@ pub struct Session {
     pub verdict: Option<Verdict>,
     #[serde(skip)]
     pub last_answer: String,
+    /// The answer was wrong and is being edited: a typo fix (a right answer then counts as right).
+    #[serde(skip)]
+    pub fixing_typo: bool,
+    /// Retry was used after a wrong answer: the item counts as missed whatever comes next.
+    #[serde(skip)]
+    pub missed: bool,
 }
 
 pub fn find_sentence<'a>(p: &'a GrammarPoint, id: u64) -> Option<&'a Sentence> {
@@ -71,6 +77,8 @@ impl Session {
             input: String::new(),
             verdict: None,
             last_answer: String::new(),
+            fixing_typo: false,
+            missed: false,
         };
         s.advance(content, progress);
         s
@@ -113,6 +121,8 @@ impl Session {
         self.input.clear();
         self.raw.clear();
         self.verdict = None;
+        self.fixing_typo = false;
+        self.missed = false;
         let Some(id) = self.queue.pop_front() else {
             self.point = None;
             self.sentence = None;
@@ -139,8 +149,24 @@ impl Session {
     }
 
     pub fn on_input(&mut self, raw: &str, romaji: bool) {
-        self.raw = raw.to_string();
-        self.input = if romaji { kana::romaji_to_hiragana(raw, false) } else { raw.to_string() };
+        self.on_input_composing(raw, raw, romaji);
+    }
+
+    /// `field` is the text in the answer field, `full` the same with the keyboard's composition
+    /// (not confirmed yet) inserted: the blank and the check use `full`.
+    pub fn on_input_composing(&mut self, field: &str, full: &str, romaji: bool) {
+        self.raw = field.to_string();
+        self.input = if romaji { kana::romaji_to_hiragana(full, false) } else { full.to_string() };
+    }
+
+    /// The user edits a wrong answer: back to answering, as a typo fix. Returns true if it switched.
+    pub fn edit_after_wrong(&mut self) -> bool {
+        if self.verdict == Some(Verdict::Wrong) {
+            self.verdict = None;
+            self.fixing_typo = true;
+            return true;
+        }
+        false
     }
 
     /// Check the answer; returns false if there was nothing to check.
@@ -166,7 +192,12 @@ impl Session {
         }
     }
 
+    /// Try again after a wrong answer; the item still counts as missed.
     pub fn retry(&mut self) {
+        if self.verdict == Some(Verdict::Wrong) {
+            self.missed = true;
+        }
+        self.fixing_typo = false;
         self.verdict = None;
         self.input.clear();
         self.raw.clear();
@@ -175,7 +206,7 @@ impl Session {
     /// Commit the verdict (grading on first attempt) and move to the next item.
     pub fn next(&mut self, content: &Content, progress: &mut Progress) {
         let (Some(pid), Some(sid), Some(v)) = (self.point.clone(), self.sentence, self.verdict) else { return };
-        let correct = v == Verdict::Correct;
+        let correct = v == Verdict::Correct && !self.missed;
         if self.graded.insert(pid.clone()) {
             let now = now_ms();
             let card = scheduler::grade(&progress.card(&pid), correct, now, progress.settings.retention, sid);
