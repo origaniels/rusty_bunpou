@@ -1392,3 +1392,165 @@ fn the_e2e_hook_runs_only_with_its_marker() {
     drop(hook);
     std::fs::remove_dir_all(dir).ok();
 }
+
+// ------------------------------------------------------------------ every button, pressed
+
+/// A progress like the emulator tests use: points learned, reviews due, a leech, a report.
+fn crawl_progress(french: bool) -> Progress {
+    let t = setup();
+    t.learn_lesson();
+    let mut p = std::mem::replace(&mut t.app.state.borrow_mut().progress, Progress::in_memory());
+    drop(t);
+    for c in p.cards.values_mut() {
+        c.due = clock::now_ms() - 1000;
+    }
+    let leech = p.cards.keys().next().unwrap().clone();
+    make_leech(&mut p, &leech);
+    p.reports.push(bunpo_core::store::Report { point: leech, reason: "translation".into(), ..Default::default() });
+    p.settings.language = if french { "fr" } else { "en" }.into();
+    p.paused = None;
+    p
+}
+
+/// Something observable about the app: what is on screen, platform calls, saved progress.
+fn fingerprint(t: &T) -> String {
+    let st = t.app.state.borrow();
+    format!(
+        "{} | {} calls | {} cards {} reports {:?}",
+        audit::command(&t.app.ui, "digest"),
+        t.rec.0.borrow().len(),
+        st.progress.cards.len(),
+        st.progress.reports.len(),
+        serde_json::to_string(&st.progress.settings).unwrap_or_default()
+    )
+}
+
+/// The control with this label and role; inside the open dialog if there is one (the screen
+/// behind it may have a button with the same label).
+fn find_control(t: &T, label: &str, role: i_slint_core::items::AccessibleRole) -> Option<ElementHandle> {
+    use i_slint_backend_testing::ElementQuery;
+    let all = ElementQuery::from_root(&t.app.ui).find_all();
+    let dialog = all
+        .iter()
+        .filter(|e| e.accessible_role() == Some(i_slint_core::items::AccessibleRole::Groupbox) && e.accessible_label().is_some_and(|l| l == "dialog"))
+        .last()
+        .cloned();
+    let scope = match dialog {
+        Some(d) => d.query_descendants().find_all(),
+        None => all,
+    };
+    scope.into_iter().find(|e| e.accessible_role() == Some(role) && e.accessible_label().is_some_and(|l| l.trim() == label))
+}
+
+/// Press every enabled button and switch of every state, each on a fresh app in that state:
+/// nothing panics, something changes, and the screen it leads to passes the layout audit.
+fn press_every_control(french: bool) {
+    let progress = crawl_progress(french);
+    let json = serde_json::to_string(&progress).unwrap();
+    type Goto = Box<dyn Fn(&T)>;
+    let wrong = |t: &T| {
+        t.app.ui.invoke_start_reviews();
+        t.type_and_enter("ぜんぜんちがう");
+    };
+    let states: Vec<(&str, Goto)> = vec![
+        ("home", Box::new(|_| {})),
+        ("settings", Box::new(|t| t.app.ui.invoke_open_settings())),
+        ("grammar list", Box::new(|t| t.app.ui.invoke_open_list())),
+        ("grammar point", Box::new(|t| t.app.ui.invoke_open_detail(t.app.content.points[0].id.clone().into()))),
+        ("stats", Box::new(|t| t.app.ui.invoke_open_stats())),
+        ("lesson", Box::new(|t| t.app.ui.invoke_start_learn())),
+        ("reviews", Box::new(|t| t.app.ui.invoke_start_reviews())),
+        ("reviews, wrong answer", Box::new(wrong)),
+        ("reviews, right answer", Box::new(move |t| {
+            wrong(t);
+            t.app.ui.invoke_quiz_typo();
+        })),
+        ("grammar notes", Box::new(move |t| {
+            wrong(t);
+            t.app.ui.set_show_notes(true);
+        })),
+        ("report dialog", Box::new(move |t| {
+            wrong(t);
+            t.app.ui.invoke_open_report();
+        })),
+        ("reset point dialog", Box::new(|t| {
+            let id = t.app.state.borrow().progress.cards.keys().next().unwrap().clone();
+            t.app.ui.invoke_open_detail(id.into());
+            t.app.ui.set_confirm_reset(true);
+        })),
+        ("reset all dialog", Box::new(|t| {
+            t.app.ui.invoke_open_settings();
+            t.app.ui.set_confirm_reset(true);
+        })),
+    ];
+    // a real file: export needs one
+    let dir = tmp_dir(if french { "crawl-fr" } else { "crawl-en" });
+    let path = dir.join("progress.json");
+    let fresh = |goto: &Goto| -> T {
+        std::fs::write(&path, &json).unwrap();
+        fastrand::seed(7); // the same review order and sentences every time
+        let rec = Rc::new(Recorder::default());
+        let app = build(Progress::load(&path), rec.clone()).expect("build ui");
+        app.ui.window().set_size(slint::LogicalSize::new(400.0, 4000.0));
+        app.ui.show().unwrap();
+        let t = T { app, rec };
+        goto(&t);
+        t
+    };
+    let mut pressed = 0;
+    for (name, goto) in &states {
+        let t = fresh(goto);
+        audit_ok(&t, &format!("{name}"), false);
+        let controls: Vec<audit::El> =
+            audit::elements(&t.app.ui).into_iter().filter(|e| audit::is_control(e.role) && e.enabled).collect();
+        assert!(!controls.is_empty(), "{name}: no buttons?");
+        drop(t);
+        for c in controls {
+            let t = fresh(goto);
+            let before = fingerprint(&t);
+            let e = find_control(&t, &c.label, c.role).unwrap_or_else(|| panic!("{name}: '{}' is gone", c.label));
+            e.invoke_accessible_default_action();
+            let after = fingerprint(&t);
+            assert!(after != before || c.checked, "{name}: '{}' did nothing", c.label);
+            audit_ok(&t, &format!("{name}, after '{}'", c.label), false);
+            pressed += 1;
+        }
+    }
+    assert!(pressed > 60, "only {pressed} controls pressed");
+    std::fs::remove_dir_all(dir).ok();
+}
+
+#[test]
+fn every_control_on_every_screen_does_something_english() {
+    press_every_control(false);
+}
+
+#[test]
+fn every_control_on_every_screen_does_something_french() {
+    press_every_control(true);
+}
+
+/// Sentences with Latin letters or digits: each character has its own box, sized from an estimate
+/// of its width; the glyph must fit it (else it runs into its neighbour).
+#[test]
+fn latin_letters_and_digits_fit_their_boxes() {
+    let t = setup();
+    let mut n = 0;
+    let points: Vec<(String, Vec<u64>)> = t
+        .app
+        .content
+        .points
+        .iter()
+        .map(|p| (p.id.clone(), p.sentences.iter().filter(|s| s.ja.chars().any(|c| c.is_ascii_alphanumeric())).map(|s| s.id).collect()))
+        .collect();
+    for (pid, ids) in points {
+        for sid in ids {
+            quiz_on(&t, &pid, |s| s.id == sid);
+            let a = t.correct_answer();
+            t.type_and_enter(&a); // revealed: the whole sentence is drawn
+            assert_fits(&t, &format!("{pid} sentence {sid}"));
+            n += 1;
+        }
+    }
+    assert!(n > 20, "only {n} sentences with Latin letters or digits");
+}

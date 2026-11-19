@@ -23,4 +23,5 @@ jni = "0.21.1"
 slint-build = "1.19"
 
 [dev-dependencies]
+fastrand = "2.5.0"
 i-slint-core = "=1.19.0"
