@@ -38,6 +38,8 @@ export struct QuizData {
     verdict: int, // 0 = unanswered, 1 = correct, 2 = wrong
     last-answer: string, answer: string, grammar-line: string, attribution: string,
     finished: bool, summary: string, lesson: bool,
+    answered: int, // points answered at least once (graded)
+    practising: bool, // the current point was missed earlier in this session
     reported: bool, // this sentence was already reported
     words: [string], // dictionary forms, shown as lookup chips after answering
 }
@@ -46,6 +48,7 @@ export struct HomeData {
     due: int, new-count: int, learned: int, total: int, next-due: string, next-titles: string,
     learn-label: string, levels: [int], reviews-24h: int, source: string, level-rows: [LevelRow],
     start-level: string,
+    resume-reviews: int, resume-lesson: int, // items left in a saved (unfinished) quiz, 0 = none
 }
 
 export global Logic {
@@ -410,6 +413,7 @@ export component AppWindow inherits Window {
     callback lesson-prev();
     callback lesson-next();
     callback start-reviews();
+    callback resume();
     /// returns the text the field should show (only differs after the answer was checked)
     callback quiz-edited(string) -> string;
     callback quiz-submit();
@@ -483,7 +487,8 @@ export component AppWindow inherits Window {
                         Text { text: @tr("Reviews"); font-size: 17px; color: Theme.fg; }
                         Text { text: @tr("{} due", root.home.due); font-size: 40px; font-weight: 700; color: Theme.fg; }
                         if root.home.due == 0 && root.home.next-due != "": Text { text: @tr("Next review {}", root.home.next-due); color: Theme.fg; }
-                        Btn { text: @tr("Start reviews"); primary: true; enabled: root.home.due > 0; clicked => { root.start-reviews(); } }
+                        if root.home.resume-reviews > 0: Btn { text: @tr("Resume reviews ({} left)", root.home.resume-reviews); primary: true; clicked => { root.resume(); } }
+                        if root.home.resume-reviews == 0: Btn { text: @tr("Start reviews"); primary: true; enabled: root.home.due > 0; clicked => { root.start-reviews(); } }
                     }
                 }
                 Card {
@@ -501,7 +506,8 @@ export component AppWindow inherits Window {
                             font-size: 14px; color: Theme.muted; wrap: word-wrap;
                         }
                         if root.home.next-titles != "": Text { text: @tr("Next: {}", root.home.next-titles); font-size: 14px; color: Theme.muted; wrap: word-wrap; }
-                        Btn { text: root.home.learn-label; primary: true; enabled: root.home.new-count > 0; clicked => { root.start-learn(); } }
+                        if root.home.resume-lesson > 0: Btn { text: @tr("Resume the lesson quiz ({} left)", root.home.resume-lesson); primary: true; clicked => { root.resume(); } }
+                        if root.home.resume-lesson == 0: Btn { text: root.home.learn-label; primary: true; enabled: root.home.new-count > 0; clicked => { root.start-learn(); } }
                     }
                 }
                 Text { text: @tr("Example sentences: {}", root.home.source); font-size: 12px; color: Theme.muted; wrap: word-wrap; }
@@ -536,8 +542,8 @@ export component AppWindow inherits Window {
                 property <int> tick: root.focus-tick;
                 changed tick => { answer.focus(); }
                 init => { answer.focus(); }
-                TopBar { title: root.quiz.title + "  " + root.quiz.done + " / " + root.quiz.total; back => { root.go-home(); } }
-                HorizontalLayout { padding-left: 16px; padding-right: 16px; ProgressBar { progress: root.quiz.total > 0 ? root.quiz.done / root.quiz.total : 0; } }
+                TopBar { title: root.quiz.title + "  " + root.quiz.answered + " / " + root.quiz.total; back => { root.go-home(); } }
+                HorizontalLayout { padding-left: 16px; padding-right: 16px; ProgressBar { progress: root.quiz.total > 0 ? root.quiz.answered / root.quiz.total : 0; } }
                 Scroller {
                     vertical-stretch: 1;
                     spacing: 14px;
@@ -551,6 +557,10 @@ export component AppWindow inherits Window {
                     }
                     if root.english || root.quiz.verdict != 0: Text { text: root.quiz.en; font-size: 18px; color: Theme.muted; wrap: word-wrap; }
                     HorizontalLayout { alignment: start; Pill { text: root.quiz.hint; } }
+                    if root.quiz.practising: Text {
+                        text: @tr("Missed earlier: practice only, not graded again.");
+                        font-size: 14px; color: Theme.muted; wrap: word-wrap;
+                    }
                     if root.quiz.verdict != 0: VerticalLayout {
                         spacing: 12px;
                         Text {

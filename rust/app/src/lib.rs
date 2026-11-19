@@ -329,6 +329,31 @@ fn new_ids(content: &Content, progress: &Progress) -> Vec<String> {
     content.points.iter().filter(|p| progress.card(&p.id).is_new()).map(|p| p.id.clone()).collect()
 }
 
+/// Items left in the saved (unfinished) lesson quiz or review session, 0 if there is none.
+fn paused_left(content: &Content, st: &State, lesson: bool) -> i32 {
+    match &st.progress.paused {
+        Some(s) if s.lesson == lesson && s.resumable(content) => s.remaining() as i32,
+        _ => 0,
+    }
+}
+
+/// Keep the running quiz in the progress file, so it can be resumed after leaving it (or after
+/// the app was closed); a finished quiz leaves nothing to resume.
+fn save_session(st: &mut State) {
+    st.progress.paused = st.session.as_ref().filter(|s| !s.finished()).cloned();
+    st.progress.save();
+}
+
+/// Leaving the quiz screen: an answer already checked counts, the rest can be resumed.
+fn leave_session(content: &Content, st: &mut State) {
+    let st = &mut *st;
+    if let Some(sess) = st.session.as_mut() {
+        sess.commit_pending(content, &mut st.progress);
+        save_session(st);
+    }
+    st.session = None;
+}
+
 fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
     let now = now_ms();
     let due = due_ids(content, &st.progress, now).len() as i32;
@@ -363,6 +388,8 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
         reviews_24h: st.progress.reviews_since(now - 86_400_000) as i32,
         source: content.source_in(lang).into(),
         level_rows: model(level_rows(content, &st.progress)),
+        resume_reviews: paused_left(content, st, false),
+        resume_lesson: paused_left(content, st, true),
     });
     ui.set_level_pies(model(level_pies(content, &st.progress)));
     refresh_stats(ui, content, st, now);
@@ -548,6 +575,8 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         done: sess.done as i32,
         total: sess.total as i32,
         lesson: sess.lesson,
+        answered: sess.answered() as i32,
+        practising: sess.practising() && sess.verdict.is_none(),
         finished: sess.finished(),
         summary: if fr {
             format!("{} / {} justes du premier coup.", sess.correct_first_try, sess.total)
@@ -734,6 +763,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         } else {
             let ids = st.lesson_ids.clone();
             st.session = Some(Session::new(&c, &st.progress, ids, true));
+            save_session(&mut st);
             st.stack.clear();
             st.stack.push(SCREEN_HOME);
             ui.set_screen(SCREEN_QUIZ);
@@ -750,6 +780,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         }
         fastrand::shuffle(&mut ids);
         st.session = Some(Session::new(&c, &st.progress, ids, false));
+        save_session(&mut st);
         show(&ui, &mut st, SCREEN_QUIZ);
         refresh_quiz(&ui, &c, &st);
         ui.set_focus_tick(ui.get_focus_tick() + 1);
@@ -795,10 +826,11 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             }
         } else {
             sess.next(&c, &mut st.progress);
-            sync_reminder(&*p, &st.progress);
             if sess.finished() {
                 event(&format!("session-finished correct_first_try={} total={}", sess.correct_first_try, sess.total));
             }
+            save_session(st);
+            sync_reminder(&*p, &st.progress);
             ui.set_focus_tick(ui.get_focus_tick() + 1);
         }
         refresh_quiz(&ui, &c, st);
@@ -823,8 +855,28 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         ui.set_show_notes(true);
     }));
 
+    ui.on_resume(cb!(|ui, c, st| {
+        match st.progress.paused.clone() {
+            Some(s) if s.resumable(&c) => {
+                let lesson = s.lesson;
+                st.session = Some(s);
+                st.stack.clear();
+                st.stack.push(SCREEN_HOME);
+                ui.set_screen(SCREEN_QUIZ);
+                event(if lesson { "screen=2 lesson resumed" } else { "screen=2 resumed" });
+                refresh_quiz(&ui, &c, &st);
+                ui.set_focus_tick(ui.get_focus_tick() + 1);
+            }
+            _ => {
+                st.progress.paused = None;
+                st.progress.save();
+                refresh_home(&ui, &c, &st);
+            }
+        }
+    }));
+
     ui.on_go_home(cb!(|ui, c, st| {
-        st.session = None;
+        leave_session(&c, &mut st);
         show(&ui, &mut st, SCREEN_HOME);
         refresh_home(&ui, &c, &st);
         refresh_list(&ui, &c, &st);
@@ -844,7 +896,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             let prev = if cur == SCREEN_QUIZ { SCREEN_HOME } else { st.stack.pop().unwrap_or(SCREEN_HOME) };
             if prev == SCREEN_HOME {
                 st.stack.clear();
-                st.session = None;
+                leave_session(&c, &mut st);
             }
             ui.set_show_notes(false);
             ui.set_screen(prev);

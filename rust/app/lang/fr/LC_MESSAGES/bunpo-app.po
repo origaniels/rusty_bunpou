@@ -266,3 +266,12 @@ msgstr "{} ratées"
 
 msgid "Look up a word in Takoboto:"
 msgstr "Chercher un mot dans Takoboto :"
+
+msgid "Resume reviews ({} left)"
+msgstr "Reprendre les révisions (encore {})"
+
+msgid "Resume the lesson quiz ({} left)"
+msgstr "Reprendre le quiz de la leçon (encore {})"
+
+msgid "Missed earlier: practice only, not graded again."
+msgstr "Raté plus tôt : simple entraînement, pas noté une deuxième fois."

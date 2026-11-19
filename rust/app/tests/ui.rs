@@ -686,6 +686,10 @@ fn check_every_screen(width: f32, french: bool) {
     }
     assert_eq!(t.screen(), SCREEN_QUIZ);
     check("quiz, unanswered");
+    t.app.ui.invoke_go_home();
+    check("home with a lesson quiz to resume");
+    t.app.ui.invoke_resume();
+    assert_eq!(t.screen(), SCREEN_QUIZ);
     t.type_and_enter("ぜんぜんちがう");
     check("quiz, wrong answer");
     t.app.ui.set_show_notes(true);
@@ -711,6 +715,18 @@ fn check_every_screen(width: f32, french: bool) {
     check("home with reviews due");
     t.app.ui.invoke_start_reviews();
     check("reviews");
+    t.app.ui.invoke_go_home();
+    check("home with reviews to resume");
+    t.app.ui.invoke_resume();
+    t.type_and_enter("ぜんぜんちがう");
+    t.app.ui.invoke_quiz_submit();
+    // answer the others until the missed one comes back as practice
+    while !t.app.ui.get_quiz().practising {
+        let a = t.correct_answer();
+        t.type_and_enter(&a);
+        t.app.ui.invoke_quiz_submit();
+    }
+    check("reviews, practising a missed point");
     t.app.ui.invoke_go_home();
 
     // tabs
@@ -1012,4 +1028,110 @@ fn checked_answers_vibrate_unless_turned_off() {
     let a = t.correct_answer();
     t.type_and_enter(&a);
     assert!(!t.rec.0.borrow().iter().any(|e| e.starts_with("haptic")));
+}
+
+// ------------------------------------------------------------------ leaving reviews halfway
+
+fn due_reviews_setup(path: &std::path::Path) -> T {
+    let t = setup_with(Progress::load(path));
+    for _ in 0..3 {
+        t.learn_lesson();
+    }
+    t.wait(5 * HOUR);
+    assert_eq!(t.app.ui.get_home().due, 15);
+    t
+}
+
+#[test]
+fn leaving_reviews_halfway_can_be_resumed_even_after_a_restart() {
+    let dir = tmp_dir("resume");
+    let path = dir.join("progress.json");
+    let t = due_reviews_setup(&path);
+    t.press("Start reviews");
+    // 4 answered and moved on, the 5th answered but left on screen: it counts too
+    for i in 0..5 {
+        let a = t.correct_answer();
+        t.type_and_enter(&a);
+        if i < 4 {
+            t.app.ui.invoke_quiz_submit();
+        }
+    }
+    assert_eq!(t.app.ui.get_quiz().answered, 4);
+    assert!(t.app.ui.invoke_go_back());
+    assert_eq!(t.screen(), SCREEN_HOME);
+    let home = t.app.ui.get_home();
+    assert_eq!((home.due, home.resume_reviews), (10, 10));
+    assert!(t.exists("Resume reviews (10 left)"));
+    assert!(!t.exists("Start reviews"));
+
+    // the app is closed and opened again
+    drop(t);
+    // (one platform per thread: rebuild the app only)
+    let rec = Rc::new(Recorder::default());
+    let app = build(Progress::load(&path), rec.clone()).expect("build ui");
+    app.ui.window().set_size(slint::LogicalSize::new(400.0, 860.0));
+    app.ui.show().unwrap();
+    let t = T { app, rec };
+    assert_eq!(t.app.ui.get_home().resume_reviews, 10);
+    t.press("Resume reviews (10 left)");
+    assert_eq!(t.screen(), SCREEN_QUIZ);
+    assert_eq!((t.app.ui.get_quiz().answered, t.app.ui.get_quiz().total), (5, 15));
+    t.finish_quiz(&[]);
+    t.press("Home");
+    let home = t.app.ui.get_home();
+    assert_eq!((home.due, home.resume_reviews), (0, 0));
+    assert!(t.exists("Start reviews"));
+    std::fs::remove_dir_all(dir).ok();
+}
+
+#[test]
+fn a_missed_review_comes_back_as_practice_and_can_be_resumed() {
+    let dir = tmp_dir("practice");
+    let t = due_reviews_setup(&dir.join("progress.json"));
+    t.press("Start reviews");
+    let first = t.app.state.borrow().session.as_ref().unwrap().point.clone().unwrap();
+    t.type_and_enter("ぜんぜんちがう");
+    t.app.ui.invoke_quiz_submit();
+    for _ in 0..14 {
+        assert!(!t.app.ui.get_quiz().practising);
+        let a = t.correct_answer();
+        t.type_and_enter(&a);
+        t.app.ui.invoke_quiz_submit();
+    }
+    // every point was answered once; the missed one is practice now
+    assert_eq!(t.app.state.borrow().session.as_ref().unwrap().point.clone().unwrap(), first);
+    assert_eq!(t.app.ui.get_quiz().answered, 15);
+    assert!(t.app.ui.get_quiz().practising);
+    assert!(t.exists("Missed earlier: practice only, not graded again."));
+    t.app.ui.invoke_go_home();
+    let home = t.app.ui.get_home();
+    assert_eq!((home.due, home.resume_reviews), (0, 1), "graded, but it can still be practised");
+    t.press("Resume reviews (1 left)");
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    t.app.ui.invoke_quiz_submit();
+    assert!(t.app.ui.get_quiz().finished);
+    std::fs::remove_dir_all(dir).ok();
+}
+
+#[test]
+fn a_lesson_quiz_left_halfway_can_be_resumed() {
+    let t = setup();
+    t.press("Learn 5 new");
+    for _ in 0..4 {
+        t.press("Next");
+    }
+    t.press("Start quiz");
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    t.app.ui.invoke_quiz_submit();
+    t.app.ui.invoke_go_home();
+    assert_eq!(t.app.ui.get_home().resume_lesson, 4);
+    t.press("Resume the lesson quiz (4 left)");
+    assert_eq!(t.screen(), SCREEN_QUIZ);
+    assert!(t.app.ui.get_quiz().lesson);
+    t.finish_quiz(&[]);
+    t.press("Home");
+    assert_eq!(t.app.ui.get_home().learned, 5);
+    assert_eq!(t.app.ui.get_home().resume_lesson, 0);
 }
