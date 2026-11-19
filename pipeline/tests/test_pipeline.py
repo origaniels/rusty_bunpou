@@ -216,3 +216,28 @@ def test_answer_parts_mark_particles_and_conjugations():
     parts = answer_parts(tokenize("元気でした")[1:])
     assert all(k == "v" for _, k in parts), parts
 
+
+def test_alternatives_fit_the_context():
+    from alternatives import alternatives
+
+    def alts(pid, ja, blank):
+        ts = tokenize(ja)
+        start = ja.rindex(blank)  # the last one (テニスが…が)
+        a = next(k for k, t in enumerate(ts) if t.start == start)
+        b = next(k for k, t in enumerate(ts) if t.end == start + len(blank)) + 1
+        return alternatives(pid, blank, ts, a, b, {blank})
+
+    assert alts("kara_because", "雨が降っているから、出かけない。", "から") == ["ので"]
+    assert alts("kara_because", "学生だから、お金がない。", "から") == [], "だので is wrong"
+    assert alts("kara_because", "一人になりたくないからです。", "から") == [], "のでです is wrong"
+    assert alts("ga_but", "テニスがしたいのですが。", "が") == ["けれども", "けれど", "けど"], "not ですのに"
+    assert alts("you_da", "子供のようだ。", "ようだ") == [], "子供のみたいだ is wrong"
+    assert alts("you_da", "まるで酔っているようだ。", "ようだ") == ["みたいだ", "みたい"], "not まるで…らしい"
+    assert alts("mitai", "もう嘘みたいだったよ。", "みたい") == [], "嘘らしいだった is wrong"
+    assert alts("mitai", "風邪引いたみたい。", "みたい") == ["ようだ", "らしい"]
+    assert "かもしれない" not in alts("darou", "失敗したらどうなるだろう。", "だろう"), "a question"
+    assert "かもしれない" in alts("darou", "彼はおそらく来るだろう。", "だろう")
+    # the blank includes the verb: same politeness
+    ts = tokenize("行かなければなりません。")
+    assert alternatives("nakereba", "いかなければなりません", ts, 0, len(ts) - 1, set()) == [
+        "いかなくてはいけません", "いかなくてはなりません", "いかないといけません"]

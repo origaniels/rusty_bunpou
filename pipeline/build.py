@@ -19,6 +19,7 @@ sys.path.insert(0, str(HERE))
 import zlib  # noqa: E402
 
 import fr as french  # noqa: E402
+from alternatives import NUANCE, alternatives  # noqa: E402
 from extra_examples import EXTRA  # noqa: E402
 from jp import KANJI_RE, furigana, has_kanji, tokenize  # noqa: E402
 
@@ -423,6 +424,12 @@ def main():
         for c in chosen:
             used_global[c[0]] += 1
         sents = [to_sentence(sid, a, b, h, cands, toks) for sid, a, b, h, _ in chosen]
+        for (sid, a, b, _, _), sent in zip(chosen, sents):
+            kana = next((x for x in sent["answers"] if not has_kanji(x)), None)
+            if kana and p["id"] in NUANCE:
+                alts = alternatives(p["id"], kana, toks[sid], a, b, set(sent["answers"]))
+                if alts:
+                    sent["alts"] = alts
         for s in sents:
             if "fr" in s:
                 continue
@@ -441,6 +448,8 @@ def main():
             id=p["id"], level=p["level"], order=order, title=p["title"], meaning=p["meaning"],
             structure=p["structure"], explanation=" ".join(p["explanation"].split()), sentences=sents,
         )
+        if p["id"] in NUANCE:
+            po["nuance"] = list(NUANCE[p["id"]])
         if p["id"] in fr_points:
             f = fr_points[p["id"]]
             po["fr"] = dict(title=f.get("title", p["title"]), meaning=f["meaning"], structure=f["structure"],
