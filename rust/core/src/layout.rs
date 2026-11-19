@@ -71,9 +71,18 @@ impl Metrics {
 /// are square in Japanese fonts; ASCII and half-width forms are roughly half.
 pub fn char_em(c: char) -> f32 {
     match c as u32 {
-        0x20..=0x7e => {
-            if c.is_ascii_digit() || c.is_ascii_lowercase() { 0.58 } else if c.is_ascii_uppercase() { 0.68 } else { 0.4 }
-        }
+        // Latin letters and digits (each character gets its own box, so err on the wide side:
+        // a glyph wider than its box runs into its neighbour)
+        0x20..=0x7e => match c {
+            'm' | 'w' => 0.9,
+            'M' | 'W' => 0.98,
+            'i' | 'l' | 'j' | '.' | ',' | ':' | ';' | '!' | '|' | '\'' | ' ' => 0.32,
+            'f' | 't' | 'r' => 0.45,
+            '0'..='9' => 0.62,
+            'a'..='z' => 0.6,
+            'A'..='Z' => 0.74,
+            _ => 0.5,
+        },
         0xff61..=0xff9f => 0.5,
         _ => 1.0,
     }
