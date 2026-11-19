@@ -1308,7 +1308,8 @@ pub fn run(progress_path: Option<PathBuf>, platform: Rc<dyn Platform>) -> Result
 }
 
 /// Emulator end-to-end tests: when `dir/e2e.on` exists, poll `dir/e2e.cmd` and answer each command
-/// (see [`audit::command`]) as an `e2e …` event. The test script writes a command, then reads the log.
+/// (see [`audit::command`]) as an `e2e …` event (`e2e #<id> …` for a command sent as `#<id> …`).
+/// The test script writes a command, then reads the log.
 pub fn start_e2e_hook(ui: &AppWindow, dir: PathBuf) -> Option<slint::Timer> {
     if !dir.join("e2e.on").exists() {
         return None;
@@ -1322,7 +1323,12 @@ pub fn start_e2e_hook(ui: &AppWindow, dir: PathBuf) -> Option<slint::Timer> {
         let _ = std::fs::remove_file(&cmd_file);
         if let Some(ui) = w.upgrade() {
             for line in cmd.lines().filter(|l| !l.trim().is_empty()) {
-                event(&format!("e2e {}", audit::command(&ui, line)));
+                // "#<id> <command>": the answer repeats the id, so the script can't mistake an
+                // older answer for it
+                match line.strip_prefix('#').and_then(|l| l.split_once(' ')) {
+                    Some((id, c)) => event(&format!("e2e #{id} {}", audit::command(&ui, c))),
+                    None => event(&format!("e2e {}", audit::command(&ui, line))),
+                }
             }
         }
     });
