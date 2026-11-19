@@ -78,13 +78,13 @@ launch
 
 echo "== settings: 3 points per lesson (だ, です, でした: one possible answer each), language $LANG_UI"
 tap 929 2250; wait_ev '^screen=5'              # Settings (menu bar)
-tap 207 1217                                   # "3" (points per lesson)
+tap 207 1343                                   # "3" (points per lesson)
 if [ "$LANG_UI" = fr ]; then tap 752 450; wait_ev '^language=fr'; ok "app switched to French"; fi
 shot settings
 $A shell input keyevent 4; wait_ev '^screen=0 back'
 shot home
 echo "== lesson"
-tap 524 1225                                   # Learn 3 new
+tap 524 1162                                   # Learn 3 new
 wait_ev '^screen=1'
 shot lesson
 for _ in 1 2 3; do tap 816 2231; done          # Next x2, Start quiz
@@ -129,7 +129,7 @@ for cycle in 1 2 3 4 5; do
   [ "$due" = "$count" ] || fail "notification said $count, app shows $due due"; ok "$due due (matches notification)"
   $A shell dumpsys notification --noredact | grep -q "$NOTE_RE" && fail "notification not dismissed on open"
   ok "notification dismissed on open"
-  tap 524 728                                  # Start reviews
+  tap 524 695                                  # Start reviews
   wait_ev '^screen=2'
   (( cycle == 1 )) && shot reviews
   answer_session
