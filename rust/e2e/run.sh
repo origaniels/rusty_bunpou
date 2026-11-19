@@ -1,31 +1,39 @@
 #!/bin/bash
 # End-to-end test on the Android emulator (AVD "bunpo", Pixel 7 profile, 1080x2400, gesture nav).
 # Drives the real app with taps/typing, checks logcat events ("bunpo" tag), and travels in time by
-# setting the emulator clock (needs `adb root`, works on google_apis images).
+# setting the emulator clock (needs `adb root`, works on google_apis images). Taps go where the app
+# says each label is (e2e/lib.sh), and the screens on the way are checked by the layout audit.
 #   ./e2e/run.sh [apk]      (default: release APK from rust/android)
 #   E2E_LANG=fr  run the whole scenario with the app in French
 #   SHOTS=dir    save a screenshot of each screen there (for a visual check)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-A="${ADB:-$HOME/Android/Sdk/platform-tools/adb}"
-PKG=dev.local.bunpo.rust
+source e2e/lib.sh
 APK="${1:-android/app/build/outputs/apk/release/app-release.apk}"
 H=3600; D=86400
 LANG_UI="${E2E_LANG:-en}"
 if [ "$LANG_UI" = fr ]; then NOTE_RE="[0-9]* révisions\? de grammaire vous attend\(ent\)\?"; else NOTE_RE="[0-9]* grammar reviews\? \(is\|are\) waiting"; fi
 shot() { [ -n "${SHOTS:-}" ] || return 0; mkdir -p "$SHOTS"; sleep 0.8; $A exec-out screencap -p > "$SHOTS/$LANG_UI-$1.png"; }
 fail() { echo "FAIL: $*"; restore_clock; exit 1; }
-ok() { echo "  ok: $*"; }
 restore_clock() { $A shell date "@$(date +%s)" >/dev/null 2>&1 || true; $A shell settings put global auto_time 1 >/dev/null 2>&1 || true; }
 trap restore_clock EXIT
 
-ev() { $A logcat -d -s bunpo:I | sed -n 's/.* bunpo *: //p'; }        # all events so far
-last_ev() { ev | grep -E "$1" | tail -1; }
-wait_ev() {  # wait_ev <regex> [timeout_s]
-  for _ in $(seq 1 $(( ${2:-10} * 4 ))); do last_ev "$1" >/dev/null && [ -n "$(last_ev "$1")" ] && return 0; sleep 0.25; done
-  fail "timeout waiting for event /$1/ (last: $(ev | tail -3 | tr '\n' '|'))"
+PO=app/lang/fr/LC_MESSAGES/bunpo-app.po
+L() {  # the label in the scenario's language
+  if [ "$LANG_UI" = fr ]; then
+    python3 - "$PO" "$1" <<'PY'
+import sys
+po, want = open(sys.argv[1], encoding="utf8").read().split("\n"), sys.argv[2]
+for i, l in enumerate(po):
+    if l == 'msgid "%s"' % want:
+        print(po[i + 1][len('msgstr "'):-1]); break
+else:
+    print(want)
+PY
+  else
+    echo "$1"
+  fi
 }
-tap() { $A shell input tap "$1" "$2"; sleep 0.6; }
 # virtual time: the emulator re-syncs its clock with the host now and then, so keep the total
 # offset here and re-apply it (host time + OFFSET) whenever it matters.
 OFFSET=0
@@ -33,6 +41,7 @@ apply_clock() { $A shell date "@$(( $(date +%s) + OFFSET ))" >/dev/null; }
 travel() { OFFSET=$(( OFFSET + $1 )); apply_clock; }
 # open the app: either a fresh start or a resume of the backgrounded one
 launch() { apply_clock; $A logcat -c; $A shell am start -n $PKG/android.app.NativeActivity >/dev/null 2>&1; wait_ev '^(started|resumed)' 15; sleep 1; }
+home_button() { cmd buttons | sed 's/^buttons //' | tr '|' '\n' | sed 's/^ *//; s/ *$//; s/ \[on\]$//' | grep -E "^($1)" | sed -n 1p; }
 # leave the app like a user would (Home), then let Android kill the background process.
 # (Never `am force-stop`: that also cancels the app's alarms, i.e. the reminder.)
 close_app() { $A shell input keyevent 3; sleep 0.5; $A shell am kill $PKG; sleep 0.5; }
@@ -73,31 +82,41 @@ $A shell settings put global auto_time 0
 $A uninstall $PKG >/dev/null 2>&1 || true
 $A install "$APK" >/dev/null
 $A shell pm grant $PKG android.permission.POST_NOTIFICATIONS
+enable_hook
+keyboard en
 launch
 [ "$(due_now)" = 0 ] || fail "fresh install has due reviews"; ok "fresh start, nothing due"
 
 echo "== settings: 3 points per lesson (だ, です, でした: one possible answer each), language $LANG_UI"
-tap 929 2250; wait_ev '^screen=5'              # Settings (menu bar)
-tap 207 1343                                   # "3" (points per lesson)
-if [ "$LANG_UI" = fr ]; then tap 752 450; wait_ev '^language=fr'; ok "app switched to French"; fi
+tap_label Settings; wait_ev '^screen=5'
+tap_label 3                                    # daily goal: 3 new points
+if [ "$LANG_UI" = fr ]; then tap_label Français; wait_ev '^language=fr'; ok "app switched to French"; fi
+audit settings
 shot settings
 $A shell input keyevent 4; wait_ev '^screen=0 back'
+audit home
 shot home
 echo "== lesson"
-tap 524 1240                                   # Learn 3 new
+tap_label "$(home_button 'Learn|Apprendre')"   # Learn 3 new
 wait_ev '^screen=1'
+audit lesson
 shot lesson
-for _ in 1 2 3; do tap 816 2231; done          # Next x2, Start quiz
+for _ in 1 2; do tap_label "$(L Next)"; done
+tap_label "$(L 'Start quiz')"
 wait_ev '^screen=2 lesson'
+audit "lesson quiz"
 shot quiz
 answer_session
 ok "$(last_ev '^session-finished')"
+audit "quiz finished"
 shot quiz-finished
-tap 540 490; wait_ev '^screen=0'               # Home
-tap 669 2250; wait_ev '^screen=6'              # Stats (menu bar)
+tap_label "$(L Home)"; wait_ev '^screen=0'
+tap_label "$(L Stats)"; wait_ev '^screen=6'
+audit stats
 ok "stats screen opens"
 shot stats
-tap 409 2250; wait_ev '^screen=3'              # Grammar (menu bar)
+tap_label "$(L 'Grammar list')"; wait_ev '^screen=3'
+audit "grammar list"
 shot grammar
 $A shell input keyevent 4; wait_ev '^screen=0 back'
 rem=$(last_ev '^reminder'); [[ "$rem" == *"count=3"* ]] || fail "reminder not scheduled: $rem"; ok "$rem"
@@ -120,7 +139,7 @@ for cycle in 1 2 3 4 5; do
     (( i % 10 == 0 )) && apply_clock
     sleep 1
   done
-  note=$($A shell dumpsys notification --noredact | grep -o "$NOTE_RE" | head -1)
+  note=$($A shell dumpsys notification --noredact | grep -o "$NOTE_RE" | sed -n 1p)
   [ -n "$note" ] || fail "no reminder notification in cycle $cycle"
   [[ "$note" == "$count "* ]] || fail "notification says '$note', reminder was for $count"
   ok "notification: $note"
@@ -129,11 +148,11 @@ for cycle in 1 2 3 4 5; do
   [ "$due" = "$count" ] || fail "notification said $count, app shows $due due"; ok "$due due (matches notification)"
   $A shell dumpsys notification --noredact | grep -q "$NOTE_RE" && fail "notification not dismissed on open"
   ok "notification dismissed on open"
-  tap 524 695                                  # Start reviews
+  tap_label "$(L 'Start reviews')"
   wait_ev '^screen=2'
   (( cycle == 1 )) && shot reviews
   answer_session
-  tap 540 490; wait_ev '^screen=0'
+  tap_label "$(L Home)"; wait_ev '^screen=0'
   [ "$(due_now)" = 0 ] || fail "reviews left after session"
 done
 

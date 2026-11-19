@@ -49,13 +49,20 @@ hide_keyboard() { $A shell input keyevent 111; sleep 0.5; }               # Esca
 
 # where_on <label>: print "x y" of the label on screen, scrolling down to it if needed
 # (content scrolled out of view is not reported at all: "none" may mean further down)
+# The position must hold still for a moment: while the keyboard opens or closes the layout moves,
+# and a tap at the old position would land on the keyboard.
 where_on() {
-  local r
-  for _ in 1 2 3 4 5 6 7 8; do
+  local r prev="" misses=0
+  for _ in $(seq 1 16); do
     r=$(cmd "where $1")
     case "$r" in
-      "where on "*) set -- $r; echo "$3 $4"; return 0 ;;
-      *) scroll_down ;;
+      "where on "*)
+        if [ "$r" = "$prev" ]; then set -- $r; echo "$3 $4"; return 0; fi
+        prev=$r; misses=0; sleep 0.4 ;;
+      *)
+        # not on screen: maybe the layout is still moving (keyboard); look again before scrolling
+        prev=""; misses=$((misses + 1))
+        if (( misses < 3 )); then sleep 0.5; else misses=0; scroll_down; fi ;;
     esac
   done
   return 1
@@ -95,7 +102,7 @@ in_front() { $A shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' | gre
 push_progress() {
   $A shell am force-stop $PKG
   $A shell mkdir -p $DATA
-  $A push "$1" $DATA/progress.json >/dev/null
+  $A push "$1" $DATA/progress.json >/dev/null 2>&1
   local owner ctx
   owner=$($A shell stat -c %U:%G /data/data/$PKG)
   ctx=$($A shell ls -dZ /data/data/$PKG | awk '{print $1}')

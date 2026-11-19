@@ -20,7 +20,8 @@ and sentence translations. Lessons can start at any JLPT level (Settings → Sta
   real UI headlessly through Slint's testing backend. Interface strings are marked `@tr` and translated in
   `lang/fr/LC_MESSAGES/bunpo-app.po`
 - `rust/android/` — Gradle project packaging `libbunpo_app.so` + `ReviewReminder.java` into an APK
-- `rust/e2e/run.sh` — end-to-end test on the emulator (time travel via the emulator clock)
+- `rust/e2e/` — emulator tests: a two-week scenario with time travel (`run.sh`), a layout tour of every
+  screen (`tour.sh`), real-device flows (`flows.sh`) and a crawler that taps every button (`crawl.sh`)
 - `rust/third_party/i-slint-core/` — Slint core with one fix (`../i-slint-core-cancel.patch`):
   a cancelled touch (Android back gesture) must not count as a tap
 - `data/raw/` — Tatoeba exports (CC-BY 2.0 FR), not committed; see `pipeline/fetch_data.sh`
@@ -40,7 +41,10 @@ interval growth capped at 3× per review, max 1 year). A mistake on a learned po
 
 ## Tests
     ./test-all.sh            # pytest + cargo test (core, SRS simulations, headless UI)
-    ./test-all.sh --e2e      # + emulator end-to-end (AVD must be running)
+    ./test-all.sh --e2e      # + emulator tests (AVD must be running)
+    ./test-all.sh --e2e-full # + the button crawler
+
+See [TESTING.md](TESTING.md) for what each suite covers.
 
 ## Install on the phone
 Copy the APK to the phone and open it, or `adb install -r rust/android/app/build/outputs/apk/release/app-release.apk`.

@@ -29,7 +29,7 @@ PY
 }
 # first button whose label starts with one of the given prefixes
 button_starting() {
-  cmd buttons | sed 's/^buttons //' | tr '|' '\n' | sed 's/^ *//; s/ *$//; s/ \[on\]$//' | grep -E "^($1)" | head -1
+  cmd buttons | sed 's/^buttons //' | tr '|' '\n' | sed 's/^ *//; s/ *$//; s/ \[on\]$//' | grep -E "^($1)" | sed -n 1p
 }
 
 echo "== tour ($LANG_UI)"
