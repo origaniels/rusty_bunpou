@@ -84,7 +84,7 @@ shot settings
 $A shell input keyevent 4; wait_ev '^screen=0 back'
 shot home
 echo "== lesson"
-tap 524 1162                                   # Learn 3 new
+tap 524 1240                                   # Learn 3 new
 wait_ev '^screen=1'
 shot lesson
 for _ in 1 2 3; do tap 816 2231; done          # Next x2, Start quiz
