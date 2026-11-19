@@ -140,6 +140,10 @@ impl Platform for AndroidPlatform {
         });
     }
 
+    fn e2e_dir(&self) -> Option<std::path::PathBuf> {
+        self.app.external_data_path()
+    }
+
     fn on_started(&self) {
         // Android may restore the keyboard if the app was killed while it was open (e.g. mid-quiz)
         self.app.hide_soft_input(false);

@@ -90,6 +90,11 @@ pub trait Platform {
     fn haptic(&self, _correct: bool) {}
     /// Called shortly after start-up.
     fn on_started(&self) {}
+    /// Folder for the emulator end-to-end tests' commands (see [`start_e2e_hook`]); the hook only
+    /// runs when it contains an `e2e.on` marker, which adb can create but other apps can't.
+    fn e2e_dir(&self) -> Option<PathBuf> {
+        None
+    }
 }
 
 /// Desktop/test platform: does nothing.
@@ -1296,8 +1301,32 @@ pub fn run(progress_path: Option<PathBuf>, platform: Rc<dyn Platform>) -> Result
         Some(p) => Progress::load(p),
         None => Progress::in_memory(),
     };
+    let e2e = platform.e2e_dir();
     let app = build(progress, platform)?;
+    let _hook = e2e.and_then(|dir| start_e2e_hook(&app.ui, dir));
     app.ui.run()
+}
+
+/// Emulator end-to-end tests: when `dir/e2e.on` exists, poll `dir/e2e.cmd` and answer each command
+/// (see [`audit::command`]) as an `e2e …` event. The test script writes a command, then reads the log.
+pub fn start_e2e_hook(ui: &AppWindow, dir: PathBuf) -> Option<slint::Timer> {
+    if !dir.join("e2e.on").exists() {
+        return None;
+    }
+    event("e2e hook on");
+    let timer = slint::Timer::default();
+    let w = ui.as_weak();
+    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(200), move || {
+        let cmd_file = dir.join("e2e.cmd");
+        let Ok(cmd) = std::fs::read_to_string(&cmd_file) else { return };
+        let _ = std::fs::remove_file(&cmd_file);
+        if let Some(ui) = w.upgrade() {
+            for line in cmd.lines().filter(|l| !l.trim().is_empty()) {
+                event(&format!("e2e {}", audit::command(&ui, line)));
+            }
+        }
+    });
+    Some(timer)
 }
 
 #[cfg(target_os = "android")]

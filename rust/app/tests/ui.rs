@@ -1377,3 +1377,18 @@ fn the_audit_catches_what_doesnt_fit() {
     assert!(els.iter().any(|e| e.label == "Close"));
     assert!(!els.iter().any(|e| e.label == "Check"), "the quiz under the dialog is not checked");
 }
+
+#[test]
+fn the_e2e_hook_runs_only_with_its_marker() {
+    let t = setup();
+    let dir = tmp_dir("e2e-hook");
+    assert!(start_e2e_hook(&t.app.ui, dir.clone()).is_none(), "off without the marker");
+    std::fs::write(dir.join("e2e.on"), "").unwrap();
+    let hook = start_e2e_hook(&t.app.ui, dir.clone());
+    assert!(hook.is_some());
+    std::fs::write(dir.join("e2e.cmd"), "where Stats\naudit home\n").unwrap();
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(300));
+    assert!(!dir.join("e2e.cmd").exists(), "the command was read");
+    drop(hook);
+    std::fs::remove_dir_all(dir).ok();
+}
