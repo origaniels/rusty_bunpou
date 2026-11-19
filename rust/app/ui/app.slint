@@ -189,6 +189,8 @@ component Icon inherits Path {
 component AnswerField inherits Rectangle {
     in-out property <string> text <=> ti.text;
     in property <string> placeholder-text;
+    /// show the clear button (not once the answer is right: it can't be changed any more)
+    in property <bool> can-clear: true;
     out property <string> preedit: ti.preedit-text;
     out property <int> cursor: ti.cursor-position-byte-offset;
     out property <bool> has-focus: ti.has-focus;
@@ -246,7 +248,7 @@ component AnswerField inherits Rectangle {
                 accessible-placeholder-text: root.placeholder-text;
             }
         }
-        if ti.text != "": Rectangle {
+        if ti.text != "" && root.can-clear: Rectangle {
             width: 40px;
             Icon { d: "M 6 6 L 18 18 M 18 6 L 6 18"; stroke: Theme.fg; x: 8px; y: (parent.height - 24px) / 2; }
             TouchArea {
@@ -327,6 +329,8 @@ component NavItem inherits Rectangle {
     ta := TouchArea { clicked => { root.clicked(); } }
     accessible-role: button;
     accessible-label: root.name;
+    accessible-checkable: true;
+    accessible-checked: root.active; // the current tab
     accessible-action-default => { root.clicked(); }
 }
 
@@ -710,6 +714,7 @@ export component AppWindow inherits Window {
                         answer := AnswerField {
                             text <=> root.quiz-input;
                             placeholder-text: root.romaji ? @tr("type in kana or romaji") : @tr("type the answer");
+                        can-clear: root.quiz.verdict != 1;
                             // The field keeps exactly what was typed (rewriting it would fight the keyboard's
                             // composition); the romaji→kana preview is shown inside the blank instead.
                             edited(t) => {
@@ -722,6 +727,8 @@ export component AppWindow inherits Window {
                         Btn {
                             text: root.quiz.verdict == 0 ? @tr("Check") : @tr("Next");
                             primary: true;
+                            // nothing to check yet (what the keyboard is composing counts)
+                            enabled: root.quiz.verdict != 0 || answer.text != "" || answer.preedit != "";
                             clicked => { answer.commit-composition(); root.quiz-submit(); }
                         }
                     }
@@ -1126,6 +1133,8 @@ export component AppWindow inherits Window {
                         rt := TouchArea { clicked => { root.report-reason = i; } }
                         accessible-role: button;
                         accessible-label: r;
+                        accessible-checkable: true;
+                        accessible-checked: i == root.report-reason;
                         accessible-action-default => { root.report-reason = i; }
                     }
                     LineEdit {
