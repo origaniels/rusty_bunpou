@@ -22,6 +22,8 @@ if [[ "${1:-}" == --e2e* ]]; then
   echo "### android layout tour (every screen, audited on the device)"
   rust/e2e/tour.sh "" en
   rust/e2e/tour.sh "" fr
+  echo "### android layout tour with the phone's largest font size"
+  FONT_SCALE=1.3 rust/e2e/tour.sh "" fr
   echo "### android flows (app killed mid-review, Japanese keyboard)"
   rust/e2e/flows.sh
   if [[ "$1" == "--e2e-full" ]]; then

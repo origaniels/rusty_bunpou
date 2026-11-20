@@ -45,7 +45,9 @@ cmd() {
 
 scroll_down() { $A shell input swipe 540 1500 540 700 300; sleep 0.8; }   # content moves up
 scroll_up() { $A shell input swipe 540 700 540 1500 300; sleep 0.8; }
-hide_keyboard() { $A shell input keyevent 111; sleep 0.5; }               # Escape: keyboard only
+keyboard_shown() { $A shell dumpsys input_method | grep -q 'mInputShown=true'; }
+# close the keyboard like a person: Back, only while the keyboard shows (else Back leaves the screen)
+hide_keyboard() { if keyboard_shown; then $A shell input keyevent 4; sleep 0.8; fi; }
 
 # where_on <label>: print "x y" of the label on screen, scrolling down to it if needed
 # (content scrolled out of view is not reported at all: "none" may mean further down)

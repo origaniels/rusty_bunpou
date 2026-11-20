@@ -3,12 +3,15 @@
 # answered or not, long pages scrolled through) and run the layout audit on each, as drawn on the
 # device with its real fonts. Taps go through the labels the app reports, like a finger would.
 #   ./e2e/tour.sh [apk] [en|fr]    (needs the AVD "bunpo" running; the APK is installed first)
+#   FONT_SCALE=1.3  with the phone's font size setting at 1.3 ("Largest")
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source e2e/lib.sh
 APK="${1:-android/app/build/outputs/apk/release/app-release.apk}"
 LANG_UI="${2:-en}"
-WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
+WORK=$(mktemp -d)
+FONT_SCALE="${FONT_SCALE:-1.0}"
+trap '$A shell settings put system font_scale 1.0 >/dev/null 2>&1 || true; rm -rf "$WORK"' EXIT
 PO=app/lang/fr/LC_MESSAGES/bunpo-app.po
 
 # L <English>: the label in the tour's language (from the French translations)
@@ -32,8 +35,9 @@ button_starting() {
   cmd buttons | sed 's/^buttons //' | tr '|' '\n' | sed 's/^ *//; s/ *$//; s/ \[on\]$//' | grep -E "^($1)" | sed -n 1p
 }
 
-echo "== tour ($LANG_UI)"
+echo "== tour ($LANG_UI, font x$FONT_SCALE)"
 $A root >/dev/null 2>&1 || true; $A wait-for-device
+$A shell settings put system font_scale "$FONT_SCALE"
 $A install -r "$APK" >/dev/null
 $A shell pm grant $PKG android.permission.POST_NOTIFICATIONS
 enable_hook
@@ -41,6 +45,9 @@ keyboard en
 python3 e2e/make_progress.py "$WORK/p.json" "$LANG_UI" --due 6 --learned 8
 push_progress "$WORK/p.json"
 start_app
+want=$(python3 -c "print(min(max($FONT_SCALE, 1.0), 1.3))")
+[[ "$(last_ev '^started')" == *"text-scale=$want"* ]] || fail "the app didn't follow the font size: $(last_ev '^started')"
+ok "text scale $want from the phone's font size"
 
 audit_scrolled home; ok "home"
 
@@ -99,4 +106,4 @@ resume=$(button_starting 'Resume|Reprendre')
 [ -n "$resume" ] || fail "no resume button: $(cmd buttons)"
 tap_label "$resume"; sleep 1
 audit "resumed quiz"; ok "resumed quiz"
-echo "PASS: tour ($LANG_UI), $AUDITS layout audits on the device"
+echo "PASS: tour ($LANG_UI, font x$FONT_SCALE), $AUDITS layout audits on the device"
