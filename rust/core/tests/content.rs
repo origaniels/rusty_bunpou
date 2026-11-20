@@ -180,3 +180,24 @@ fn almost_hints_on_real_answers() {
     assert!(particle > 100, "only {particle} answers with a particle to drop");
     assert!(form > 300, "only {form} verb answers get a form hint");
 }
+
+#[test]
+fn another_point_that_fits_gets_a_nuance_hint_that_keeps_the_answer_hidden() {
+    use bunpo_core::hints::{nudge, Nudge};
+    let c = Content::bundled();
+    let mut n = 0;
+    for p in &c.points {
+        for s in p.sentences.iter().filter(|s| !s.alts.is_empty()) {
+            let (en, fr) = p.nuance.as_ref().unwrap_or_else(|| panic!("{} has alternatives but no nuance text", p.id));
+            for alt in &s.alts {
+                assert!(s.answers.iter().all(|a| normalize(a) != normalize(alt)), "{alt} is also accepted in {}", s.ja);
+                assert_eq!(nudge(s, alt), Some(Nudge::Nuance), "{alt} in {}", s.ja);
+                n += 1;
+            }
+            for a in &s.answers {
+                assert!(!en.contains(a.as_str()) && !fr.contains(a.as_str()), "the {} hint gives away {a}", p.id);
+            }
+        }
+    }
+    assert!(n > 800, "only {n} alternative answers");
+}

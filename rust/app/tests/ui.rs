@@ -1359,6 +1359,20 @@ fn another_point_that_fits_gets_a_nuance_hint_once() {
 }
 
 #[test]
+fn a_cause_you_blame_for_one_you_are_grateful_for_gets_a_nuance_hint() {
+    let t = setup();
+    let s = quiz_on(&t, "okage_de", |s| s.alts.iter().any(|a| a == "せいで"));
+    t.type_and_enter("seide");
+    let q = t.app.ui.get_quiz();
+    assert_eq!(q.verdict, 0, "not wrong: try again");
+    assert!(q.nudge.contains("a cause you are grateful for"), "{}", q.nudge);
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    assert_eq!(t.app.ui.get_quiz().verdict, 1);
+    let _ = s;
+}
+
+#[test]
 fn missing_particle_and_wrong_form_get_a_hint_then_count_if_right() {
     let t = setup();
     let s = quiz_on(&t, "temo_ii", |s| s.parts.iter().any(|(k, _)| k == "も"));
