@@ -24,8 +24,8 @@ def _not_after_da(prev: Tok | None) -> bool:
 
 
 def _noni_after(prev: Tok | None) -> bool:
-    # 静かなのに, 行ったのに; not だのに / ですのに / ますのに
-    return not (prev and prev.s in ("だ", "です", "ます"))
+    # 静かなのに, 行ったのに; not だのに / ですのに / ますのに, nor ののに (子供のくせに)
+    return not (prev and prev.s in ("だ", "です", "ます", "の"))
 
 
 def _not_after_na(prev: Tok | None) -> bool:
@@ -35,6 +35,28 @@ def _not_after_na(prev: Tok | None) -> bool:
 def _you_da_after(prev: Tok | None) -> bool:
     # verb / adjective / auxiliary, or の / な (子供のようだ, 静かなようだ); not a bare noun
     return bool(prev) and (prev.p1 in ("動詞", "形容詞", "助動詞") or prev.s in ("の", "な"))
+
+
+def _verb_before(prev: Tok | None) -> bool:
+    # right after a verb or an auxiliary (会うたびに, 知りつつも), not after a noun or の
+    return bool(prev) and prev.p1 in ("動詞", "助動詞")
+
+
+def _verb_adj_before(prev: Tok | None) -> bool:
+    return bool(prev) and prev.p1 in ("動詞", "助動詞", "形容詞")
+
+
+def _noun_before(prev: Tok | None) -> bool:
+    # right after a noun (子供に限らず, 英語はもとより)
+    return bool(prev) and prev.p1 in ("名詞", "代名詞") or bool(prev) and prev.p1 == "接尾辞" and prev.p2.startswith("名詞")
+
+
+def _not_after_no_na(prev: Tok | None) -> bool:
+    return not (prev and prev.s in ("の", "な"))
+
+
+def _not_after_na_da(prev: Tok | None) -> bool:
+    return not (prev and prev.s in ("な", "だ"))
 
 
 def _mitai_after(prev: Tok | None) -> bool:
@@ -77,7 +99,92 @@ GROUPS: list[list[tuple[str, list[tuple[str, str]], object]]] = [
         ("ni_kanshite", [("に関しては", "wa"), ("に関しての", "no"), ("に関して", "te"), ("にかんしては", "wa"),
                          ("にかんしての", "no"), ("にかんして", "te")], _any),
     ],
+    [  # hearsay
+        ("sou_hear", [("そうでした", POLITE_PAST), ("そうです", POLITE), ("そうだ", PLAIN)], _verb_adj_before),
+        ("rashii", [("らしいです", POLITE), ("らしい", PLAIN)], _not_after_na_da),
+    ],
+    [  # a cause, good or bad
+        ("okage_de", [("おかげで", "de"), ("おかげだ", "da"), ("おかげです", "desu"), ("おかげか", "ka")], _any),
+        ("sei_de", [("せいで", "de"), ("せいだ", "da"), ("せいです", "desu"), ("せいか", "ka")], _any),
+    ],
+    [  # while (a span of time)
+        ("uchi_ni", [("うちに", "")], _any),
+        ("aida", [("あいだに", "")], _any),
+    ],
+    [  # while doing
+        ("nagara", [("ながら", "")], _verb_before),
+        ("tsutsu", [("つつ", "")], _verb_before),
+    ],
+    [  # although
+        ("nagara_mo", [("ながらも", "")], _any),
+        ("tsutsu_mo", [("つつも", "")], _verb_before),
+    ],
+    [  # covered with
+        ("darake", [("だらけ", "")], _any),
+        ("mamire", [("まみれ", "")], _any),
+    ],
+    [  # without doing (ないで / ずに: converted in alternatives(), the verb form changes)
+        ("naide", [("ないで", "")], _any),
+        ("zu_ni", [("ずに", "")], _any),
+    ],
+    [  # every time
+        ("tabi_ni", [("たびに", "")], _verb_before),
+        ("goto_ni", [("ごとに", "")], _verb_before),
+    ],
+    [  # as one thing changes, so does another
+        ("ni_tsurete", [("につれて", "te"), ("につれ", "ren")], _any),
+        ("ni_shitagatte", [("にしたがって", "te"), ("にしたがい", "ren")], _any),
+        ("ni_tomonatte", [("にともなって", "te"), ("にともない", "ren")], _any),
+    ],
+    [  # on the occasion of
+        ("ni_saishite", [("にさいして", "te"), ("にさいし", "ren")], _any),
+        ("ni_atatte", [("にあたって", "te"), ("にあたり", "ren")], _any),
+    ],
+    [  # not only ... but also
+        ("dake_de_naku", [("だけでなく", ""), ("だけではなく", ""), ("ばかりでなく", "")], _any),
+        ("nomi_narazu", [("のみならず", "")], _any),
+        ("bakari_ka", [("ばかりか", "")], _any),
+        ("ni_kagirazu", [("にかぎらず", "")], _noun_before),
+        ("wa_motoyori", [("はもとより", "")], _noun_before),
+    ],
+    [  # on the other hand
+        ("ippou", [("いっぽうでは", ""), ("いっぽうで", "")], _any),
+        ("hanmen", [("はんめん", "")], _any),
+    ],
+    [  # even
+        ("sae", [("でさえ", "de"), ("さえ", "bare")], _any),
+        ("sura", [("ですら", "de"), ("すら", "bare")], _any),
+    ],
+    [  # it must be / it should be
+        ("ni_chigainai", [("にちがいない", PLAIN), ("にちがいありません", POLITE)], _not_after_no_na),
+        ("hazu", [("はずだ", PLAIN), ("はずです", POLITE)], _you_da_after),
+    ],
+    [  # about, to the extent of
+        ("hodo", [("ほど", "")], _any),
+        ("gurai", [("くらい", ""), ("ぐらい", "")], _any),
+    ],
+    [  # in the end, after all that
+        ("ageku", [("あげくのはてに", "hate"), ("あげくに", "ni"), ("あげく", "bare")], _any),
+        ("sue_ni", [("すえに", "ni"), ("すえ", "bare")], _any),
+    ],
+    [  # for, considering
+        ("ni_shite_wa", [("にしては", "")], _not_after_no_na),
+        ("wari_ni", [("わりには", ""), ("わりに", "")], _verb_adj_before),
+    ],
+    [  # although, with blame
+        ("noni", [("のに", "")], _noni_after),
+        ("kuse_ni", [("くせに", "")], _not_after_na_da),
+    ],
 ]
+
+# nouns of gradual change: X に伴って / につれて / にしたがって all work after them (after other nouns
+# にしたがって means "obeying" and に伴って "along with": no swap)
+CHANGE_NOUNS = {"増加", "減少", "進歩", "発展", "変化", "上昇", "低下", "成長", "普及", "発達", "拡大", "進行", "経過",
+                "増大", "悪化", "改善", "高齢化", "年齢"}
+
+# nouns that まみれ can follow (something sticky or dirty covering you); だらけ goes with anything
+MAMIRE_NOUNS = {"泥", "どろ", "汗", "あせ", "血", "ち", "ほこり", "埃", "油", "あぶら", "砂", "すな", "粉", "こな", "雪", "ゆき",
+                "借金", "しゃっきん", "ゴミ", "ごみ", "傷", "きず"}
 
 # what the expected point adds: "That could work, but here we're looking for <nuance>."
 NUANCE = {
@@ -113,6 +220,82 @@ NUANCE = {
                   "le « à propos de » courant"),
     "ni_kanshite": ("the formal \"regarding\" (documents, announcements)",
                     "le « concernant » soutenu (documents, annonces)"),
+    "sou_hear": ("passing on what you heard, plainly as hearsay (\"I hear that\")",
+                 "rapporter ce qu'on a entendu, clairement comme un ouï-dire (« il paraît que »)"),
+    "okage_de": ("a cause you are grateful for: it led to something good",
+                 "une cause dont on est reconnaissant : elle a mené à quelque chose de bien"),
+    "sei_de": ("a cause you blame: it led to something bad",
+               "une cause qu'on accuse : elle a mené à quelque chose de mal"),
+    "uchi_ni": ("\"while it is still so\": do it in time, before the situation changes",
+                "« tant que c'est encore le cas » : le faire à temps, avant que ça change"),
+    "aida": ("\"during\" a span of time, neutral, with no idea of urgency",
+             "« pendant » une période, neutre, sans idée d'urgence"),
+    "nagara": ("the everyday \"while doing\" (two actions at once)",
+               "le « en faisant » courant (deux actions à la fois)"),
+    "tsutsu": ("the written, formal \"while doing\"",
+               "le « en faisant » écrit, soutenu"),
+    "nagara_mo": ("the more common \"although\", after verbs, adjectives or nouns",
+                  "le « bien que » plus courant, après un verbe, un adjectif ou un nom"),
+    "tsutsu_mo": ("the written \"although (doing)\", often for knowing or thinking something and doing the opposite",
+                  "le « tout en (faisant) » écrit, souvent : savoir ou penser une chose et faire l'inverse"),
+    "darake": ("\"full of, covered in\" anything, usually unpleasant (mistakes, dust, debts)",
+               "« plein de, couvert de » n'importe quoi, souvent désagréable (fautes, poussière, dettes)"),
+    "mamire": ("\"smeared all over\" with something sticky or dirty (mud, sweat, blood)",
+               "« tout maculé » de quelque chose de collant ou de sale (boue, sueur, sang)"),
+    "naide": ("the everyday \"without doing\"",
+              "le « sans faire » courant"),
+    "zu_ni": ("the slightly formal, written \"without doing\"",
+              "le « sans faire » un peu soutenu, écrit"),
+    "tabi_ni": ("\"each time\" something happens, often with a feeling about it",
+                "« chaque fois que » quelque chose arrive, souvent avec un sentiment"),
+    "goto_ni": ("\"every\" regular unit or interval (every hour, every time, step by step)",
+                "« à chaque » unité ou intervalle régulier (toutes les heures, à chaque fois)"),
+    "ni_tsurete": ("\"as\" one thing changes, another changes naturally with it",
+                   "« à mesure que » : une chose change, une autre change naturellement avec elle"),
+    "ni_shitagatte": ("\"as, in step with\": a change that follows another, a bit formal",
+                      "« au fur et à mesure que » : un changement qui en suit un autre, un peu soutenu"),
+    "ni_tomonatte": ("\"along with\": a formal word, often for events or official changes",
+                     "« avec, en même temps que » : soutenu, souvent pour des événements ou changements officiels"),
+    "ni_saishite": ("\"on the occasion of\", at that very moment (formal)",
+                    "« à l'occasion de », au moment même (soutenu)"),
+    "ni_atatte": ("\"when starting, in preparing for\" something you undertake",
+                  "« au moment d'entreprendre », en se préparant à quelque chose"),
+    "dake_de_naku": ("the everyday \"not only ... but also\"",
+                     "le « non seulement ... mais aussi » courant"),
+    "nomi_narazu": ("the formal, written \"not only ... but also\"",
+                    "le « non seulement ... mais aussi » soutenu, écrit"),
+    "bakari_ka": ("\"not only ... but even\": the second thing is more surprising",
+                  "« non seulement ... mais même » : la seconde chose est plus surprenante"),
+    "ni_kagirazu": ("\"not limited to\": the first is just one example among many",
+                    "« pas seulement » : la première chose n'est qu'un exemple parmi d'autres"),
+    "wa_motoyori": ("\"not to mention\": the first is obvious, the second is the point",
+                    "« sans parler de » : la première chose va de soi, la seconde compte"),
+    "ippou": ("\"while, on the other hand\": two facts set side by side, neutral",
+              "« alors que, d'un autre côté » : deux faits mis côte à côte, neutre"),
+    "hanmen": ("\"but at the same time\": two sides of one thing, one good and one bad",
+               "« mais en revanche » : deux faces d'une même chose, l'une bonne, l'autre mauvaise"),
+    "sae": ("the everyday \"even\"",
+            "le « même » courant"),
+    "sura": ("the literary, emphatic \"even\" (written)",
+             "le « même » littéraire et appuyé (à l'écrit)"),
+    "ni_chigainai": ("a firm conclusion you've reached: \"it must be\"",
+                     "une conclusion ferme : « ça doit être »"),
+    "hazu": ("what you expect from what you know: \"it should be\"",
+             "ce qu'on attend d'après ce qu'on sait : « ça devrait être »"),
+    "hodo": ("\"to the extent of\", a bit formal; also for comparisons",
+             "« au point de », un peu soutenu ; aussi pour comparer"),
+    "gurai": ("\"about, around\", everyday; also \"at least\" or \"so much that\"",
+              "« environ », courant ; aussi « au moins » ou « tellement que »"),
+    "ageku": ("\"in the end, after all that\": a tiresome or bad outcome",
+              "« à la fin, après tout ça » : une issue pénible ou mauvaise"),
+    "sue_ni": ("\"in the end, after long effort\": often a good outcome",
+               "« à la fin, après de longs efforts » : souvent une bonne issue"),
+    "ni_shite_wa": ("\"for\" someone or something: compared with what you'd expect of it",
+                    "« pour » quelqu'un ou quelque chose : par rapport à ce qu'on en attendrait"),
+    "wari_ni": ("\"considering\" a degree or amount: more or less than you'd expect",
+                "« compte tenu de » un degré ou une quantité : plus ou moins que prévu"),
+    "kuse_ni": ("a \"though\" that blames or looks down on someone",
+                "un « alors que » qui reproche ou méprise"),
 }
 
 
@@ -135,8 +318,10 @@ def alternatives(pid: str, answer_kana: str, ts: list[Tok], a: int, b: int, acce
         me = group[ids.index(pid)]
         ending = next(((e, k) for e, k in me[1] if answer_kana.endswith(e)), None)
         if ending is None:
-            return []
+            continue
         stem = answer_kana[: len(answer_kana) - len(ending[0])]
+        if not _context_ok(pid, ending[0], stem, ts, a, b, text):
+            continue
         # bare みたい followed by だった / です / な / に: らしい or ようだ can't take its place
         if ending[0] == "みたい" and nxt is not None and (nxt.p1 == "助動詞" or nxt.s in ("な", "に")):
             return []
@@ -153,8 +338,15 @@ def alternatives(pid: str, answer_kana: str, ts: list[Tok], a: int, b: int, acce
             # まるで goes with ようだ / みたい, not らしい
             if other == "rashii" and "まるで" in text:
                 continue
+            if not _swap_ok(pid, other, stem, prev, nxt, ts, b):
+                continue
+            if {pid, other} == {"naide", "zu_ni"}:
+                alt = _without(answer_kana, to_zu=(other == "zu_ni"))
+                if alt and alt not in accepted and alt not in out:
+                    out.append(alt)
+                continue
             for e, k in endings:
-                if e.startswith("に関"):  # kana only: the learner types kana
+                if any("\u4e00" <= ch <= "\u9fff" for ch in e):  # kana only: the learner types kana
                     continue
                 if ending[1] and k and k != ending[1]:
                     continue
@@ -162,3 +354,65 @@ def alternatives(pid: str, answer_kana: str, ts: list[Tok], a: int, b: int, acce
                 if alt not in accepted and alt not in out:
                     out.append(alt)
     return out
+
+
+def _context_ok(pid: str, ending: str, stem: str, ts: list[Tok], a: int, b: int, text: str) -> bool:
+    """Whether this sentence's blank can take another point of the group at all."""
+    # さえ〜ば (if only): すら can't
+    if pid == "sae" and any(t.s in ("ば", "たら", "れば") for t in ts[b:]):
+        return False
+    # AほどBない (not as ... as): くらい would change the meaning
+    if pid in ("hodo", "gurai") and any(t.lemma in ("ない", "無い", "ず") or t.s.startswith("ませ") for t in ts[b:]):
+        return False
+    # 〜につれて after a noun: only nouns of change (ご忠告に従って means "obeying")
+    if pid in ("ni_tsurete", "ni_shitagatte", "ni_tomonatte") and a > 0 and ts[a - 1].p1 in ("名詞", "代名詞", "接尾辞") \
+            and ts[a - 1].s not in CHANGE_NOUNS:
+        return False
+    # に従いなさい: the verb "obey"
+    if pid == "ni_shitagatte" and b < len(ts) and ts[b].p1 in ("助動詞", "動詞"):
+        return False
+    # 近いうちに (soon), 今のうちに (while you can): set phrases
+    if pid == "uchi_ni" and a > 0 and (ts[a - 1].s == "近い" or (a > 1 and ts[a - 1].s == "の" and ts[a - 2].s == "今")):
+        return False
+    # 一方である (keeps ...ing) is another point
+    if pid == "ippou" and b < len(ts) and ts[b].lemma in ("ある", "有る"):
+        return False
+    # sentence-final ないで (please don't): a request, ずに can't
+    if pid == "naide" and (b >= len(ts) or ts[b].s in ("。", "！", "!", "？", "?", "ね", "よ")):
+        return False
+    # ないでください / ないでくれ / ないでほしい: a request, ずに can't
+    if pid == "naide" and any(t.s in ("ください", "下さい", "くれ", "くれる", "ほしい", "欲しい", "くださ") for t in ts[b:b + 2]):
+        return False
+    return True
+
+
+def _swap_ok(pid: str, other: str, stem: str, prev: Tok | None, nxt: Tok | None, ts: list[Tok], b: int) -> bool:
+    """Whether `other` can replace `pid` here (rules beyond the token before the blank)."""
+    # まみれ only for something smeared on you (mud, sweat, blood), not mistakes or problems
+    if other == "mamire":
+        noun = stem or (prev.s if prev else "")
+        return any(noun == n or (len(n) > 1 and noun.endswith(n)) for n in MAMIRE_NOUNS)
+    # 同じくらい: a set phrase (同じほど sounds odd); どのくらい but not どのほど
+    if other == "hodo" and prev is not None and prev.s in ("同じ", "どの", "この", "その", "あの"):
+        return False
+    # 〜ないうちに (before it happens): 間に can't follow a negative
+    if other == "aida" and prev is not None and prev.lemma in ("ない", "無い", "ぬ", "ず"):
+        return False
+    return True
+
+
+def _without(answer: str, to_zu: bool) -> str:
+    """しないで ↔ せずに, 食べないで ↔ 食べずに, こないで ↔ こずに."""
+    if to_zu:
+        if not answer.endswith("ないで"):
+            return ""
+        stem = answer[: -len("ないで")]
+        if stem.endswith("し"):  # する: しないで → せずに
+            stem = stem[:-1] + "せ"
+        return stem + "ずに"
+    if not answer.endswith("ずに"):
+        return ""
+    stem = answer[: -len("ずに")]
+    if stem.endswith("せ"):  # せずに → しないで
+        stem = stem[:-1] + "し"
+    return stem + "ないで"

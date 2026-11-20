@@ -241,3 +241,42 @@ def test_alternatives_fit_the_context():
     ts = tokenize("行かなければなりません。")
     assert alternatives("nakereba", "いかなければなりません", ts, 0, len(ts) - 1, set()) == [
         "いかなくてはいけません", "いかなくてはなりません", "いかないといけません"]
+
+
+def test_more_alternatives_and_their_context_rules():
+    from alternatives import alternatives
+
+    def alts(pid, ja, blank, kana=None):
+        ts = tokenize(ja)
+        start = ja.rindex(blank)
+        a = next(k for k, t in enumerate(ts) if t.start == start)
+        b = next(k for k, t in enumerate(ts) if t.end == start + len(blank)) + 1
+        return alternatives(pid, kana or blank, ts, a, b, {kana or blank})
+
+    assert alts("okage_de", "先生のおかげで合格した。", "おかげで") == ["せいで"]
+    assert alts("naide", "朝ご飯を食べないで出かけた。", "食べないで", "たべないで") == ["たべずに"]
+    assert alts("naide", "勉強しないで遊んだ。", "しないで") == ["せずに"], "する: せずに"
+    assert alts("zu_ni", "勉強せずに遊んだ。", "せずに") == ["しないで"]
+    assert alts("naide", "泣かないでください。", "泣かないで", "なかないで") == [], "a request: no ずに"
+    assert alts("darake", "服が泥だらけになった。", "だらけ") == ["まみれ"]
+    assert alts("darake", "この作文は間違いだらけだ。", "だらけ") == [], "間違いまみれ is wrong"
+    assert alts("tabi_ni", "会うたびに、彼は背が伸びている。", "たびに") == ["ごとに"]
+    assert alts("tabi_ni", "会議のたびに、同じ話をする。", "たびに") == [], "会議のごとに is wrong"
+    assert alts("uchi_ni", "暗くならないうちに帰ろう。", "うちに") == [], "ないあいだに is wrong"
+    assert alts("uchi_ni", "若いうちに旅行したい。", "うちに") == ["あいだに"]
+    assert alts("sae", "時間さえあれば行ける。", "さえ") == [], "さえ〜ば: no すら"
+    assert alts("hodo", "彼ほど背が高くない。", "ほど") == [], "AほどBない: no くらい"
+    assert alts("kuse_ni", "子供のくせに生意気だ。", "くせに") == [], "子供ののに is wrong"
+    assert "くせに" in alts("noni", "知っているのに教えてくれない。", "のに")
+    assert alts("sou_hear", "明日は雨だそうだ。", "そうだ") == [], "雨だらしい is wrong"
+    assert alts("sou_hear", "明日は雨が降るそうだ。", "そうだ") == ["らしい"]
+    assert alts("ni_kagirazu", "子供に限らず、大人も楽しめる。", "に限らず", "にかぎらず")[:2] == ["だけでなく", "だけではなく"]
+    assert "にかぎらず" not in alts("dake_de_naku", "歌うだけでなく、踊りもする。", "だけでなく"), "after a verb: no に限らず"
+    assert alts("gurai", "彼は君と同じくらい速く走る。", "くらい") == [], "同じほど sounds odd"
+    assert alts("naide", "音を立てないで。", "立てないで", "たてないで") == [], "please don't: no ずに"
+    assert alts("ni_shitagatte", "ご忠告に従って行動します。", "に従って", "にしたがって") == [], "obeying, not 'as'"
+    assert alts("uchi_ni", "近いうちに会いましょう。", "うちに") == [], "近いうちに: set phrase"
+    assert "ですら" not in alts("sae", "時間さえもない。", "さえ"), "さえ ↔ すら, でさえ ↔ ですら"
+    assert alts("gurai", "どのくらいバスを待っているんですか。", "くらい") == [], "どのほど is wrong"
+    assert alts("gurai", "そこへ着くのにどれぐらいかかりますか。", "ぐらい") == ["ほど"], "どれほど is fine"
+    assert alts("ni_shitagatte", "お父さんに従いなさい。", "に従い", "にしたがい") == [], "obey"
