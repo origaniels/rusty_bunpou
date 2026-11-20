@@ -78,10 +78,16 @@ tap_label() {
 has_label() { [[ "$(cmd "where $1")" == "where on "* ]]; }   # on screen now, no scrolling
 
 # audit <name> [strict]: the screen as drawn on the device has no layout problem
+# (a list still sliding after a swipe can be caught mid-way: a failure is checked once more, a moment
+# later; a real layout problem fails both times)
 audit() {
   local r; r=$(cmd "audit $1${2:+ $2}")
   AUDITS=$((AUDITS + 1))
-  [[ "$r" == "audit $1 ok" ]] || fail "layout: $r"
+  if [[ "$r" != "audit $1 ok" ]]; then
+    sleep 1.5
+    r=$(cmd "audit $1${2:+ $2}")
+    [[ "$r" == "audit $1 ok" ]] || fail "layout: $r"
+  fi
 }
 # audit_scrolled <name>: audit the whole screen, page by page (up to 6 pages)
 audit_scrolled() {
