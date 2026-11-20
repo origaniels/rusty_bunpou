@@ -46,7 +46,8 @@ python3 e2e/make_progress.py "$WORK/p.json" "$LANG_UI" --due 6 --learned 8
 push_progress "$WORK/p.json"
 start_app
 want=$(python3 -c "print(min(max($FONT_SCALE, 1.0), 1.3))")
-[[ "$(last_ev '^started')" == *"text-scale=$want"* ]] || fail "the app didn't follow the font size: $(last_ev '^started')"
+got=$(last_ev '^started' | sed -n 's/.*text-scale=\([0-9.]*\).*/\1/p')
+python3 -c "import sys; sys.exit(abs($want - ${got:-0}) > 0.01)" || fail "the app didn't follow the font size: $(last_ev '^started')"
 ok "text scale $want from the phone's font size"
 
 audit_scrolled home; ok "home"

@@ -26,14 +26,14 @@ count_ev() { ev | grep -cE "$1" || true; }
 enable_hook() { $A shell mkdir -p $EXT; $A shell touch $EXT/e2e.on; $A logcat -G 16M >/dev/null 2>&1 || true; }
 
 # cmd <command>: run a test command in the app, print its answer (one line)
-CMD_ID=0
 cmd() {
-  CMD_ID=$((CMD_ID + 1))
-  local id="$$-$CMD_ID-$RANDOM"
+  # unique even in subshells (where a counter wouldn't advance and $RANDOM repeats)
+  local id="$BASHPID-$(date +%s%N)"
   local q=${1//\'/\'\\\'\'}   # quote for the device shell: ' -> '\''
   local r try
   for try in 1 2; do   # once more if the answer got lost (the log daemon may drop lines)
-    $A shell "printf '%s\n' '#$id $q' > $EXT/e2e.cmd"
+    # owned by the app's user: after a fresh install the app can't read a file root made there
+    $A shell "printf '%s\n' '#$id $q' > $EXT/e2e.tmp && chown \$(stat -c %U ${EXT%/files}) $EXT/e2e.tmp && mv $EXT/e2e.tmp $EXT/e2e.cmd"
     for _ in $(seq 1 24); do
       r=$($A logcat -d -s bunpo:I | sed -n "s/.* bunpo *: e2e #$id //p" | tail -1)
       if [ -n "$r" ]; then echo "$r"; return 0; fi
