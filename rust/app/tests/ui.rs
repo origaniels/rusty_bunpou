@@ -754,14 +754,20 @@ fn audit_ok(t: &T, ctx: &str, strict_vertical: bool) {
 
 /// Visit every screen and state of the app at the given window width and language.
 fn check_every_screen(width: f32, french: bool) {
+    check_every_screen_at(width, french, 1.0);
+}
+
+/// [`check_every_screen`] with the phone's font size setting at `text_scale`.
+fn check_every_screen_at(width: f32, french: bool, text_scale: f32) {
     let mut p = Progress::in_memory();
     p.settings.language = if french { "fr" } else { "en" }.into();
     let t = setup_with(p);
+    set_text_scale(&t.app.ui, text_scale);
     // tall enough that long screens (settings, grammar points) are laid out completely: the
     // element search only sees what is inside the window, not what is scrolled away
     t.app.ui.window().set_size(slint::LogicalSize::new(width, 4000.0));
     let lang = if french { "fr" } else { "en" };
-    let check = |what: &str| assert_fits(&t, &format!("[{lang}] {what}"));
+    let check = |what: &str| assert_fits(&t, &format!("[{lang}, text x{text_scale}] {what}"));
     check("home");
 
     // a lesson: every page, then the quiz in every state
@@ -881,6 +887,41 @@ fn check_every_screen(width: f32, french: bool) {
     t.app.ui.invoke_set_start_level(4);
     t.app.ui.invoke_go_home();
     check("home, lessons from N1");
+}
+
+#[test]
+fn every_screen_fits_large_text_pixel_8a_english() {
+    check_every_screen_at(411.0, false, MAX_TEXT_SCALE);
+}
+
+#[test]
+fn every_screen_fits_large_text_pixel_8a_french() {
+    check_every_screen_at(411.0, true, MAX_TEXT_SCALE);
+}
+
+#[test]
+fn every_screen_fits_large_text_narrow_phone_english() {
+    check_every_screen_at(360.0, false, MAX_TEXT_SCALE);
+}
+
+#[test]
+fn every_screen_fits_large_text_narrow_phone_french() {
+    check_every_screen_at(360.0, true, MAX_TEXT_SCALE);
+}
+
+#[test]
+fn text_scale_follows_the_phone_but_within_bounds() {
+    let t = setup();
+    let theme = || t.app.ui.global::<Theme>().get_text_scale();
+    assert_eq!(theme(), 1.0);
+    set_text_scale(&t.app.ui, 1.15);
+    assert_eq!(theme(), 1.15);
+    set_text_scale(&t.app.ui, 2.0);
+    assert_eq!(theme(), MAX_TEXT_SCALE);
+    set_text_scale(&t.app.ui, 0.85); // smaller than normal: kept at normal
+    assert_eq!(theme(), 1.0);
+    set_text_scale(&t.app.ui, f32::NAN);
+    assert_eq!(theme(), 1.0);
 }
 
 #[test]
