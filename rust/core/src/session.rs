@@ -5,7 +5,7 @@ use crate::content::{Content, GrammarPoint, Sentence};
 use crate::kana;
 use crate::store::{scheduler, Progress};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub const LESSON_EXAMPLES: usize = 4;
 
@@ -29,6 +29,9 @@ pub struct Session {
     queue: VecDeque<String>,
     graded: HashSet<String>,
     seen: HashSet<u64>,
+    /// The sentence each point was asked with in this session: a missed point comes back with the
+    /// same sentence (the next session picks another one).
+    chosen: HashMap<String, u64>,
     pub point: Option<String>,
     pub sentence: Option<u64>,
     /// What the user typed into the field (may be romaji).
@@ -77,6 +80,7 @@ impl Session {
             queue: ids.into(),
             graded: HashSet::new(),
             seen,
+            chosen: HashMap::new(),
             point: None,
             sentence: None,
             raw: String::new(),
@@ -139,6 +143,13 @@ impl Session {
             return;
         };
         let p = content.get(&id).expect("known point");
+        if let Some(&sid) = self.chosen.get(&id) {
+            if find_sentence(p, sid).is_some() {
+                self.point = Some(id);
+                self.sentence = Some(sid);
+                return;
+            }
+        }
         let last = progress.card(&id).last_sentence;
         let pool: Vec<&Sentence> =
             p.sentences.iter().filter(|s| s.id != last && !self.seen.contains(&s.id)).collect();
@@ -148,6 +159,7 @@ impl Session {
             pool[fastrand::usize(..pool.len())]
         };
         self.seen.insert(pick.id);
+        self.chosen.insert(id.clone(), pick.id);
         self.point = Some(id);
         self.sentence = Some(pick.id);
     }
@@ -270,6 +282,31 @@ mod tests {
             }
         }
         assert!(n > 500);
+    }
+
+    #[test]
+    fn a_missed_point_comes_back_with_the_same_sentence_then_another_next_time() {
+        let c = Content::bundled();
+        let mut prog = Progress::in_memory();
+        let ids: Vec<String> = c.points.iter().filter(|p| p.sentences.len() > 3).take(3).map(|p| p.id.clone()).collect();
+        for _ in 0..20 {
+            let mut s = Session::new(&c, &prog, ids.clone(), false);
+            let (first, sid) = (s.point.clone().unwrap(), s.sentence.unwrap());
+            s.on_input("xxx", false);
+            assert!(s.submit(&c));
+            s.next(&c, &mut prog);
+            // answer the others until the missed one is back
+            while s.point.as_ref() != Some(&first) {
+                let a = s.current(&c).unwrap().1.answer();
+                s.on_input(&a, false);
+                s.submit(&c);
+                s.next(&c, &mut prog);
+            }
+            assert_eq!(s.sentence, Some(sid), "same sentence within the session");
+            // a later session: another sentence for that point
+            let s2 = Session::new(&c, &prog, vec![first.clone()], false);
+            assert_ne!(s2.sentence, Some(sid), "another sentence next time");
+        }
     }
 
     #[test]

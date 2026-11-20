@@ -27,7 +27,7 @@ fn lesson_quiz_never_uses_lesson_examples() {
 }
 
 #[test]
-fn wrong_answers_come_back_with_another_sentence_but_grade_once() {
+fn wrong_answers_come_back_with_the_same_sentence_and_grade_once() {
     let c = Content::bundled();
     let mut prog = Progress::in_memory();
     let mut s = Session::new(&c, &prog, first_ids(&c, 2), false);
@@ -38,10 +38,10 @@ fn wrong_answers_come_back_with_another_sentence_but_grade_once() {
     // second point, answered correctly
     answer_current(&mut s, &c, true);
     s.next(&c, &mut prog);
-    // the missed point is back, with a different sentence
+    // the missed point is back, with the same sentence
     let (p1, s1) = s.current(&c).map(|(p, s)| (p.id.clone(), s.id)).unwrap();
     assert_eq!(p1, p0);
-    assert_ne!(s1, s0);
+    assert_eq!(s1, s0);
     answer_current(&mut s, &c, true);
     s.next(&c, &mut prog);
     assert!(s.finished());
