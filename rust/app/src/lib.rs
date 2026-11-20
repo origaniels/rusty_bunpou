@@ -90,6 +90,10 @@ pub trait Platform {
     fn haptic(&self, _correct: bool) {}
     /// Called shortly after start-up.
     fn on_started(&self) {}
+    /// The phone's font size setting (1.0 = normal), see [`set_text_scale`].
+    fn font_scale(&self) -> f32 {
+        1.0
+    }
     /// Folder for the emulator end-to-end tests' commands (see [`start_e2e_hook`]); the hook only
     /// runs when it contains an `e2e.on` marker, which adb can create but other apps can't.
     fn e2e_dir(&self) -> Option<PathBuf> {
@@ -410,6 +414,17 @@ pub fn with_composition(text: &str, (preedit, at): &(String, usize)) -> String {
         at -= 1;
     }
     format!("{}{}{}", &text[..at], preedit, &text[at..])
+}
+
+/// Largest text scale applied: Android's "Largest" font size (beyond it some rows, like the six
+/// SRS stages side by side in Stats, would no longer fit a phone screen).
+pub const MAX_TEXT_SCALE: f32 = 1.3;
+
+/// Follow the phone's font size setting: every text size of the UI is multiplied by it (clamped to
+/// 1.0..=MAX_TEXT_SCALE; spacing and fixed sizes stay as they are).
+pub fn set_text_scale(ui: &AppWindow, scale: f32) {
+    let s = if scale.is_finite() { scale.clamp(1.0, MAX_TEXT_SCALE) } else { 1.0 };
+    ui.global::<Theme>().set_text_scale(s);
 }
 
 /// Items left in the saved (unfinished) lesson quiz or review session, 0 if there is none.
@@ -1276,6 +1291,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
                 let st_rc = &st;
                 let (Some(ui), Ok(st)) = (w.upgrade(), st_rc.try_borrow()) else { return };
                 event("resumed");
+                set_text_scale(&ui, p.font_scale());
                 p.dismiss_reminder();
                 drop(st);
                 if let Ok(mut st) = st_rc.try_borrow_mut() {
@@ -1292,7 +1308,8 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             }))
         });
     }
-    event("started");
+    set_text_scale(&ui, platform.font_scale());
+    event(&format!("started text-scale={}", ui.global::<Theme>().get_text_scale()));
     Ok(App { ui, state: st, content, _timer: timer })
 }
 

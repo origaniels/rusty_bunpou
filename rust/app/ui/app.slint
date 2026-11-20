@@ -61,6 +61,8 @@ export global Logic {
 }
 
 export global Theme {
+    /// the phone's font size setting (Android accessibility), 1.0 = normal; all text sizes use it
+    in-out property <float> text-scale: 1.0;
     out property <color> accent: #ff8a7a;
     out property <color> gold: #e0a100;
     out property <color> good: #3fbf72;
@@ -73,11 +75,12 @@ export global Theme {
 
 // ------------------------------------------------------------------ building blocks
 
-// A one-line text that tells the layout audit when it doesn't fit the room it was given (it would
-// be cut off or run into its neighbours): its accessible description is then "clipped".
+// A one-line text that tells the layout audit when it doesn't fit the room it was given, too wide or
+// too tall (it would be cut off or run into its neighbours): its accessible description is then
+// "clipped".
 component FitText inherits Text {
     wrap: no-wrap;
-    accessible-description: self.preferred-width > self.width + 1px ? "clipped" : "";
+    accessible-description: self.preferred-width > self.width + 1px || self.preferred-height > self.height + 1px ? "clipped" : "";
 }
 
 component SentenceView {
@@ -85,7 +88,7 @@ component SentenceView {
     in property <int> mode;
     in property <string> typed;
     in property <bool> furigana: true;
-    in property <length> font-size: 24px;
+    in property <length> font-size: 24px * Theme.text-scale;
     in property <color> frame-color: mode == 2 ? Theme.good : Theme.accent;
     property <SentenceData> d: Logic.layout(key, mode, typed, furigana, root.width / 1px, font-size / 1px);
     min-height: d.height;
@@ -141,7 +144,7 @@ component Chip inherits Rectangle {
     border-width: 1px;
     border-color: #5c596c;
     background: ta.pressed ? #ffffff1c : transparent;
-    label := FitText { text: root.text; font-size: 16px; color: Theme.fg; }
+    label := FitText { text: root.text; font-size: 16px * Theme.text-scale; color: Theme.fg; }
     ta := TouchArea { clicked => { root.clicked(); } }
     accessible-role: button;
     accessible-label: root.text;
@@ -154,18 +157,21 @@ component Btn inherits Rectangle {
     in property <bool> enabled: true;
     callback clicked();
     min-height: 44px;
-    preferred-height: 44px;
-    min-width: label.preferred-width + 32px;
-    preferred-width: label.preferred-width + 32px;
     border-radius: 12px;
     background: !enabled ? (primary ? #3a3846 : transparent)
         : primary ? (ta.pressed ? Theme.accent.darker(0.25) : Theme.accent)
         : (ta.pressed ? #ffffff1c : transparent);
     border-width: primary ? 0px : 1px;
     border-color: enabled ? #5c596c : #3e3b4a;
-    label := FitText {
-        text: root.text; font-size: 15px; font-weight: 600;
-        color: !root.enabled ? #77748a : root.primary ? #2a0f0b : Theme.fg;
+    // a label too long for the room (large phone font, long translation) wraps: the button grows
+    // taller instead of running off the screen
+    HorizontalLayout {
+        padding-left: 16px; padding-right: 16px; padding-top: 6px; padding-bottom: 6px;
+        label := Text {
+            text: root.text; font-size: 15px * Theme.text-scale; font-weight: 600;
+            color: !root.enabled ? #77748a : root.primary ? #2a0f0b : Theme.fg;
+            wrap: word-wrap; horizontal-alignment: center; vertical-alignment: center;
+        }
     }
     ta := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
     accessible-role: button;
@@ -224,9 +230,12 @@ component AnswerField inherits Rectangle {
         Rectangle {
             horizontal-stretch: 1;
             clip: true;
+            min-width: 0px; // the typed text or placeholder must not widen the field
             placeholder := Text {
                 width: 100%; height: 100%;
                 vertical-alignment: center;
+                // never makes the field wider than its room (large phone font)
+                wrap: no-wrap; overflow: elide;
                 text: (ti.text == "" && ti.preedit-text == "") ? root.placeholder-text : "";
                 font-size: ti.font-size;
                 color: Theme.muted;
@@ -236,7 +245,7 @@ component AnswerField inherits Rectangle {
                 width: 100%; height: 100%;
                 vertical-alignment: center;
                 single-line: true;
-                font-size: 22px;
+                font-size: 22px * Theme.text-scale;
                 color: Theme.fg;
                 // no suggestions/autocorrect: the keyboard must not "fix" romaji we convert to kana
                 input-method-hints: { capitalization: CapitalizationMode.none, auto-correct: false, auto-complete: false };
@@ -289,7 +298,7 @@ component Segmented inherits Rectangle {
             border-radius: 9px;
             background: i == root.selected ? Theme.accent : (t.pressed ? #ffffff14 : transparent);
             FitText {
-                text: o; font-size: 15px; font-weight: 600;
+                text: o; font-size: 15px * Theme.text-scale; font-weight: 600;
                 color: i == root.selected ? #2a0f0b : Theme.fg;
                 horizontal-alignment: center; vertical-alignment: center;
             }
@@ -322,7 +331,7 @@ component NavItem inherits Rectangle {
             }
         }
         FitText {
-            text: root.label; font-size: 12px; font-weight: root.active ? 700 : 500;
+            text: root.label; font-size: 12px * Theme.text-scale; font-weight: root.active ? 700 : 500;
             color: root.active ? Theme.fg : Theme.muted; horizontal-alignment: center;
         }
     }
@@ -364,7 +373,7 @@ component ToggleRow {
     callback toggled(bool);
     HorizontalLayout {
         spacing: 12px;
-        Text { text: root.text; font-size: 17px; color: Theme.fg; wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1; }
+        Text { text: root.text; font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1; }
         Switch { checked: root.checked; toggled => { root.toggled(self.checked); } accessible-label: root.text; }
     }
 }
@@ -377,7 +386,7 @@ component Pill inherits Rectangle {
     border-radius: min(self.height / 2, 18px);
     HorizontalLayout {
         padding-left: 12px; padding-right: 12px; padding-top: 6px; padding-bottom: 6px;
-        label := Text { text: root.text; color: Theme.fg; font-size: 15px; font-weight: 600; wrap: word-wrap; }
+        label := Text { text: root.text; color: Theme.fg; font-size: 15px * Theme.text-scale; font-weight: 600; wrap: word-wrap; }
     }
 }
 
@@ -390,13 +399,14 @@ component TopBar inherits Rectangle {
     in property <string> title;
     in property <bool> show-back: true;
     callback back();
-    preferred-height: 56px;
+    min-height: 56px;
     // a fixed bar: the layout audit ignores content scrolled under it
     accessible-role: groupbox; accessible-label: "bar";
     HorizontalLayout {
         padding-left: root.show-back ? 8px : 20px; padding-right: 16px; spacing: 6px;
         if show-back: VerticalLayout { alignment: center; BackBtn { clicked => { root.back(); } } }
-        FitText { text: root.title; font-size: 21px; font-weight: 600; color: Theme.fg; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+        // a long title (large phone font) takes a second line rather than being cut
+        Text { text: root.title; font-size: 21px * Theme.text-scale; font-weight: 600; color: Theme.fg; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; }
     }
 }
 
@@ -420,26 +430,26 @@ component GrammarBody {
         HorizontalLayout {
             spacing: 10px; alignment: start;
             VerticalLayout { alignment: center; Pill { text: p.level; } }
-            Text { text: p.title; font-size: 30px; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
+            Text { text: p.title; font-size: 30px * Theme.text-scale; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
         }
-        Text { text: p.meaning; font-size: 18px; color: Theme.accent; wrap: word-wrap; }
+        Text { text: p.meaning; font-size: 18px * Theme.text-scale; color: Theme.accent; wrap: word-wrap; }
         Card {
             VerticalLayout {
                 padding: 12px; spacing: 2px;
-                FitText { text: @tr("Structure"); font-size: 13px; color: Theme.muted; }
-                Text { text: p.structure; font-size: 18px; color: Theme.fg; wrap: word-wrap; }
+                Text { text: @tr("Structure"); font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
+                Text { text: p.structure; font-size: 18px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
             }
         }
-        Text { text: p.explanation; font-size: 17px; color: Theme.fg; wrap: word-wrap; }
+        Text { text: p.explanation; font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
         Rectangle { height: 1px; background: #4a4658; }
-        FitText { text: @tr("Examples"); font-size: 18px; font-weight: 600; color: Theme.fg; }
+        Text { text: @tr("Examples"); font-size: 18px * Theme.text-scale; font-weight: 600; color: Theme.fg; wrap: word-wrap; }
         for ex[i] in p.examples: VerticalLayout {
             spacing: 6px;
             padding-bottom: 8px;
             visible: i < root.max-examples;
             height: i < root.max-examples ? self.preferred-height : 0;
-            SentenceView { key: ex.key; mode: 0; furigana: root.furigana; font-size: 20px; }
-            Text { text: ex.en; font-size: 15px; color: Theme.muted; wrap: word-wrap; }
+            SentenceView { key: ex.key; mode: 0; furigana: root.furigana; font-size: 20px * Theme.text-scale; }
+            Text { text: ex.en; font-size: 15px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
         }
     }
 }
@@ -463,7 +473,7 @@ component Scroller inherits ScrollView {
 export component AppWindow inherits Window {
     title: "文法 SRS";
     background: Theme.bg;
-    default-font-size: 16px;
+    default-font-size: 16px * Theme.text-scale;
 
     in-out property <int> screen; // 0 home, 1 lesson, 2 quiz, 3 list, 4 detail, 5 settings, 6 stats
     in property <[LevelPie]> level-pies;
@@ -577,14 +587,14 @@ export component AppWindow inherits Window {
 
             // ---------------------------------------------------------- home
             if root.screen == 0: Scroller {
-                FitText { text: "文法 SRS"; font-size: 24px; font-weight: 700; color: Theme.accent; }
+                Text { text: "文法 SRS"; font-size: 24px * Theme.text-scale; font-weight: 700; color: Theme.accent; wrap: word-wrap; }
                 Text { text: @tr("Japanese grammar, one sentence at a time."); color: Theme.fg; wrap: word-wrap; }
                 Card {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
-                        FitText { text: @tr("Reviews"); font-size: 17px; color: Theme.fg; }
-                        FitText { text: @tr("{} due", root.home.due); font-size: 40px; font-weight: 700; color: Theme.fg; }
-                        if root.home.due == 0 && root.home.next-due != "": FitText { text: @tr("Next review {}", root.home.next-due); color: Theme.fg; }
+                        Text { text: @tr("Reviews"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
+                        Text { text: @tr("{} due", root.home.due); font-size: 40px * Theme.text-scale; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
+                        if root.home.due == 0 && root.home.next-due != "": Text { text: @tr("Next review {}", root.home.next-due); color: Theme.fg; wrap: word-wrap; }
                         if root.home.resume-reviews > 0: Btn { text: @tr("Resume reviews ({} left)", root.home.resume-reviews); primary: true; clicked => { root.resume(); } }
                         if root.home.resume-reviews == 0: Btn { text: @tr("Start reviews"); primary: true; enabled: root.home.due > 0; clicked => { root.start-reviews(); } }
                     }
@@ -592,7 +602,7 @@ export component AppWindow inherits Window {
                 Card {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
-                        FitText { text: @tr("Learn"); font-size: 17px; color: Theme.fg; }
+                        Text { text: @tr("Learn"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                         Text {
                             text: root.home.start-level == "N5"
                                 ? @tr("{} new grammar points available", root.home.new-count)
@@ -601,15 +611,15 @@ export component AppWindow inherits Window {
                         }
                         if root.home.new-count == 0 && root.home.start-level != "N5": Text {
                             text: @tr("Lower levels can still be learned: choose a lower start level in Settings.");
-                            font-size: 14px; color: Theme.muted; wrap: word-wrap;
+                            font-size: 14px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
                         }
-                        if root.home.next-titles != "": Text { text: @tr("Next: {}", root.home.next-titles); font-size: 14px; color: Theme.muted; wrap: word-wrap; }
-                        Text { text: root.home.goal-line; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
+                        if root.home.next-titles != "": Text { text: @tr("Next: {}", root.home.next-titles); font-size: 14px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
+                        Text { text: root.home.goal-line; font-size: 14px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
                         if root.home.resume-lesson > 0: Btn { text: @tr("Resume the lesson quiz ({} left)", root.home.resume-lesson); primary: true; clicked => { root.resume(); } }
                         if root.home.resume-lesson == 0: Btn { text: root.home.learn-label; primary: true; enabled: root.home.new-count > 0; clicked => { root.start-learn(); } }
                     }
                 }
-                Text { text: @tr("Example sentences: {}", root.home.source); font-size: 12px; color: Theme.muted; wrap: word-wrap; }
+                Text { text: @tr("Example sentences: {}", root.home.source); font-size: 12px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
             }
 
             // ---------------------------------------------------------- lesson
@@ -636,8 +646,8 @@ export component AppWindow inherits Window {
             // ---------------------------------------------------------- quiz
             if root.screen == 2 && root.quiz.finished: VerticalLayout {
                 padding: 24px; spacing: 16px; alignment: start;
-                FitText { text: root.quiz.lesson ? @tr("Lesson complete!") : @tr("Reviews done!"); font-size: 30px; font-weight: 700; color: Theme.fg; }
-                FitText { text: root.quiz.summary; color: Theme.fg; }
+                Text { text: root.quiz.lesson ? @tr("Lesson complete!") : @tr("Reviews done!"); font-size: 30px * Theme.text-scale; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
+                Text { text: root.quiz.summary; color: Theme.fg; wrap: word-wrap; }
                 Btn { text: @tr("Home"); primary: true; clicked => { root.go-home(); } }
             }
             if root.screen == 2 && !root.quiz.finished: VerticalLayout {
@@ -654,31 +664,31 @@ export component AppWindow inherits Window {
                         mode: root.quiz.verdict == 0 ? 1 : 2;
                         typed: root.quiz-preview;
                         furigana: root.furigana;
-                        font-size: 26px;
+                        font-size: 26px * Theme.text-scale;
                         frame-color: root.quiz.verdict == 0 ? Theme.accent : root.quiz.verdict == 1 ? Theme.good : Theme.bad;
                     }
-                    if root.english || root.quiz.verdict != 0: Text { text: root.quiz.en; font-size: 18px; color: Theme.muted; wrap: word-wrap; }
+                    if root.english || root.quiz.verdict != 0: Text { text: root.quiz.en; font-size: 18px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
                     HorizontalLayout { alignment: start; Pill { text: root.quiz.hint; } }
                     if root.quiz.nudge != "" && root.quiz.verdict == 0: Text {
                         text: root.quiz.nudge;
-                        font-size: 17px; font-weight: 700; color: Theme.gold; wrap: word-wrap;
+                        font-size: 17px * Theme.text-scale; font-weight: 700; color: Theme.gold; wrap: word-wrap;
                     }
                     if root.quiz.fixing-typo: Text {
                         text: @tr("Fixing a typo: if the answer is right now, it counts as right.");
-                        font-size: 14px; color: Theme.muted; wrap: word-wrap;
+                        font-size: 14px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
                     }
                     if root.quiz.practising: Text {
                         text: @tr("Missed earlier: practice only, not graded again.");
-                        font-size: 14px; color: Theme.muted; wrap: word-wrap;
+                        font-size: 14px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
                     }
                     if root.quiz.verdict != 0: VerticalLayout {
                         spacing: 12px;
                         Text {
                             text: root.quiz.verdict == 1 ? @tr("Correct!") : @tr("Not quite. You wrote: {}", root.quiz.last-answer);
                             color: root.quiz.verdict == 1 ? Theme.good : Theme.bad;
-                            font-size: 20px; font-weight: 700; wrap: word-wrap;
+                            font-size: 20px * Theme.text-scale; font-weight: 700; wrap: word-wrap;
                         }
-                        Text { text: @tr("Answer: {}", root.quiz.answer); font-size: 18px; color: Theme.fg; wrap: word-wrap; }
+                        Text { text: @tr("Answer: {}", root.quiz.answer); font-size: 18px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                         Text { text: root.quiz.grammar-line; color: Theme.fg; wrap: word-wrap; }
                         // two rows so long (French) labels never run off the screen
                         if root.quiz.verdict == 2: HorizontalLayout {
@@ -697,14 +707,14 @@ export component AppWindow inherits Window {
                         }
                         if root.quiz.words.length > 0: VerticalLayout {
                             spacing: 8px;
-                            Text { text: @tr("Look up a word in Takoboto:"); font-size: 13px; color: Theme.muted; wrap: word-wrap; }
+                            Text { text: @tr("Look up a word in Takoboto:"); font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
                             // the scroller's content is the window width minus its padding
-                            for row in Logic.chip-rows(root.quiz.words, (root.width - 48px) / 1px, 16): HorizontalLayout {
+                            for row in Logic.chip-rows(root.quiz.words, (root.width - 48px) / 1px, 16 * Theme.text-scale): HorizontalLayout {
                                 spacing: 8px; alignment: start;
                                 for w in row.words: Chip { text: w; clicked => { answer.unfocus(); root.lookup(w); } }
                             }
                         }
-                        Text { text: root.quiz.attribution; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
+                        Text { text: root.quiz.attribution; font-size: 12px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
                     }
                 }
                 Rectangle {
@@ -761,17 +771,17 @@ export component AppWindow inherits Window {
                                         stroke: Theme.accent;
                                     }
                                 }
-                                FitText { text: item.header; font-size: 17px; font-weight: 700; color: Theme.accent; vertical-alignment: center; horizontal-stretch: 1; }
-                                FitText { text: item.num; font-size: 14px; color: Theme.muted; vertical-alignment: center; }
+                                FitText { text: item.header; font-size: 17px * Theme.text-scale; font-weight: 700; color: Theme.accent; vertical-alignment: center; horizontal-stretch: 1; }
+                                FitText { text: item.num; font-size: 14px * Theme.text-scale; color: Theme.muted; vertical-alignment: center; }
                             }
                         }
                         if item.header == "": HorizontalLayout {
                             padding: 12px; padding-left: 16px; spacing: 12px;
-                            FitText { text: item.num; width: 28px; color: Theme.muted; vertical-alignment: center; }
+                            FitText { text: item.num; width: 32px * Theme.text-scale; color: Theme.muted; vertical-alignment: center; }
                             VerticalLayout {
                                 horizontal-stretch: 1;
-                                Text { text: item.title; font-size: 20px; color: Theme.fg; wrap: word-wrap; } // long titles wrap instead of pushing the stage label off
-                                Text { text: item.meaning; font-size: 13px; color: Theme.muted; wrap: word-wrap; }
+                                Text { text: item.title; font-size: 20px * min(Theme.text-scale, 1.15); /* big already: a long word must leave room for the stage label */ color: Theme.fg; wrap: word-wrap; } // long titles wrap instead of pushing the stage label off
+                                Text { text: item.meaning; font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
                             }
                             VerticalLayout { alignment: center; Pill { text: item.level; } }
                         }
@@ -807,7 +817,7 @@ export component AppWindow inherits Window {
                         VerticalLayout {
                             padding: 16px; spacing: 12px;
                             property <string> tip;
-                            Text { text: root.streak-line; font-size: 17px; font-weight: 600; color: Theme.fg; wrap: word-wrap; }
+                            Text { text: root.streak-line; font-size: 17px * Theme.text-scale; font-weight: 600; color: Theme.fg; wrap: word-wrap; }
                             // 15 weeks, one column per week (Monday on top); squares sized to the width
                             cal := Rectangle {
                                 property <length> gap: 3px;
@@ -827,15 +837,15 @@ export component AppWindow inherits Window {
                                 spacing: 4px;
                                 Text {
                                     text: tip != "" ? tip : @tr("Tap a day to see its reviews.");
-                                    font-size: 13px; color: tip != "" ? Theme.fg : Theme.muted; horizontal-stretch: 1;
+                                    font-size: 13px * Theme.text-scale; color: tip != "" ? Theme.fg : Theme.muted; horizontal-stretch: 1;
                                     vertical-alignment: center; wrap: word-wrap;
                                 }
-                                FitText { text: @tr("Less"); font-size: 12px; color: Theme.muted; vertical-alignment: center; }
+                                FitText { text: @tr("Less"); font-size: 12px * Theme.text-scale; color: Theme.muted; vertical-alignment: center; }
                                 for l in 5: Rectangle {
                                     width: 10px; height: 10px; y: (parent.height - self.height) / 2; border-radius: 2px;
                                     background: [#34323f, #1f4a7a, #2f74c8, #5d9de8, #a9cdf6][l];
                                 }
-                                FitText { text: @tr("More"); font-size: 12px; color: Theme.muted; vertical-alignment: center; }
+                                FitText { text: @tr("More"); font-size: 12px * Theme.text-scale; color: Theme.muted; vertical-alignment: center; }
                             }
                         }
                     }
@@ -843,13 +853,13 @@ export component AppWindow inherits Window {
                     Card {
                         VerticalLayout {
                             padding: 16px; spacing: 10px;
-                            FitText { text: @tr("Upcoming reviews"); font-size: 17px; font-weight: 600; color: Theme.fg; }
+                            Text { text: @tr("Upcoming reviews"); font-size: 17px * Theme.text-scale; font-weight: 600; color: Theme.fg; wrap: word-wrap; }
                             HorizontalLayout {
                                 spacing: 6px; height: 120px;
                                 for b in root.forecast: VerticalLayout {
                                     horizontal-stretch: 1; spacing: 4px; alignment: end;
                                     // only days with reviews get a number
-                                    FitText { text: b.count > 0 ? b.count : ""; font-size: 13px; font-weight: 600; color: Theme.fg; horizontal-alignment: center; }
+                                    FitText { text: b.count > 0 ? b.count : ""; font-size: 13px * Theme.text-scale; font-weight: 600; color: Theme.fg; horizontal-alignment: center; }
                                     HorizontalLayout {
                                         alignment: center;
                                         Rectangle {
@@ -859,7 +869,7 @@ export component AppWindow inherits Window {
                                             background: b.count > 0 ? #3987e5 : #34323f;
                                         }
                                     }
-                                    FitText { text: b.label; font-size: 12px; color: Theme.muted; horizontal-alignment: center; }
+                                    FitText { text: b.label; font-size: 12px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; }
                                 }
                             }
                         }
@@ -868,10 +878,10 @@ export component AppWindow inherits Window {
                     if root.leeches.length > 0: Card {
                         VerticalLayout {
                             padding: 16px; spacing: 8px;
-                            FitText { text: @tr("Leeches"); font-size: 17px; font-weight: 600; color: Theme.fg; }
+                            Text { text: @tr("Leeches"); font-size: 17px * Theme.text-scale; font-weight: 600; color: Theme.fg; wrap: word-wrap; }
                             Text {
                                 text: @tr("Points you got wrong 3 times in your last 5 reviews. Open one to read the notes again, or reset it to learn it again.");
-                                font-size: 13px; color: Theme.muted; wrap: word-wrap;
+                                font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
                             }
                             for l in root.leeches: TouchArea {
                                 height: lrow.preferred-height;
@@ -880,10 +890,10 @@ export component AppWindow inherits Window {
                                     padding-top: 8px; padding-bottom: 8px; spacing: 12px;
                                     VerticalLayout {
                                         horizontal-stretch: 1;
-                                        Text { text: l.title; font-size: 18px; color: Theme.fg; wrap: word-wrap; }
-                                        Text { text: l.meaning; font-size: 13px; color: Theme.muted; wrap: word-wrap; }
+                                        Text { text: l.title; font-size: 18px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
+                                        Text { text: l.meaning; font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
                                     }
-                                    FitText { text: @tr("{} wrong", l.mistakes); font-size: 13px; color: Theme.bad; vertical-alignment: center; }
+                                    FitText { text: @tr("{} wrong", l.mistakes); font-size: 13px * Theme.text-scale; color: Theme.bad; vertical-alignment: center; }
                                 }
                                 accessible-role: list-item;
                                 accessible-label: l.title;
@@ -894,12 +904,12 @@ export component AppWindow inherits Window {
                     Card {
                         VerticalLayout {
                             padding: 16px; spacing: 14px;
-                            FitText { text: @tr("Progress: {} / {} learned", root.home.learned, root.home.total); font-size: 17px; font-weight: 600; color: Theme.fg; }
+                            Text { text: @tr("Progress: {} / {} learned", root.home.learned, root.home.total); font-size: 17px * Theme.text-scale; font-weight: 600; color: Theme.fg; wrap: word-wrap; }
                             HorizontalLayout {
                                 spacing: 4px;
                                 for pie in root.level-pies: VerticalLayout {
                                     spacing: 6px;
-                                    FitText { text: pie.name; font-size: 15px; font-weight: 700; color: Theme.fg; horizontal-alignment: center; }
+                                    FitText { text: pie.name; font-size: 15px * Theme.text-scale; font-weight: 700; color: Theme.fg; horizontal-alignment: center; }
                                     HorizontalLayout {
                                         alignment: center;
                                         Rectangle {
@@ -913,7 +923,7 @@ export component AppWindow inherits Window {
                                             }
                                         }
                                     }
-                                    FitText { text: pie.learned + " / " + pie.total; font-size: 12px; color: Theme.muted; horizontal-alignment: center; }
+                                    FitText { text: pie.learned + " / " + pie.total; font-size: 12px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; }
                                 }
                             }
                             // legend (identity is never color-alone: every stage is named)
@@ -923,7 +933,7 @@ export component AppWindow inherits Window {
                                     // equal-width columns so both legend rows line up
                                     spacing: 6px; width: (parent.width - 16px) / 3;
                                     Rectangle { width: 12px; height: 12px; y: (parent.height - self.height) / 2; border-radius: 6px; background: root.stage-colors[i]; }
-                                    FitText { text: [@tr("New"), @tr("Beginner"), @tr("Adept"), @tr("Seasoned"), @tr("Expert"), @tr("Mastered")][i]; font-size: 13px; color: Theme.fg; vertical-alignment: center; }
+                                    FitText { text: [@tr("New"), @tr("Beginner"), @tr("Adept"), @tr("Seasoned"), @tr("Expert"), @tr("Mastered")][i]; font-size: 13px * Theme.text-scale; color: Theme.fg; vertical-alignment: center; }
                                 }
                             }
                         }
@@ -932,10 +942,10 @@ export component AppWindow inherits Window {
                     Card {
                         VerticalLayout {
                             padding: 16px; spacing: 14px;
-                            FitText { text: @tr("By level"); font-size: 17px; font-weight: 600; color: Theme.fg; }
+                            Text { text: @tr("By level"); font-size: 17px * Theme.text-scale; font-weight: 600; color: Theme.fg; wrap: word-wrap; }
                             for pie in root.level-pies: VerticalLayout {
                                 spacing: 6px;
-                                FitText { text: "JLPT " + pie.name; font-size: 15px; font-weight: 700; color: Theme.accent; }
+                                FitText { text: "JLPT " + pie.name; font-size: 15px * Theme.text-scale; font-weight: 700; color: Theme.accent; }
                                 HorizontalLayout {
                                     for i in 6: VerticalLayout {
                                         horizontal-stretch: 1;
@@ -943,13 +953,13 @@ export component AppWindow inherits Window {
                                         HorizontalLayout {
                                             alignment: center; spacing: 5px;
                                             Rectangle { width: 8px; height: 8px; y: (parent.height - self.height) / 2; border-radius: 4px; background: root.stage-colors[i]; }
-                                            FitText { text: pie.counts[i]; font-size: 18px; font-weight: 700; color: Theme.fg; }
+                                            FitText { text: pie.counts[i]; font-size: 18px * Theme.text-scale; font-weight: 700; color: Theme.fg; }
                                         }
-                                        FitText { text: [@tr("New"), @tr("Beginner"), @tr("Adept"), @tr("Seasoned"), @tr("Expert"), @tr("Mastered")][i]; font-size: 11px; color: Theme.muted; horizontal-alignment: center; }
+                                        FitText { text: [@tr("New"), @tr("Beginner"), @tr("Adept"), @tr("Seasoned"), @tr("Expert"), @tr("Mastered")][i]; font-size: 11px; /* not scaled: six columns side by side (the legend above names them in larger text) */ color: Theme.muted; horizontal-alignment: center; }
                                     }
                                 }
                             }
-                            FitText { text: @tr("Reviews in the last 24 h: {}", root.home.reviews-24h); font-size: 13px; color: Theme.muted; }
+                            Text { text: @tr("Reviews in the last 24 h: {}", root.home.reviews-24h); font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
                         }
                     }
                 }
@@ -960,7 +970,7 @@ export component AppWindow inherits Window {
                 TopBar { title: @tr("Settings"); show-back: false; }
                 Scroller {
                     vertical-stretch: 1;
-                    Text { text: @tr("Language"); font-size: 17px; color: Theme.fg; wrap: word-wrap; }
+                    Text { text: @tr("Language"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                     // language names are never translated
                     Segmented { options: ["English", "Français"]; selected: root.language-index; picked(i) => { root.set-language(i); } }
                     ToggleRow { text: @tr("Furigana (readings above kanji)"); checked: root.furigana; toggled(v) => { root.set-furigana(v); } }
@@ -968,22 +978,22 @@ export component AppWindow inherits Window {
                     ToggleRow { text: @tr("Convert romaji to kana"); checked: root.romaji; toggled(v) => { root.set-romaji(v); } }
                     ToggleRow { text: @tr("Remind me when reviews are due"); checked: root.notifications; toggled(v) => { root.set-notifications(v); } }
                     ToggleRow { text: @tr("Vibrate when an answer is checked"); checked: root.haptics; toggled(v) => { root.set-haptics(v); } }
-                    Text { text: @tr("Daily goal (new points per day)"); font-size: 17px; color: Theme.fg; wrap: word-wrap; }
+                    Text { text: @tr("Daily goal (new points per day)"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                     Segmented {
                         options: ["3", "5", "10"];
                         selected: root.batch-size == 3 ? 0 : root.batch-size == 10 ? 2 : 1;
                         picked(i) => { root.set-batch([3, 5, 10][i]); }
                     }
-                    Text { text: @tr("Start lessons at"); font-size: 17px; color: Theme.fg; wrap: word-wrap; }
+                    Text { text: @tr("Start lessons at"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                     Segmented { options: ["N5", "N4", "N3", "N2", "N1"]; selected: root.start-level-index; picked(i) => { root.set-start-level(i); } }
                     Text {
                         text: @tr("Lessons teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again.");
-                        font-size: 13px; color: Theme.muted; wrap: word-wrap;
+                        font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
                     }
-                    Text { text: @tr("Target retention (FSRS)"); font-size: 17px; color: Theme.fg; wrap: word-wrap; }
+                    Text { text: @tr("Target retention (FSRS)"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                     Segmented { options: ["85%", "90%", "95%"]; selected: root.retention-index; picked(i) => { root.set-retention(i); } }
-                    Text { text: @tr("Higher retention = more frequent reviews. 90% is a good default."); font-size: 13px; color: Theme.muted; wrap: word-wrap; }
-                    Text { text: @tr("Backup"); font-size: 17px; color: Theme.fg; wrap: word-wrap; }
+                    Text { text: @tr("Higher retention = more frequent reviews. 90% is a good default."); font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
+                    Text { text: @tr("Backup"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                     HorizontalLayout {
                         spacing: 8px;
                         Btn { text: @tr("Export progress"); horizontal-stretch: 1; clicked => { root.export-progress(); } }
@@ -992,7 +1002,7 @@ export component AppWindow inherits Window {
                     Text {
                         text: root.backup-status != "" ? root.backup-status
                             : @tr("Your progress is only stored on this phone: export it now and then (Drive, email, …) to keep a copy.");
-                        font-size: 13px; color: root.backup-status != "" ? Theme.fg : Theme.muted; wrap: word-wrap;
+                        font-size: 13px * Theme.text-scale; color: root.backup-status != "" ? Theme.fg : Theme.muted; wrap: word-wrap;
                     }
                     if root.report-count > 0: HorizontalLayout {
                         alignment: start;
@@ -1001,7 +1011,7 @@ export component AppWindow inherits Window {
                     HorizontalLayout { alignment: start; Btn { text: @tr("Reset all progress"); clicked => { root.confirm-reset = true; } } }
                     Text {
                         text: @tr("Most example sentences come from Tatoeba (tatoeba.org), licensed CC-BY 2.0 FR, and show their Tatoeba number and contributor. A few were written for this app and are marked as such.");
-                        font-size: 13px; color: Theme.muted; wrap: word-wrap;
+                        font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
                     }
                 }
             }
@@ -1104,8 +1114,8 @@ export component AppWindow inherits Window {
                 TouchArea { }
                 rbox := VerticalLayout {
                     padding: 20px; spacing: 10px;
-                    Text { text: @tr("Report this sentence"); font-size: 20px; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
-                    Text { text: root.report-sentence; font-size: 16px; color: Theme.muted; wrap: word-wrap; }
+                    Text { text: @tr("Report this sentence"); font-size: 20px * Theme.text-scale; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
+                    Text { text: root.report-sentence; font-size: 16px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
                     for r[i] in [
                         @tr("It doesn't use this grammar point"),
                         @tr("The translation is wrong"),
@@ -1139,12 +1149,12 @@ export component AppWindow inherits Window {
                     }
                     LineEdit {
                         text <=> root.report-note;
-                        font-size: 16px;
+                        font-size: 16px * Theme.text-scale;
                         placeholder-text: @tr("Note (optional)");
                     }
                     if root.kb-height == 0: Text {
                         text: @tr("Reports stay on this phone. Export them from Settings to send them.");
-                        font-size: 13px; color: Theme.muted; wrap: word-wrap;
+                        font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
                     }
                     HorizontalLayout {
                         spacing: 8px; alignment: end;

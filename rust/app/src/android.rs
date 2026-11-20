@@ -140,6 +140,25 @@ impl Platform for AndroidPlatform {
         });
     }
 
+    fn font_scale(&self) -> f32 {
+        // activity.getResources().getConfiguration().fontScale
+        let res = (|| -> jni::errors::Result<f32> {
+            let vm = unsafe { JavaVM::from_raw(self.app.vm_as_ptr() as *mut jni::sys::JavaVM)? };
+            let mut env = vm.attach_current_thread()?;
+            let activity = unsafe { JObject::from_raw(self.app.activity_as_ptr() as jni::sys::jobject) };
+            let resources = env.call_method(&activity, "getResources", "()Landroid/content/res/Resources;", &[])?.l()?;
+            let config = env.call_method(&resources, "getConfiguration", "()Landroid/content/res/Configuration;", &[])?.l()?;
+            env.get_field(&config, "fontScale", "F")?.f()
+        })();
+        match res {
+            Ok(f) => f,
+            Err(e) => {
+                log(&format!("font scale: {e}"));
+                1.0
+            }
+        }
+    }
+
     fn e2e_dir(&self) -> Option<std::path::PathBuf> {
         self.app.external_data_path()
     }
