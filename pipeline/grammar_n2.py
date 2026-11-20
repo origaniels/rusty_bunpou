@@ -138,7 +138,7 @@ P("kagiri", "〜限り", "as long as; as far as", "Plain form + 限り(は)",
 # ---------------------------------------------------------------- contrast & concession
 P("ippou", "〜一方(で)", "while, on the other hand", "Plain form + 一方(で)",
   """一方で contrasts two sides: 都会は便利な一方で、物価が高い (cities are convenient, but prices are high).""",
-  r"一方(?:で|では)", "都会は便利な一方で、物価が高い。", after="any")
+  r"一方(?:では|で)(?!あ)", "都会は便利な一方で、物価が高い。", after="any")  # not 〜一方である (keeps ...ing)
 P("hanmen", "〜反面", "on the other hand", "Plain form + 反面",
   """反面 (はんめん) shows a downside of the same thing: この仕事は楽しい反面、責任も重い.""",
   r"反面", "この仕事は楽しい反面、責任も重いです。", after="any")
@@ -167,7 +167,7 @@ P("tsutsu_aru", "〜つつある", "be in the process of", "Verb stem + つつ�
   r"つつ" + ARU, "地球の気温は上がりつつある。", pre="v", tail=True)
 P("wari_ni", "〜わりに(は)", "considering, for", "Plain form / Noun + の + わりに",
   """わりに means "considering": 値段のわりにおいしい (tasty, considering the price).""",
-  r"(?:わり|割)に(?:は)?(?!合)", "この店は値段のわりにおいしい。", after="any")  # 割に合わない
+  r"(?<!時間)(?:わり|割)に(?:は)?(?!合)", "この店は値段のわりにおいしい。", after="any")  # 割に合わない, 時間割
 P("ni_shiro", "〜にしろ / 〜にせよ", "even if; whether ... or", "Plain form / Noun + にしろ",
   """にしろ / にせよ mean "even if" or, repeated, "whether A or B": 行くにしろ行かないにしろ連絡して.""",
   r"(?:にしろ|にせよ)(?![^。]*(?:にしろ|にせよ))", "行くにしろ行かないにしろ、連絡してください。", after="any",

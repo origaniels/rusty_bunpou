@@ -75,6 +75,8 @@ POSITIVE = [
 
 # (point, sentence) — false positives seen in real Tatoeba sentences
 NEGATIVE = [
+    ("wari_ni", "私たちは時間割に従って勉強する。"),  # 時間割: timetable
+    ("ippou", "社会保険庁や厚生労働省への不信感は募る一方である。"),  # 一方だ: keeps growing
     ("sura", "フランス語すらすら読めるようになりたいなあ。"),
     ("ikani", "そんなことをするとはいかにも彼らしい。"),
     ("you_ga", "彼女は体重を減らそうと、ジムで何時間も過ごしている。"),
