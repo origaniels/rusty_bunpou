@@ -1,7 +1,10 @@
 # 文法 SRS — offline Japanese grammar SRS for Android
 
 SRS-style grammar drills (cloze sentences, typed answers, spaced repetition), fully offline,
-written in Rust (logic + Slint UI). The only Java is a small notification receiver.
+written in Rust (logic + Slint UI). Java only where Android needs an Activity: reminders, file picker,
+dictionary lookup, vibration.
+
+How the app works, feature by feature, and how to change it: [APP.md](APP.md). Tests: [TESTING.md](TESTING.md).
 
 The whole app can be used in **English or French** (Settings → Language): interface, grammar explanations
 and sentence translations. Lessons can start at any JLPT level (Settings → Start lessons at).
@@ -19,7 +22,7 @@ and sentence translations. Lessons can start at any JLPT level (Settings → Sta
 - `rust/app/` — Slint UI (`ui/app.slint`) + glue (`src/lib.rs`, `src/android.rs`); `tests/ui.rs` drives the
   real UI headlessly through Slint's testing backend. Interface strings are marked `@tr` and translated in
   `lang/fr/LC_MESSAGES/bunpo-app.po`
-- `rust/android/` — Gradle project packaging `libbunpo_app.so` + `ReviewReminder.java` into an APK
+- `rust/android/` — Gradle project packaging `libbunpo_app.so` + the Java helpers into an APK
 - `rust/e2e/` — emulator tests: a two-week scenario with time travel (`run.sh`), a layout tour of every
   screen (`tour.sh`), real-device flows (`flows.sh`) and a crawler that taps every button (`crawl.sh`)
 - `rust/third_party/i-slint-core/` — Slint core with one fix (`../i-slint-core-cancel.patch`):
