@@ -67,6 +67,7 @@ takes about 6 minutes (tokenization is cached in `data/build/tokens.pkl`).
   (`LESSON_EXAMPLES` in `session.rs`).
 
 ### Quiz and reviews (`core/src/session.rs`)
+- The header counts points cleared (answered right); a missed point counts once it is cleared.
 - Each point is graded on its first answer of the session; a missed point comes back at the end
   (practice, not graded again) **with the same sentence**; the next session uses another sentence
   (`chosen` map; `Card.last_sentence` is avoided).
@@ -114,8 +115,9 @@ reviews, lesson quiz and pre-reset reviews excluded), progress pies per level, c
 
 ### Settings
 Language (en/fr, everything follows), furigana, translation before answering, romaji conversion,
-reminders, vibration, daily goal, start level, target retention, backup (export/import progress,
-export reports), reset all.
+reminders, vibration, daily goal, start of the day (hour 0-23, `Settings::day_start`: the daily
+goal, streak, activity calendar and forecast all use `clock::study_day`), start level, target
+retention, backup (export/import progress, export reports), reset all.
 
 ### Reports
 "Report" in the quiz: a reason and a note, stored in `Progress.reports` (kept across resets, merged

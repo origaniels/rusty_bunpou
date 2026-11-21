@@ -1328,6 +1328,43 @@ fn lesson_size_is_a_daily_goal_then_extra_lessons() {
     assert_eq!(t.app.ui.get_home().learn_label, "Learn 5 new");
 }
 
+#[test]
+fn the_day_starts_at_the_hour_picked_in_the_settings() {
+    let t = setup();
+    t.press("Settings");
+    assert!(t.exists("0:00"));
+    for _ in 0..4 {
+        t.press("Start the day later");
+    }
+    assert!(t.exists("4:00"));
+    assert_eq!(t.app.state.borrow().progress.settings.day_start, 4);
+    for _ in 0..5 {
+        t.press("Start the day earlier");
+    }
+    assert!(t.exists("23:00"), "it wraps around midnight");
+    assert_eq!(t.app.state.borrow().progress.settings.day_start, 23);
+
+    // a point learned at 1 AM: today with a midnight start, yesterday's with a 4:00 start
+    let now = clock::now_ms();
+    let day = clock::local_day(now);
+    let mut first_hour = now;
+    while clock::local_day(first_hour - HOUR) == day {
+        first_hour -= HOUR;
+    }
+    let mut p = Progress::in_memory();
+    let id = t.app.content.points[0].id.clone();
+    let mut card = p.card(&id);
+    card.state = 1;
+    card.learned_at = first_hour + HOUR;
+    p.cards.insert(id, card);
+    let at_2am = first_hour + 2 * HOUR;
+    p.settings.day_start = 0;
+    assert_eq!(bunpo_app::learned_today(&p, at_2am), 1);
+    p.settings.day_start = 4;
+    assert_eq!(bunpo_app::learned_today(&p, at_2am), 1, "2 AM is still the same (previous) day");
+    assert_eq!(bunpo_app::learned_today(&p, first_hour + 5 * HOUR), 0, "a new day since 4:00");
+}
+
 // ------------------------------------------------------------------ "almost" hints
 
 /// Open a review of `pid` on the first of its sentences that `pick` accepts.

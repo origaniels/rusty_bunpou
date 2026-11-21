@@ -346,10 +346,12 @@ pub fn due_ids(content: &Content, progress: &Progress, now: i64) -> Vec<String> 
     v.into_iter().map(|(_, id)| id).collect()
 }
 
-/// Points first learned today (local time): counted against the daily goal.
+/// Points first learned today (local time, the day starting at the chosen hour): counted against
+/// the daily goal.
 pub fn learned_today(progress: &Progress, now: i64) -> usize {
-    let today = bunpo_core::clock::local_day(now);
-    progress.cards.values().filter(|c| c.learned_at > 0 && bunpo_core::clock::local_day(c.learned_at) == today).count()
+    let day = |ms| bunpo_core::clock::study_day(ms, progress.settings.day_start);
+    let today = day(now);
+    progress.cards.values().filter(|c| c.learned_at > 0 && day(c.learned_at) == today).count()
 }
 
 /// Size of the next lesson: what is left of today's goal, or a whole goal's worth once it is reached
@@ -527,7 +529,7 @@ fn day_label(lang: Lang, day: i64) -> String {
 /// Activity calendar cells, column by column (one column per week, Monday on top). Days after
 /// today have level -1 (not drawn).
 pub fn activity_cells(lang: Lang, progress: &Progress, now: i64) -> Vec<DayCell> {
-    let today = bunpo_core::clock::local_day(now);
+    let today = bunpo_core::clock::study_day(now, progress.settings.day_start);
     let weekday = (today + 3).rem_euclid(7);
     let first = today - weekday - 7 * (ACTIVITY_WEEKS as i64 - 1);
     let days = (today - first + 1) as usize;
@@ -574,7 +576,7 @@ fn refresh_stats(ui: &AppWindow, content: &Content, st: &State, now: i64) {
     );
     let cells = activity_cells(lang, &st.progress, now);
     ui.set_activity(model(cells));
-    let today = bunpo_core::clock::local_day(now);
+    let today = bunpo_core::clock::study_day(now, st.progress.settings.day_start);
     let fc = stats::forecast(&st.progress, now, 7);
     ui.set_forecast_max(fc.iter().copied().max().unwrap_or(0).max(1) as i32);
     ui.set_forecast(model(
@@ -661,6 +663,7 @@ fn refresh_settings(ui: &AppWindow, st: &State) {
     ui.set_notifications(s.notifications);
     ui.set_haptics(s.haptics);
     ui.set_batch_size(s.batch_size as i32);
+    ui.set_day_start(s.day_start as i32);
     let li = JLPT_LEVELS.iter().position(|l| *l == s.start_level).unwrap_or(0);
     ui.set_start_level_index(li as i32);
     let ri = RETENTIONS.iter().position(|r| (r - s.retention).abs() < 1e-6).unwrap_or(1);
@@ -1136,6 +1139,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
     setting!(on_set_english, bool, |s, v| s.english = v);
     setting!(on_set_romaji, bool, |s, v| s.romaji = v);
     setting!(on_set_batch, i32, |s, v| s.batch_size = v.clamp(1, 20) as u32);
+    setting!(on_set_day_start, i32, |s, v| s.day_start = v.rem_euclid(24) as u32);
     setting!(on_set_retention, i32, |s, v| s.retention = RETENTIONS[(v as usize).min(2)]);
     setting!(on_set_start_level, i32, |s, v| s.start_level = JLPT_LEVELS[(v.max(0) as usize).min(4)].into());
     {

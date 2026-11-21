@@ -494,6 +494,7 @@ export component AppWindow inherits Window {
     in property <bool> notifications: true;
     in property <bool> haptics: true;
     in property <int> batch-size: 5;
+    in property <int> day-start: 0;
     in property <int> retention-index: 1;
     in property <int> start-level-index: 0;
     in property <int> language-index: 0; // 0 English, 1 French
@@ -540,6 +541,7 @@ export component AppWindow inherits Window {
     callback set-notifications(bool);
     callback set-haptics(bool);
     callback set-batch(int);
+    callback set-day-start(int);
     callback set-retention(int);
     callback set-start-level(int);
     callback set-language(int);
@@ -982,6 +984,21 @@ export component AppWindow inherits Window {
                         options: ["3", "5", "10"];
                         selected: root.batch-size == 3 ? 0 : root.batch-size == 10 ? 2 : 1;
                         picked(i) => { root.set-batch([3, 5, 10][i]); }
+                    }
+                    Text { text: @tr("New day starts at"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Btn { text: "−"; accessible-label: @tr("Start the day earlier"); width: 64px; clicked => { root.set-day-start(root.day-start + 23); } }
+                        FitText {
+                            text: @tr("{}:00", root.day-start); horizontal-stretch: 1;
+                            font-size: 20px * Theme.text-scale; font-weight: 600; color: Theme.fg;
+                            horizontal-alignment: center; vertical-alignment: center;
+                        }
+                        Btn { text: "+"; accessible-label: @tr("Start the day later"); width: 64px; clicked => { root.set-day-start(root.day-start + 1); } }
+                    }
+                    Text {
+                        text: @tr("For the daily goal, the streak and the stats: with 4:00, a session at 1 AM still counts for the day before.");
+                        font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
                     }
                     Text { text: @tr("Start lessons at"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                     Segmented { options: ["N5", "N4", "N3", "N2", "N1"]; selected: root.start-level-index; picked(i) => { root.set-start-level(i); } }

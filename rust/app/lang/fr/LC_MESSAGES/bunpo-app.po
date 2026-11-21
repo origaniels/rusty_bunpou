@@ -284,3 +284,18 @@ msgstr "Effacer"
 
 msgid "Answer"
 msgstr "Réponse"
+
+msgid "New day starts at"
+msgstr "Début de la journée"
+
+msgid "{}:00"
+msgstr "{} h"
+
+msgid "Start the day earlier"
+msgstr "Commencer la journée plus tôt"
+
+msgid "Start the day later"
+msgstr "Commencer la journée plus tard"
+
+msgid "For the daily goal, the streak and the stats: with 4:00, a session at 1 AM still counts for the day before."
+msgstr "Pour l’objectif du jour, la série et les statistiques : avec 4 h, une session à 1 h du matin compte encore pour la veille."
