@@ -55,7 +55,7 @@ goto_quiz_wrong() {
   $A shell input text xx; tap_label "$(L Check)"; wait_ev '^verdict=Wrong'; hide_keyboard
 }
 goto_quiz_right() { goto_quiz_wrong; tap_label "$(L Typo)"; }
-goto_notes() { goto_quiz_wrong; tap_label "$(L 'Grammar notes')"; }
+goto_notes() { goto_quiz_wrong; tap_label "$(L 'Grammar note')"; }
 goto_report() { goto_quiz_wrong; tap_label "$(L Report)"; }
 goto_reviews() { tap_label "$(L 'Start reviews')"; wait_ev '^screen=2'; sleep 1; hide_keyboard; }
 goto_reset_point() { goto_grammar_point; tap_label "$(L Reset)"; }

@@ -81,14 +81,8 @@ msgstr "Accueil"
 msgid "Correct!"
 msgstr "Correct !"
 
-msgid "Not quite. You wrote: {}"
-msgstr "Pas tout à fait. Vous avez écrit : {}"
 
-msgid "Answer: {}"
-msgstr "Réponse : {}"
 
-msgid "Grammar notes"
-msgstr "Notes de grammaire"
 
 msgid "Typo"
 msgstr "Faute de frappe"
@@ -264,8 +258,6 @@ msgstr "Points ratés 3 fois lors de vos 5 dernières révisions. Ouvrez-en un p
 msgid "{} wrong"
 msgstr "{} ratées"
 
-msgid "Look up a word in Takoboto:"
-msgstr "Chercher un mot dans Takoboto :"
 
 msgid "Resume reviews ({} left)"
 msgstr "Reprendre les révisions (encore {})"
@@ -302,3 +294,15 @@ msgstr "Pour l’objectif du jour, la série et les statistiques : avec 4 h, un
 
 msgid "Answer here"
 msgstr "Répondre ici"
+
+msgid "Not quite"
+msgstr "Pas tout à fait"
+
+msgid "You wrote"
+msgstr "Vous avez écrit"
+
+msgid "Look up in Takoboto"
+msgstr "Chercher dans Takoboto"
+
+msgid "Grammar note"
+msgstr "Note de grammaire"

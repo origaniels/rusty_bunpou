@@ -89,7 +89,7 @@ $A shell input text xx; tap_label "$(L Check)"; wait_ev '^verdict=Wrong'
 audit "quiz, wrong answer, keyboard open"
 hide_keyboard
 audit_scrolled "quiz, wrong answer"; ok "quiz, wrong answer"
-tap_label "$(L 'Grammar notes')"
+tap_label "$(L 'Grammar note')"
 audit "grammar notes dialog"; ok "grammar notes dialog"
 tap_label "$(L Close)"
 tap_label "$(L Report)"

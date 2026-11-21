@@ -50,7 +50,7 @@ has_label "Resume reviews (6 left)" || fail "no resume button: $(cmd buttons)"
 ok "home offers: Resume reviews (6 left)"
 audit "home, reviews to resume"
 tap_label "Resume reviews (6 left)"; wait_ev '^screen=2 resumed'
-has_label "Reviews  0 / 6" || fail "header should count 0 cleared of 6 (both were wrong): $(cmd texts | cut -c1-300)"
+has_label "0 / 6" || fail "header should count 0 cleared of 6 (both were wrong): $(cmd texts | cut -c1-300)"
 ok "resumed where it stopped: 0 / 6 cleared, 6 left"
 audit "resumed reviews"
 

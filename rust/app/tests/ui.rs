@@ -1132,10 +1132,10 @@ fn word_chips_after_answering_open_the_dictionary() {
         st.session.as_ref().unwrap().current(&t.app.content).unwrap().1.words.clone()
     };
     assert!(!words.is_empty());
-    assert!(!t.exists("Look up a word in Takoboto:"), "no chips before answering (they would give hints)");
+    assert!(!t.exists("Look up in Takoboto"), "no chips before answering (they would give hints)");
     let a = t.correct_answer();
     t.type_and_enter(&a);
-    assert!(t.exists("Look up a word in Takoboto:"));
+    assert!(t.exists("Look up in Takoboto"));
     // the word may also be a text in the sentence: press the chip (a button)
     ElementHandle::find_by_accessible_label(&t.app.ui, &words[0])
         .find(|e| e.accessible_role() == Some(i_slint_core::items::AccessibleRole::Button))
@@ -1256,7 +1256,7 @@ fn a_missed_review_comes_back_as_practice_and_can_be_resumed() {
     // every point was answered once; the missed one is practice now, and not counted as done
     assert_eq!(t.app.state.borrow().session.as_ref().unwrap().point.clone().unwrap(), first);
     assert_eq!(t.app.ui.get_quiz().done, 14);
-    assert!(t.exists("Reviews  14 / 15"));
+    assert!(t.exists("14 / 15"));
     assert!(t.app.ui.get_quiz().practising);
     assert!(t.exists("Missed earlier: practice only, not graded again."));
     t.app.ui.invoke_go_home();
@@ -1339,7 +1339,7 @@ fn tapping_the_sentence_puts_the_keyboard_in_the_answer_field() {
     t.type_and_enter("xx");
     assert_eq!(t.app.ui.get_quiz().verdict, 2);
     // the notes take the focus away from the field
-    t.press("Grammar notes");
+    t.press("Grammar note");
     t.press("Close");
     let typed = |t: &T| {
         t.app.ui.window().dispatch_event(WindowEvent::KeyPressed { text: "a".into() });
@@ -1362,6 +1362,37 @@ fn tapping_the_sentence_puts_the_keyboard_in_the_answer_field() {
     t.type_and_enter(&a);
     assert_eq!(t.app.ui.get_quiz().verdict, 1);
     assert!(!t.exists("Answer here"));
+}
+
+#[test]
+fn holding_an_icon_button_shows_its_name_without_pressing_it() {
+    let t = setup();
+    t.press("Learn 5 new");
+    for _ in 0..4 {
+        t.press("Next");
+    }
+    t.press("Start quiz");
+    t.type_and_enter("xx");
+    let label_shown = |t: &T| {
+        ElementHandle::find_by_accessible_label(&t.app.ui, "Typo")
+            .any(|e| e.accessible_role() == Some(i_slint_core::items::AccessibleRole::Text))
+    };
+    let el = t.find("Typo");
+    let (p, s) = (el.absolute_position(), el.size());
+    let at = LogicalPoint::new(p.x + s.width / 2.0, p.y + s.height / 2.0);
+    // held: the name shows after a moment; lifting the finger doesn't press it
+    t.touch(at, TouchPhase::Started);
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(200));
+    assert!(!label_shown(&t), "not on a quick tap");
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(400));
+    assert!(label_shown(&t));
+    t.touch(at, TouchPhase::Ended);
+    assert!(!label_shown(&t));
+    assert_eq!(t.app.ui.get_quiz().verdict, 2, "not pressed");
+    // a tap presses it
+    t.touch(at, TouchPhase::Started);
+    t.touch(at, TouchPhase::Ended);
+    assert_eq!(t.app.ui.get_quiz().verdict, 1, "typo: counted as right");
 }
 
 #[test]

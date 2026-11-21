@@ -75,6 +75,12 @@ takes about 6 minutes (tokenization is cached in `data/build/tokens.pkl`).
   the kana preview is drawn in the blank. The keyboard's composition (Japanese IME, before Enter) is
   shown in the blank too and checked on Check (`AnswerField` in `app.slint`, `with_composition`,
   `composition_for` in `lib.rs`).
+- Layout: a tinted top bar (`QuizBar`: title, count, progress along its edge), the question in a
+  card, the result in a green/red box, then "Look up in Takoboto" chips. Docked at the bottom
+  (above the keyboard when open): a row of icon buttons (`IconBtn`, paths in `Icons`), Report
+  alone on the left, then Typo / Retry (after a wrong answer) and Grammar note, highlighted; then
+  the answer field. Holding an icon button half a second shows its name above it, and lifting the
+  finger then doesn't press it.
 - After a wrong answer: **Typo** (counts as right), **Retry** (try again, still counted as missed),
   or editing the field = typo fix (a right answer then counts as right).
 - Tapping the sentence (accessible label "Answer here") focuses the field and brings the keyboard
@@ -82,7 +88,7 @@ takes about 6 minutes (tokenization is cached in `data/build/tokens.pkl`).
 - Check is disabled while the field is empty; the clear button is hidden once the answer is right.
 - Leaving a quiz keeps it (`Progress.paused`, saved after every answer): Home offers "Resume reviews
   (N left)" / "Resume the lesson quiz". An answer checked but not moved past counts when leaving.
-- After answering: grammar notes, Report, dictionary chips, haptics (see below).
+- After answering: Grammar note, Report, dictionary chips, haptics (see below).
 
 ### "Almost" hints (`core/src/hints.rs`)
 A wrong answer that is nearly right gets a hint and a free retry (once per item) instead of a verdict:

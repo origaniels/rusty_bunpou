@@ -716,12 +716,7 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         };
         q.last_answer = sess.last_answer.as_str().into();
         q.answer = s.answers.iter().take(2).cloned().collect::<Vec<_>>().join("  /  ").into();
-        q.grammar_line = if fr {
-            format!("Grammaire : {} — {}", p.title_in(lang), p.meaning_in(lang))
-        } else {
-            format!("Grammar: {} — {}", p.title, p.meaning)
-        }
-        .into();
+        q.grammar_line = format!("{} — {}", p.title_in(lang), p.meaning_in(lang)).into();
         q.attribution = s.attribution(lang).into();
         q.words = model(s.words.iter().map(|w| SharedString::from(w.as_str())).collect());
         q.reported = st.progress.reports.iter().any(|r| r.point == p.id && r.sentence == s.id);
