@@ -34,6 +34,9 @@ impl Platform for Recorder {
     fn pick_import(&self) {
         self.0.borrow_mut().push("pick-import".into());
     }
+    fn share_file(&self, path: &str, name: &str, title: &str) {
+        self.0.borrow_mut().push(format!("share {path} {name} {title}"));
+    }
     fn lookup_word(&self, word: &str) {
         self.0.borrow_mut().push(format!("lookup {word}"));
     }
@@ -1052,17 +1055,14 @@ fn report_a_sentence_then_export_the_reports() {
     t.app.ui.invoke_go_home();
     t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0));
     t.press("Settings");
-    t.press("Export reports (1)");
+    t.press("Share reports (1)");
     let last = t.rec.last();
-    assert!(last.contains("reports-export.json bunpo-reports-20"), "{last}");
+    assert!(last.starts_with("share ") && last.contains("reports-export.json bunpo-reports-20"), "{last}");
     let json: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("reports-export.json")).unwrap()).unwrap();
     let item = &json["reports"][0];
     assert_eq!(item["japanese"], sentence.ja.as_str());
     assert_eq!(item["reason"], "answer-rejected");
     assert!(item["point_title"].as_str().unwrap().len() > 0);
-    std::fs::write(dir.join("backup-result.txt"), "exported").unwrap();
-    on_resume();
-    assert_eq!(t.app.ui.get_backup_status(), "Reports exported.");
 }
 
 #[test]
@@ -1071,7 +1071,7 @@ fn no_export_reports_button_without_reports() {
     t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0));
     t.press("Settings");
     assert!(t.exists("Export progress"));
-    assert!(!t.exists("Export reports (0)"));
+    assert!(!t.exists("Share reports (0)"));
 }
 
 // ------------------------------------------------------------------ stats: streak, forecast, leeches

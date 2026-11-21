@@ -1160,7 +1160,7 @@ export component AppWindow inherits Window {
                     }
                     if root.report-count > 0: HorizontalLayout {
                         alignment: start;
-                        Btn { text: @tr("Export reports ({})", root.report-count); clicked => { root.export-reports(); } }
+                        Btn { text: @tr("Share reports ({})", root.report-count); clicked => { root.export-reports(); } }
                     }
                     HorizontalLayout { alignment: start; Btn { text: @tr("Reset all progress"); clicked => { root.confirm-reset = true; } } }
                     Text {

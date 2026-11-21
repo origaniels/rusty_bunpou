@@ -33,7 +33,7 @@ labels() { sed 's/^buttons //' | tr '|' '\n' | sed 's/^ *//; s/ *$//' | grep -v 
 button_starting() { cmd buttons | labels | sed 's/ \[on\]$//' | grep -E "^($1)" | sed -n 1p; }
 
 # buttons that open another app on purpose: file pickers, the dictionary (any Japanese label)
-external() { [[ "$1" =~ ^($(L 'Export progress')|$(L 'Import progress')|Export|Exporter) ]] || grep -qP "$JA" <<<"$1"; }
+external() { [[ "$1" =~ ^($(L 'Export progress')|$(L 'Import progress')|Export|Exporter|Share|Partager) ]] || grep -qP "$JA" <<<"$1"; }
 
 # ------------------------------------------------------------------ states (from a fresh start)
 goto_home() { :; }

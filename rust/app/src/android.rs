@@ -9,6 +9,7 @@ use std::rc::Rc;
 const REMINDER_CLASS: &str = "dev.local.bunpo.rust.ReviewReminder";
 const BACKUP_CLASS: &str = "dev.local.bunpo.rust.Backup";
 const LOOKUP_CLASS: &str = "dev.local.bunpo.rust.Lookup";
+const SHARE_CLASS: &str = "dev.local.bunpo.rust.Share";
 const HAPTICS_CLASS: &str = "dev.local.bunpo.rust.Haptics";
 
 pub fn log(msg: &str) {
@@ -114,6 +115,19 @@ impl Platform for AndroidPlatform {
                 "export",
                 "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;)V",
                 &[JValue::Object(act), JValue::Object(&path), JValue::Object(&name)],
+            )
+            .map(|_| ())
+        });
+    }
+
+    fn share_file(&self, path: &str, name: &str, title: &str) {
+        self.with_class(SHARE_CLASS, |env, act, cls| {
+            let (path, name, title) = (env.new_string(path)?, env.new_string(name)?, env.new_string(title)?);
+            env.call_static_method(
+                cls,
+                "file",
+                "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+                &[JValue::Object(act), JValue::Object(&path), JValue::Object(&name), JValue::Object(&title)],
             )
             .map(|_| ())
         });

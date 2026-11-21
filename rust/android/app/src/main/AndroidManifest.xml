@@ -33,6 +33,12 @@
             android:name=".Backup"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <!-- the files shared through Android's share menu (the reports, see Share.java) -->
+        <provider
+            android:name=".SharedFiles"
+            android:authorities="dev.local.bunpo.rust.files"
+            android:exported="false"
+            android:grantUriPermissions="true" />
         <!-- review reminders (see ReviewReminder.java) -->
         <receiver android:name=".ReviewReminder" android:exported="true">
             <intent-filter>

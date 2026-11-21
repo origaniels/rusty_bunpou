@@ -81,6 +81,9 @@ pub trait Platform {
     /// Save a copy of the progress file (`path`) where the user picks, suggesting `name`.
     /// The outcome is left in `backup-result.txt` next to it (see [`check_backup_files`]).
     fn export_progress(&self, _path: &str, _name: &str) {}
+    /// Open the system's share menu with the file at `path`, named `name` (send it, or save it),
+    /// `title` heading the menu.
+    fn share_file(&self, _path: &str, _name: &str, _title: &str) {}
     /// Let the user pick an exported file; it is copied next to the progress as
     /// `progress.import.json` and imported when the app comes back (see [`check_backup_files`]).
     fn pick_import(&self) {}
@@ -225,8 +228,6 @@ pub fn check_backup_files(st: &mut State) -> Option<String> {
     event(&format!("backup {outcome}"));
     Some(
         match (outcome.trim(), fr) {
-            ("exported", false) if st.exporting == "reports" => "Reports exported.",
-            ("exported", true) if st.exporting == "reports" => "Signalements exportés.",
             ("exported", false) => "Progress exported.",
             ("exported", true) => "Progression exportée.",
             ("cancelled", false) => "Cancelled.",
@@ -1181,15 +1182,15 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         p.export_progress(&path, &format!("bunpo-progress-{}.json", date_string(now_ms())));
     }));
 
-    ui.on_export_reports(cb!(|ui, c, st, p| {
+    ui.on_export_reports(cb!(|_ui, c, st, p| {
         let Some(dir) = st.progress.path().and_then(|p| p.parent()).map(|d| d.to_path_buf()) else { return };
         let file = dir.join("reports-export.json");
         if std::fs::write(&file, reports_json(&c, &st.progress)).is_err() {
             return;
         }
-        ui.set_backup_status("".into());
-        st.exporting = "reports";
-        p.export_progress(&file.to_string_lossy(), &format!("bunpo-reports-{}.json", date_string(now_ms())));
+        let title = if st.progress.settings.lang() == Lang::Fr { "Partager les signalements" } else { "Share the reports" };
+        event("share reports");
+        p.share_file(&file.to_string_lossy(), &format!("bunpo-reports-{}.json", date_string(now_ms())), title);
     }));
 
     ui.on_lookup({

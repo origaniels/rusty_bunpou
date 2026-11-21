@@ -207,8 +207,8 @@ msgstr "Signaler"
 msgid "Reported"
 msgstr "Signalée"
 
-msgid "Export reports ({})"
-msgstr "Exporter les signalements ({})"
+msgid "Share reports ({})"
+msgstr "Partager les signalements ({})"
 
 msgid "Report this sentence"
 msgstr "Signaler cette phrase"
