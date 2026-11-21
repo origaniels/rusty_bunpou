@@ -290,7 +290,7 @@ msgid "Start the day later"
 msgstr "Commencer la journée plus tard"
 
 msgid "For the daily goal, the streak and the stats: with 4:00, a session at 1 AM still counts for the day before."
-msgstr "Pour l’objectif du jour, la série et les statistiques : avec 4 h, une session à 1 h du matin compte encore pour la veille."
+msgstr "Pour l'objectif du jour, la série et les statistiques : avec 4 h, une session à 1 h du matin compte encore pour la veille."
 
 msgid "Answer here"
 msgstr "Répondre ici"
@@ -312,3 +312,12 @@ msgstr "Encore {}"
 
 msgid "Then {} more due"
 msgstr "Puis {} autres à réviser"
+
+msgid "Report this lesson"
+msgstr "Signaler cette leçon"
+
+msgid "The explanation is wrong or unclear"
+msgstr "L'explication est fausse ou peu claire"
+
+msgid "An example is wrong (say which in the note)"
+msgstr "Un exemple est faux (précisez lequel dans la note)"

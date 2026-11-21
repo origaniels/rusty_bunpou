@@ -93,6 +93,7 @@ pub struct LogEntry {
 #[serde(default)]
 pub struct Report {
     pub point: String,
+    /// 0 for a lesson (the point's explanation and examples)
     pub sentence: u64,
     pub ts: i64,
     /// one of [`REPORT_REASONS`]
@@ -106,6 +107,8 @@ pub struct Report {
 
 /// Report reasons, in the order the app shows them.
 pub const REPORT_REASONS: [&str; 5] = ["wrong-grammar", "translation", "reading", "answer-rejected", "other"];
+/// Reasons for reporting a lesson (a report with `sentence` 0).
+pub const LESSON_REPORT_REASONS: [&str; 3] = ["explanation", "example", "other"];
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]

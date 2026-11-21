@@ -18,6 +18,7 @@ export struct Example { key: string, en: string }
 export struct PointData {
     id: string, title: string, level: string, meaning: string, structure: string,
     explanation: string, status: string, can-reset: bool, examples: [Example],
+    reported: bool, // the lesson (explanation, examples) was reported
 }
 
 /// a row of the grammar list: a level header (header != "", num = "learned / total") or a point
@@ -207,6 +208,7 @@ export global Icons {
     out property <string> typo: "M 3 3.5 h 18 a 2 2 0 0 1 2 2 v 7 a 2 2 0 0 1 -2 2 h -18 a 2 2 0 0 1 -2 -2 v -7 a 2 2 0 0 1 2 -2 z M 6 7.5 h 0.01 M 10 7.5 h 0.01 M 14 7.5 h 0.01 M 18 7.5 h 0.01 M 8 11 h 8 M 9.5 17.5 l 5 5 M 14.5 17.5 l -5 5";
     out property <string> retry: "M 3 12 a 9 9 0 1 0 9 -9 a 9.75 9.75 0 0 0 -6.74 2.74 L 3 8 M 3 3 v 5 h 5";
     out property <string> notes: "M 2 4 h 6 a 4 4 0 0 1 4 4 v 13 a 3 3 0 0 0 -3 -3 h -7 z M 22 4 h -6 a 4 4 0 0 0 -4 4 v 13 a 3 3 0 0 1 3 -3 h 7 z";
+    out property <string> previous: "M 15 5 L 8 12 L 15 19";
     out property <string> report: "M 21.73 18 l -8 -14 a 2 2 0 0 0 -3.48 0 l -8 14 A 2 2 0 0 0 4 21 h 16 a 2 2 0 0 0 1.73 -3 M 12 9 v 4 M 12 17 h 0.01";
 }
 
@@ -638,6 +640,9 @@ export component AppWindow inherits Window {
     callback export-progress();
     callback import-progress();
     callback open-report();
+    /// report the lesson being shown (its explanation or examples), not a quiz sentence
+    callback open-lesson-report();
+    in property <bool> report-lesson;
     callback save-report(int, string);
     callback export-reports();
     callback lookup(string);
@@ -727,9 +732,26 @@ export component AppWindow inherits Window {
                     accessible-role: groupbox; accessible-label: "bar";
                     HorizontalLayout {
                         padding: 16px; spacing: 12px;
-                        Btn { text: @tr("Previous"); enabled: root.lesson-index > 0; clicked => { root.lesson-prev(); } }
+                        VerticalLayout {
+                            alignment: center;
+                            IconBtn {
+                                icon: Icons.report; tip-side: -1;
+                                label: root.lesson-point.reported ? @tr("Reported") : @tr("Report");
+                                enabled: !root.lesson-point.reported;
+                                clicked => { root.open-lesson-report(); }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            IconBtn {
+                                icon: Icons.previous; label: @tr("Previous");
+                                enabled: root.lesson-index > 0;
+                                clicked => { root.lesson-prev(); }
+                            }
+                        }
                         Btn {
                             text: root.lesson-index < root.lesson-count - 1 ? @tr("Next") : @tr("Start quiz");
+                            horizontal-stretch: 1;
                             primary: true;
                             clicked => { root.lesson-next(); }
                         }
@@ -1268,15 +1290,19 @@ export component AppWindow inherits Window {
                 TouchArea { }
                 rbox := VerticalLayout {
                     padding: 20px; spacing: 10px;
-                    Text { text: @tr("Report this sentence"); font-size: 20px * Theme.text-scale; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
+                    Text { text: root.report-lesson ? @tr("Report this lesson") : @tr("Report this sentence"); font-size: 20px * Theme.text-scale; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
                     Text { text: root.report-sentence; font-size: 16px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
-                    for r[i] in [
+                    for r[i] in (root.report-lesson ? [
+                        @tr("The explanation is wrong or unclear"),
+                        @tr("An example is wrong (say which in the note)"),
+                        @tr("Something else"),
+                    ] : [
                         @tr("It doesn't use this grammar point"),
                         @tr("The translation is wrong"),
                         @tr("The reading (furigana) is wrong"),
                         @tr("My answer should have been accepted"),
                         @tr("Something else"),
-                    ]: Rectangle {
+                    ]): Rectangle {
                         border-radius: 10px;
                         background: i == root.report-reason ? #ff8a7a26 : (rt.pressed ? #ffffff14 : transparent);
                         border-width: 1px;

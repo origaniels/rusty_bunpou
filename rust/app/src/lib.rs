@@ -8,8 +8,8 @@ use bunpo_core::layout::{self, ClozeMode, Metrics};
 use bunpo_core::lessons::{lesson_queue, LEVELS as JLPT_LEVELS};
 use bunpo_core::clock::date_string;
 use bunpo_core::reminder::next_reminder;
-use bunpo_core::session::{find_sentence, now_ms, Session, Verdict};
-use bunpo_core::store::{Progress, Report, REPORT_REASONS};
+use bunpo_core::session::{find_sentence, now_ms, Session, Verdict, LESSON_EXAMPLES};
+use bunpo_core::store::{Progress, Report, LESSON_REPORT_REASONS, REPORT_REASONS};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -247,8 +247,26 @@ pub fn reports_json(content: &Content, progress: &Progress) -> String {
         .iter()
         .map(|r| {
             let p = content.get(&r.point);
+            if r.sentence == 0 {
+                let lang = Lang::from_code(&r.lang);
+                return serde_json::json!({
+                    "kind": "lesson",
+                    "date": date_string(r.ts),
+                    "point": r.point,
+                    "point_title": p.map(|p| p.title.as_str()).unwrap_or(""),
+                    "meaning": p.map(|p| p.meaning_in(lang)).unwrap_or(""),
+                    "explanation": p.map(|p| p.explanation_in(lang)).unwrap_or(""),
+                    "examples": p.map(|p| p.sentences.iter().take(LESSON_EXAMPLES).map(|s| serde_json::json!({
+                        "sentence": s.id, "japanese": s.ja, "translation": s.translation(lang),
+                    })).collect::<Vec<_>>()).unwrap_or_default(),
+                    "reason": r.reason,
+                    "note": r.note,
+                    "app_language": r.lang,
+                });
+            }
             let s = p.and_then(|p| find_sentence(p, r.sentence));
             serde_json::json!({
+                "kind": "sentence",
                 "date": date_string(r.ts),
                 "point": r.point,
                 "point_title": p.map(|p| p.title.as_str()).unwrap_or(""),
@@ -328,6 +346,7 @@ fn point_data(content: &Content, st: &State, id: &str) -> PointData {
         explanation: p.explanation_in(lang).replace('\n', " ").into(),
         status: status.into(),
         can_reset: !card.is_new(),
+        reported: st.progress.reports.iter().any(|r| r.point == p.id && r.sentence == 0),
         examples: model(
             p.sentences
                 .iter()
@@ -1205,6 +1224,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         let Some(sess) = &st.session else { return };
         let Some((point, sentence)) = sess.current(&c) else { return };
         ui.set_report_sentence(sentence.ja.as_str().into());
+        ui.set_report_lesson(false);
         ui.set_report_reason(-1);
         ui.set_report_note("".into());
         st.report_target = Some(Report {
@@ -1218,20 +1238,38 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         event(&format!("report-open point={} sentence={}", point.id, sentence.id));
     }));
 
+    ui.on_open_lesson_report(cb!(|ui, c, st| {
+        let Some(id) = st.lesson_ids.get(st.lesson_idx).cloned() else { return };
+        let Some(p) = c.get(&id) else { return };
+        let lang = st.progress.settings.lang();
+        ui.set_report_sentence(format!("{} — {}", p.title_in(lang), p.meaning_in(lang)).into());
+        ui.set_report_lesson(true);
+        ui.set_report_reason(-1);
+        ui.set_report_note("".into());
+        st.report_target = Some(Report { point: id.clone(), sentence: 0, lang: st.progress.settings.language.clone(), ..Default::default() });
+        ui.set_show_report(true);
+        event(&format!("report-open point={id} lesson"));
+    }));
+
     ui.on_save_report({
         let (w, c, st) = (ui.as_weak(), content.clone(), st.clone());
         move |reason, note| {
             let Some(ui) = w.upgrade() else { return };
             let mut st = st.borrow_mut();
             let Some(mut r) = st.report_target.take() else { return };
-            let Some(reason) = REPORT_REASONS.get(reason as usize) else { return };
+            let reasons: &[&str] = if r.sentence == 0 { &LESSON_REPORT_REASONS } else { &REPORT_REASONS };
+            let Some(reason) = reasons.get(reason as usize) else { return };
             r.reason = reason.to_string();
             r.note = note.trim().to_string();
             r.ts = now_ms();
             event(&format!("report point={} sentence={} reason={}", r.point, r.sentence, r.reason));
             st.progress.add_report(r);
             ui.set_show_report(false);
-            refresh_quiz(&ui, &c, &st);
+            if let Some(id) = st.lesson_ids.get(st.lesson_idx).cloned().filter(|_| ui.get_screen() == SCREEN_LESSON) {
+                ui.set_lesson_point(point_data(&c, &st, &id));
+            } else {
+                refresh_quiz(&ui, &c, &st);
+            }
             refresh_settings(&ui, &st);
         }
     });

@@ -128,9 +128,13 @@ goal, streak, activity calendar and forecast all use `clock::study_day`), start 
 retention, backup (export/import progress, export reports), reset all.
 
 ### Reports
-"Report" in the quiz: a reason and a note, stored in `Progress.reports` (kept across resets, merged
-on import). Settings → "Export reports" writes a readable JSON with the sentence, translations,
-answers and what was typed, to fix the content later.
+"Report" in the quiz (a sentence: `REPORT_REASONS`) and in lessons (the point's explanation and
+examples: `LESSON_REPORT_REASONS`, stored with `sentence` 0): a reason and a note, in
+`Progress.reports` (kept across resets, merged on import). Settings → "Share reports" writes a
+readable JSON (sentence, translations, answers and what was typed; for a lesson, its explanation and
+examples) and opens Android's share menu with it (`Share.java`, served by the `SharedFiles`
+provider), to send or save. Fix a misleading Tatoeba English translation in
+`pipeline/en_fixes.tsv`.
 
 ### Backup
 Export/import through Android's file picker (`Backup.java`). The picker leaves

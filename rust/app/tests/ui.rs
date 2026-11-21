@@ -1066,6 +1066,36 @@ fn report_a_sentence_then_export_the_reports() {
 }
 
 #[test]
+fn a_lesson_can_be_reported_and_the_report_says_what_it_showed() {
+    let dir = tmp_dir("lesson-report");
+    let t = setup_with(Progress::load(&dir.join("progress.json")));
+    t.press("Learn 5 new");
+    t.press("Next");
+    let id = t.app.ui.get_lesson_point().id.to_string();
+    t.press("Report");
+    assert!(t.app.ui.get_show_report() && t.exists("Report this lesson"));
+    assert!(t.exists("The explanation is wrong or unclear") && !t.exists("The translation is wrong"));
+    t.press("An example is wrong (say which in the note)");
+    t.app.ui.set_report_note("the second one".into());
+    t.press("Save report");
+    assert!(!t.app.ui.get_show_report());
+    assert_eq!(t.screen(), SCREEN_LESSON, "still on the lesson");
+    assert!(t.exists("Reported"), "once per lesson");
+    let r = t.app.state.borrow().progress.reports[0].clone();
+    assert_eq!((r.point.as_str(), r.sentence, r.reason.as_str(), r.note.as_str()), (id.as_str(), 0, "example", "the second one"));
+    // the other lessons can still be reported
+    t.press("Next");
+    assert!(t.exists("Report") && !t.exists("Reported"));
+
+    let json: serde_json::Value = serde_json::from_str(&reports_json(&t.app.content, &t.app.state.borrow().progress)).unwrap();
+    let item = &json["reports"][0];
+    assert_eq!((item["kind"].as_str(), item["reason"].as_str()), (Some("lesson"), Some("example")));
+    assert!(!item["explanation"].as_str().unwrap().is_empty());
+    assert_eq!(item["examples"].as_array().unwrap().len(), 4);
+    std::fs::remove_dir_all(dir).ok();
+}
+
+#[test]
 fn no_export_reports_button_without_reports() {
     let t = setup();
     t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0));
