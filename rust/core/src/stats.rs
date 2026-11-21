@@ -1,7 +1,8 @@
 //! Numbers for the Stats screen, computed from the cards and the review log: upcoming reviews,
-//! leeches, the daily streak and past activity. Days are local (the phone's time zone).
+//! leeches, the daily streak and past activity. Days are local (the phone's time zone) and start
+//! at the hour chosen in the settings (`Settings::day_start`).
 
-use crate::clock::local_day;
+use crate::clock::study_day;
 use crate::store::{LogEntry, Progress};
 use std::collections::HashMap;
 
@@ -11,10 +12,11 @@ pub const LEECH_WINDOW: usize = 5;
 
 /// Reviews due on each of the next `days` local days; today includes everything already due.
 pub fn forecast(p: &Progress, now: i64, days: usize) -> Vec<usize> {
-    let today = local_day(now);
+    let day = |ms| study_day(ms, p.settings.day_start);
+    let today = day(now);
     let mut out = vec![0; days];
     for c in p.cards.values().filter(|c| !c.is_new()) {
-        let d = (local_day(c.due) - today).max(0);
+        let d = (day(c.due) - today).max(0);
         if (d as usize) < days {
             out[d as usize] += 1;
         }
@@ -62,10 +64,11 @@ pub fn leeches(p: &Progress) -> Vec<(String, usize)> {
 
 /// Answers per local day for the `days` days ending today (oldest first).
 pub fn activity(p: &Progress, now: i64, days: usize) -> Vec<usize> {
-    let today = local_day(now);
+    let day = |ms| study_day(ms, p.settings.day_start);
+    let today = day(now);
     let mut out = vec![0; days];
     for e in &p.log {
-        let back = today - local_day(e.ts);
+        let back = today - day(e.ts);
         if back >= 0 && (back as usize) < days {
             out[days - 1 - back as usize] += 1;
         }
@@ -76,7 +79,8 @@ pub fn activity(p: &Progress, now: i64, days: usize) -> Vec<usize> {
 /// (current, longest) run of consecutive days with at least one answer. The current streak
 /// still counts when today has nothing yet but yesterday had (the day isn't over).
 pub fn streak(p: &Progress, now: i64) -> (usize, usize) {
-    let mut days: Vec<i64> = p.log.iter().map(|e| local_day(e.ts)).collect();
+    let day = |ms| study_day(ms, p.settings.day_start);
+    let mut days: Vec<i64> = p.log.iter().map(|e| day(e.ts)).collect();
     days.sort_unstable();
     days.dedup();
     let mut longest = 0;
@@ -87,7 +91,7 @@ pub fn streak(p: &Progress, now: i64) -> (usize, usize) {
         longest = longest.max(run);
         prev = d;
     }
-    let today = local_day(now);
+    let today = day(now);
     let current = if prev == today || prev == today - 1 { run } else { 0 };
     (current, longest)
 }

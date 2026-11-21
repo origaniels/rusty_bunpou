@@ -96,3 +96,18 @@ fn streak_and_activity() {
     assert_eq!(activity(&p, now, 4), vec![1, 1, 2, 1]);
     assert_eq!(local_day(now) - local_day(now - D), 1);
 }
+
+#[test]
+fn a_late_session_counts_for_the_day_before_when_the_day_starts_later() {
+    let mut p = Progress::in_memory();
+    let day1 = noon();
+    // reviews at noon on day 1, then 1 AM and noon on day 3 (nothing on day 2 before 1 AM)
+    for ts in [day1, day1 + D + 13 * H, day1 + 2 * D] {
+        log(&mut p, "x", ts, true);
+    }
+    let now = day1 + 2 * D;
+    assert_eq!(streak(&p, now), (1, 1), "midnight start: day 2 is empty");
+    p.settings.day_start = 4;
+    assert_eq!(streak(&p, now), (3, 3), "4:00 start: the 1 AM session belongs to day 2");
+    assert_eq!(activity(&p, now, 3), vec![1, 1, 1]);
+}

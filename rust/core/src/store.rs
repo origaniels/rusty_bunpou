@@ -62,6 +62,9 @@ pub struct Settings {
     pub language: String,
     /// Vibrate briefly when an answer is checked (different for right and wrong).
     pub haptics: bool,
+    /// Hour (0-23) the day starts at, for the daily goal, streak and stats: with 4, a review at
+    /// 1 AM still counts for the day before.
+    pub day_start: u32,
 }
 
 impl Settings {
@@ -72,7 +75,7 @@ impl Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into(), language: "en".into(), haptics: true }
+        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into(), language: "en".into(), haptics: true, day_start: 0 }
     }
 }
 

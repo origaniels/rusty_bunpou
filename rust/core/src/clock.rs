@@ -48,6 +48,12 @@ pub fn local_day(ms: i64) -> i64 {
     (ms + utc_offset_ms(ms)).div_euclid(DAY_MS)
 }
 
+/// The study day of `ms` when the day starts at `start_hour` (0 = midnight; 4 = a review at
+/// 1 AM still counts for the day before). Daily goal, streak, activity and forecast use it.
+pub fn study_day(ms: i64, start_hour: u32) -> i64 {
+    local_day(ms - start_hour.min(23) as i64 * 3_600_000)
+}
+
 /// (year, month, day) of a day number (Howard Hinnant's civil-from-days).
 pub fn civil_date(day: i64) -> (i64, u32, u32) {
     let z = day + 719_468;
@@ -85,6 +91,22 @@ mod tests {
         // whatever the test machine's zone, a local day is within a day of the UTC one
         assert!((local_day(noon_utc) - 20_775).abs() <= 1);
         assert_eq!(local_day(noon_utc), (noon_utc + utc_offset_ms(noon_utc)).div_euclid(DAY_MS));
+    }
+
+    #[test]
+    fn a_study_day_starts_at_the_chosen_hour() {
+        let noon_utc = 20_775 * DAY_MS + DAY_MS / 2;
+        let day = local_day(noon_utc);
+        // the first hour of that local day, found by walking back an hour at a time
+        let mut m = noon_utc;
+        while local_day(m - 3_600_000) == day {
+            m -= 3_600_000;
+        }
+        let one_am = m + 3_600_000;
+        assert_eq!(study_day(one_am, 0), day);
+        assert_eq!(study_day(one_am, 4), day - 1, "1 AM is still the day before");
+        assert_eq!(study_day(m + 5 * 3_600_000, 4), day);
+        assert_eq!(study_day(noon_utc, 0), local_day(noon_utc));
     }
 
     #[test]
