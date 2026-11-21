@@ -50,6 +50,7 @@ export struct HomeData {
     learn-label: string, goal-line: string, levels: [int], reviews-24h: int, source: string, level-rows: [LevelRow],
     start-level: string,
     resume-reviews: int, resume-lesson: int, // items left in a saved (unfinished) quiz, 0 = none
+    due-after: int, // reviews due that are not part of the saved review session
 }
 
 export global Logic {
@@ -681,7 +682,12 @@ export component AppWindow inherits Window {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
                         Text { text: @tr("Reviews"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
-                        Text { text: @tr("{} due", root.home.due); font-size: 40px * Theme.text-scale; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
+                        // a session left halfway: what is left of it (missed points to practise included)
+                        Text {
+                            text: root.home.resume-reviews > 0 ? @tr("{} left", root.home.resume-reviews) : @tr("{} due", root.home.due);
+                            font-size: 40px * Theme.text-scale; font-weight: 700; color: Theme.fg; wrap: word-wrap;
+                        }
+                        if root.home.resume-reviews > 0 && root.home.due-after > 0: Text { text: @tr("Then {} more due", root.home.due-after); color: Theme.fg; wrap: word-wrap; }
                         if root.home.due == 0 && root.home.next-due != "": Text { text: @tr("Next review {}", root.home.next-due); color: Theme.fg; wrap: word-wrap; }
                         if root.home.resume-reviews > 0: Btn { text: @tr("Resume reviews ({} left)", root.home.resume-reviews); primary: true; clicked => { root.resume(); } }
                         if root.home.resume-reviews == 0: Btn { text: @tr("Start reviews"); primary: true; enabled: root.home.due > 0; clicked => { root.start-reviews(); } }

@@ -501,6 +501,12 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
         level_rows: model(level_rows(content, &st.progress)),
         resume_reviews: paused_left(content, st, false),
         resume_lesson: paused_left(content, st, true),
+        due_after: match &st.progress.paused {
+            Some(s) if !s.lesson && s.resumable(content) => {
+                due_ids(content, &st.progress, now).iter().filter(|id| !s.has_pending(id)).count() as i32
+            }
+            _ => 0,
+        },
     });
     ui.set_level_pies(model(level_pies(content, &st.progress)));
     refresh_stats(ui, content, st, now);

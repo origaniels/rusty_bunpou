@@ -306,3 +306,9 @@ msgstr "Chercher dans Takoboto"
 
 msgid "Grammar note"
 msgstr "Note de grammaire"
+
+msgid "{} left"
+msgstr "Encore {}"
+
+msgid "Then {} more due"
+msgstr "Puis {} autres à réviser"

@@ -105,6 +105,11 @@ impl Session {
         self.queue.len() + usize::from(self.point.is_some())
     }
 
+    /// Whether `point` is still to be answered in this session (the current item included).
+    pub fn has_pending(&self, point: &str) -> bool {
+        self.point.as_deref() == Some(point) || self.queue.iter().any(|p| p == point)
+    }
+
     /// The current item was already graded (missed earlier): this is practice, not graded again.
     pub fn practising(&self) -> bool {
         self.point.as_ref().is_some_and(|p| self.graded.contains(p))

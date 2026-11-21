@@ -1215,8 +1215,8 @@ fn leaving_reviews_halfway_can_be_resumed_even_after_a_restart() {
     assert!(t.app.ui.invoke_go_back());
     assert_eq!(t.screen(), SCREEN_HOME);
     let home = t.app.ui.get_home();
-    assert_eq!((home.due, home.resume_reviews), (10, 10));
-    assert!(t.exists("Resume reviews (10 left)"));
+    assert_eq!((home.due, home.resume_reviews, home.due_after), (10, 10, 0));
+    assert!(t.exists("Resume reviews (10 left)") && t.exists("10 left"));
     assert!(!t.exists("Start reviews"));
 
     // the app is closed and opened again
@@ -1262,6 +1262,16 @@ fn a_missed_review_comes_back_as_practice_and_can_be_resumed() {
     t.app.ui.invoke_go_home();
     let home = t.app.ui.get_home();
     assert_eq!((home.due, home.resume_reviews), (0, 1), "graded, but it can still be practised");
+    assert!(t.exists("1 left") && !t.exists("0 due"), "the card counts what is left to do, not 0");
+    // a review that becomes due meanwhile is not in the session: it comes after
+    t.app.state.borrow_mut().progress.cards.get_mut(&first).unwrap().due = 0;
+    t.app.ui.invoke_go_home();
+    assert_eq!(t.app.ui.get_home().due_after, 0, "the missed one is in the session already");
+    let other = t.app.state.borrow().progress.cards.keys().find(|k| **k != first).unwrap().clone();
+    t.app.state.borrow_mut().progress.cards.get_mut(&other).unwrap().due = 0;
+    t.app.ui.invoke_go_home();
+    assert_eq!(t.app.ui.get_home().due_after, 1);
+    assert!(t.exists("Then 1 more due"));
     t.press("Resume reviews (1 left)");
     let a = t.correct_answer();
     t.type_and_enter(&a);
