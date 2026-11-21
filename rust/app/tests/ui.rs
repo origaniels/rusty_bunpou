@@ -238,6 +238,31 @@ fn each_lesson_page_opens_at_its_top() {
 }
 
 #[test]
+fn the_quiz_bubble_gives_the_meaning_and_the_word_follows_the_sentence() {
+    let t = setup();
+    // every sentence of the whole content, as the quiz shows it
+    for p in &t.app.content.points {
+        for s in &p.sentences {
+            let key = format!("{}:{}", p.id, s.id);
+            let d = t.app.ui.global::<Logic>().invoke_layout(key.into(), 1, "".into(), true, 360.0, 24.0);
+            let aside: String = d.glyphs.iter().filter(|g| g.aside).map(|g| g.text.to_string()).collect();
+            match s.hint_word() {
+                Some(w) => assert_eq!(aside, format!("（{}）", w.iter().map(|x| x.0.as_str()).collect::<String>())),
+                None => assert_eq!(aside, ""),
+            }
+        }
+    }
+    t.press("Learn 5 new");
+    for _ in 0..4 {
+        t.press("Next");
+    }
+    t.press("Start quiz");
+    let q = t.app.ui.get_quiz();
+    let point = t.app.content.get(q.key.split(':').next().unwrap()).unwrap();
+    assert_eq!(q.hint, point.meaning, "only the meaning, no form to put the word in");
+}
+
+#[test]
 fn wrong_answer_typo_and_retry() {
     let t = setup();
     t.press("Learn 5 new");
@@ -820,7 +845,7 @@ fn check_every_screen_at(width: f32, french: bool, text_scale: f32) {
         let longest = c
             .points
             .iter()
-            .flat_map(|p| p.sentences.iter().map(move |s| s.hint(lang).unwrap_or_else(|| p.meaning_in(lang).to_string())))
+            .map(|p| p.meaning_in(lang).to_string())
             .max_by_key(|h| h.chars().count())
             .unwrap();
         let mut q = t.app.ui.get_quiz();

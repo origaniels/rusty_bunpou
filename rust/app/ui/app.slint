@@ -2,7 +2,7 @@ import { LineEdit, Switch, ScrollView, ListView } from "std-widgets.slint";
 
 // ------------------------------------------------------------------ data from Rust
 
-export struct Glyph { x: length, y: length, w: length, text: string, ruby: string, ruby-x: length, ruby-w: length, cloze: bool }
+export struct Glyph { x: length, y: length, w: length, text: string, ruby: string, ruby-x: length, ruby-w: length, cloze: bool, aside: bool }
 
 export struct Frame { x: length, y: length, w: length, h: length }
 
@@ -112,14 +112,15 @@ component SentenceView {
             // the reading may be wider than the character and overhang its neighbours
             x: g.ruby-x; y: 0; width: g.ruby-w; height: d.ruby-h;
             text: g.ruby; font-size: root.font-size * 0.45;
-            color: (g.cloze && mode != 0 ? root.frame-color : Theme.fg).with-alpha(0.75);
+            color: (g.cloze && mode != 0 ? root.frame-color : g.aside ? Theme.muted : Theme.fg).with-alpha(0.75);
             horizontal-alignment: center; vertical-alignment: bottom;
             overflow: clip; wrap: no-wrap;
         }
         FitText {
             y: d.ruby-h; width: parent.width; height: d.main-h;
             text: g.text; font-size: root.font-size;
-            color: g.cloze && mode != 0 ? root.frame-color : Theme.fg;
+            // the word in brackets after the sentence is greyer: it isn't part of the sentence
+            color: g.cloze && mode != 0 ? root.frame-color : g.aside ? Theme.muted : Theme.fg;
             font-weight: g.cloze ? 700 : 400;
             horizontal-alignment: center; vertical-alignment: center;
             wrap: no-wrap;

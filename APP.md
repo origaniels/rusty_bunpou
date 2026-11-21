@@ -75,6 +75,9 @@ takes about 6 minutes (tokenization is cached in `data/build/tokens.pkl`).
   the kana preview is drawn in the blank. The keyboard's composition (Japanese IME, before Enter) is
   shown in the blank too and checked on Check (`AnswerField` in `app.slint`, `with_composition`,
   `composition_for` in `lib.rs`).
+- Question: the sentence with its blank, then the word to use in brackets with furigana
+  (`hint_word`, `layout_with_word`, drawn greyer), the translation, and a bubble with the point's
+  meaning only. The form tags of `hint` are not shown: working out the form is the exercise.
 - Layout: a tinted top bar (`QuizBar`: title, count, progress along its edge), the question in a
   card, the result in a green/red box, then "Look up in Takoboto" chips. Docked at the bottom
   (above the keyboard when open): a row of icon buttons (`IconBtn`, paths in `Icons`), Report

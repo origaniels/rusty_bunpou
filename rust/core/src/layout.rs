@@ -26,6 +26,8 @@ pub struct Glyph {
     /// Left edge of the reading relative to `x` (negative when it overhangs to the left).
     pub ruby_x: f32,
     pub in_cloze: bool,
+    /// Part of the word in brackets after the sentence (see [`layout_with_word`]), not of the sentence.
+    pub aside: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -132,6 +134,37 @@ struct Unit {
     blank_w: f32,
 }
 
+/// [`layout`] followed by `word` in brackets, with its readings (the word to put in the blank,
+/// in dictionary form). Its glyphs are marked `aside`.
+pub fn layout_with_word(
+    s: &Sentence,
+    word: &[(String, String)],
+    max_width: f32,
+    m: Metrics,
+    mode: ClozeMode,
+    typed: &str,
+) -> Layout {
+    if word.is_empty() {
+        return layout(s, max_width, m, mode, typed);
+    }
+    let mut s = s.clone();
+    let mut extra = vec![("（".to_string(), String::new())];
+    extra.extend(word.iter().cloned());
+    extra.push(("）".to_string(), String::new()));
+    for (text, _) in &extra {
+        s.ja.push_str(text);
+    }
+    // pieces: one per character, a segment with a reading stays whole
+    let n: usize = extra.iter().map(|(t, r)| if r.is_empty() { t.chars().count() } else { 1 }).sum();
+    s.furi.extend(extra.into_iter().map(|(t, r)| crate::content::Seg(t, r)));
+    let mut l = layout(&s, max_width, m, mode, typed);
+    let total = l.glyphs.len();
+    for g in &mut l.glyphs[total - n..] {
+        g.aside = true;
+    }
+    l
+}
+
 pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: &str) -> Layout {
     let main_h = m.main_h();
     let ruby_h = m.ruby_h();
@@ -230,7 +263,7 @@ pub fn layout(s: &Sentence, max_width: f32, m: Metrics, mode: ClozeMode, typed: 
                 }
             }
             line_ruby[line] |= !ruby.is_empty();
-            out.glyphs.push(Glyph { x, y: line as f32, w, text, ruby, ruby_w, ruby_x, in_cloze });
+            out.glyphs.push(Glyph { x, y: line as f32, w, text, ruby, ruby_w, ruby_x, in_cloze, aside: false });
             x += w;
         }
     }
@@ -274,12 +307,30 @@ mod tests {
     use crate::content::Content;
 
     #[test]
+    fn the_word_to_use_follows_the_sentence_in_brackets() {
+        let c = Content::bundled();
+        let s = c.points.iter().flat_map(|p| &p.sentences).find(|s| s.hint_word().is_some_and(|w| w.len() > 1)).unwrap();
+        let word = s.hint_word().unwrap();
+        let m = Metrics::new(24.0, true);
+        let plain = layout(s, 330.0, m, ClozeMode::Blank, "");
+        let l = layout_with_word(s, &word, 330.0, m, ClozeMode::Blank, "");
+        assert_eq!(l.glyphs[..plain.glyphs.len()], plain.glyphs[..], "the sentence itself doesn't move");
+        let aside: Vec<&Glyph> = l.glyphs.iter().filter(|g| g.aside).collect();
+        let text: String = aside.iter().map(|g| g.text.as_str()).collect();
+        let want: String = word.iter().map(|w| w.0.as_str()).collect();
+        assert_eq!(text, format!("（{want}）"));
+        assert_eq!(aside.len(), l.glyphs.len() - plain.glyphs.len());
+        assert!(aside.iter().any(|g| !g.ruby.is_empty()) || word.iter().all(|w| w.1.is_empty()));
+    }
+
+    #[test]
     fn readings_never_overlap_and_glyphs_dont_collide() {
         let c = Content::bundled();
         let m = Metrics::new(24.0, true);
         for s in c.points.iter().flat_map(|p| &p.sentences) {
             for mode in [ClozeMode::Highlight, ClozeMode::Revealed, ClozeMode::Blank] {
-                let l = layout(s, 330.0, m, mode, "");
+                // with the word in brackets after it, as in the quiz
+                let l = layout_with_word(s, &s.hint_word().unwrap_or_default(), 330.0, m, mode, "");
                 let line = |g: &Glyph| (g.y * 10.0) as i64;
                 for (a, b) in l.glyphs.iter().zip(l.glyphs.iter().skip(1)) {
                     if line(a) != line(b) {

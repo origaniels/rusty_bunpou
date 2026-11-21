@@ -734,7 +734,9 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         }
         q.key = sentence_key(&p.id, s.id);
         q.en = s.translation(lang).into();
-        q.hint = s.hint(lang).unwrap_or_else(|| p.meaning_in(lang).to_string()).into();
+        // only the meaning: the word to use is after the sentence, and its form is for the learner
+        // to work out
+        q.hint = p.meaning_in(lang).into();
         q.verdict = match sess.verdict {
             None => 0,
             Some(Verdict::Correct) => 1,
@@ -797,7 +799,10 @@ fn layout_for(content: &Content, key: &str, mode: i32, typed: &str, furigana: bo
         2 => ClozeMode::Revealed,
         _ => ClozeMode::Highlight,
     };
-    let l = layout::layout(s, width.max(50.0), Metrics::new(font, furigana), mode, typed);
+    // in the quiz, the word to use follows the sentence in brackets
+    let word = if mode == ClozeMode::Highlight { None } else { s.hint_word() };
+    let m = Metrics::new(font, furigana);
+    let l = layout::layout_with_word(s, &word.unwrap_or_default(), width.max(50.0), m, mode, typed);
     SentenceData {
         glyphs: model(
             l.glyphs
@@ -811,6 +816,7 @@ fn layout_for(content: &Content, key: &str, mode: i32, typed: &str, furigana: bo
                     ruby_x: g.ruby_x,
                     ruby_w: g.ruby_w,
                     cloze: g.in_cloze,
+                    aside: g.aside,
                 })
                 .collect(),
         ),

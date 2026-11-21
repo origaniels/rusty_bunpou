@@ -84,17 +84,66 @@ impl Sentence {
         }
     }
 
-    /// Hint under the blank ("食べる（たべる） · past, negative") with the grammatical tags in `lang`.
-    pub fn hint(&self, lang: Lang) -> Option<String> {
-        let h = self.hint.as_ref()?;
-        Some(match (lang, h.split_once(" · ")) {
-            (Lang::Fr, Some((word, tags))) => {
-                let tags: Vec<&str> = tags.split(", ").map(|t| crate::i18n::tr(lang, t)).collect();
-                format!("{word} · {}", tags.join(", "))
-            }
-            _ => h.clone(),
+    /// The word to put in the blank, in dictionary form, with its reading split over its kanji
+    /// (食べる（たべる） gives 食/た, べる/""), from the hint "食べる（たべる） · past, negative".
+    /// The grammatical tags after " · " are left out: they would give the answer away.
+    pub fn hint_word(&self) -> Option<Vec<(String, String)>> {
+        let head = self.hint.as_ref()?.split(" · ").next()?.trim();
+        if head.is_empty() {
+            return None;
+        }
+        Some(match head.split_once('（') {
+            Some((word, rest)) => ruby_split(word, rest.trim_end_matches('）')),
+            None => vec![(head.to_string(), String::new())],
         })
     }
+}
+
+/// Split `reading` over `word` so each kanji run gets its own reading and kana are matched as
+/// they are (持ち出す, もちだす gives 持/も ち 出/だ す). The whole word carries the whole reading
+/// when they can't be matched.
+pub fn ruby_split(word: &str, reading: &str) -> Vec<(String, String)> {
+    use crate::kana::{is_kana, kata_to_hira};
+    // runs of kana and of other characters (kanji, 々 ...)
+    let mut runs: Vec<(String, bool)> = Vec::new();
+    for c in word.chars() {
+        let k = is_kana(c);
+        match runs.last_mut() {
+            Some((r, rk)) if *rk == k => r.push(c),
+            _ => runs.push((c.to_string(), k)),
+        }
+    }
+    let reading: Vec<char> = kata_to_hira(reading).chars().collect();
+    fn fit(runs: &[(String, bool)], r: &[char], out: &mut Vec<(String, String)>) -> bool {
+        let Some(((run, kana), rest)) = runs.split_first() else { return r.is_empty() };
+        if *kana {
+            let k: Vec<char> = crate::kana::kata_to_hira(run).chars().collect();
+            if !r.starts_with(&k) {
+                return false;
+            }
+            out.push((run.clone(), String::new()));
+            if fit(rest, &r[k.len()..], out) {
+                return true;
+            }
+        } else {
+            for n in 1..=r.len() {
+                out.push((run.clone(), r[..n].iter().collect()));
+                if fit(rest, &r[n..], out) {
+                    return true;
+                }
+                out.pop();
+            }
+            return false;
+        }
+        out.pop();
+        false
+    }
+    let mut out = Vec::new();
+    if runs.iter().all(|r| r.1) || !fit(&runs, &reading, &mut out) {
+        let all_kana = runs.iter().all(|r| r.1);
+        return vec![(word.to_string(), if all_kana { String::new() } else { reading.iter().collect() })];
+    }
+    out
 }
 
 impl Sentence {
@@ -218,11 +267,43 @@ mod tests {
         assert_eq!(s.attribution(Lang::En), "Tatoeba #4771 by bunbuku · translation written for this app");
     }
 
+    fn ruby(v: &[(&str, &str)]) -> Vec<(String, String)> {
+        v.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect()
+    }
+
     #[test]
-    fn hint_tags_are_translated() {
-        let s = sentence("");
-        assert_eq!(s.hint(Lang::Fr).unwrap(), "食べる（たべる） · passé, négatif");
-        assert_eq!(s.hint(Lang::En).unwrap(), "食べる（たべる） · past, negative");
+    fn the_hint_word_comes_without_its_tags_and_with_its_reading_on_each_kanji() {
+        assert_eq!(sentence("").hint_word().unwrap(), ruby(&[("食", "た"), ("べる", "")]));
+        let with = |h: Option<&str>| Sentence { hint: h.map(String::from), ..sentence("") };
+        assert_eq!(with(Some("する · polite")).hint_word().unwrap(), ruby(&[("する", "")]));
+        let w = with(Some("持ち出す（もちだす）")).hint_word().unwrap();
+        assert_eq!(w, ruby(&[("持", "も"), ("ち", ""), ("出", "だ"), ("す", "")]));
+        assert_eq!(with(None).hint_word(), None);
+    }
+
+    #[test]
+    fn readings_are_split_over_kanji_runs_or_kept_whole() {
+        assert_eq!(ruby_split("大切", "たいせつ"), ruby(&[("大切", "たいせつ")]));
+        assert_eq!(ruby_split("好き", "すき"), ruby(&[("好", "す"), ("き", "")]));
+        assert_eq!(ruby_split("お茶", "おちゃ"), ruby(&[("お", ""), ("茶", "ちゃ")]));
+        assert_eq!(ruby_split("引っ越す", "ひっこす"), ruby(&[("引", "ひ"), ("っ", ""), ("越", "こ"), ("す", "")]));
+        // no way to match: the whole word gets the whole reading
+        assert_eq!(ruby_split("今日は", "きょうわ"), ruby(&[("今日は", "きょうわ")]));
+    }
+
+    #[test]
+    fn every_hint_word_has_a_reading_on_its_kanji() {
+        let c = Content::bundled();
+        for s in c.points.iter().flat_map(|p| &p.sentences) {
+            let Some(w) = s.hint_word() else { continue };
+            for (text, reading) in &w {
+                assert!(
+                    text.chars().all(crate::kana::is_kana) || !reading.is_empty(),
+                    "{:?}: {text} has no reading",
+                    s.hint
+                );
+            }
+        }
     }
 
     #[test]
