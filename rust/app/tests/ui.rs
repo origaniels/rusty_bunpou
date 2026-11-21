@@ -1211,7 +1211,7 @@ fn leaving_reviews_halfway_can_be_resumed_even_after_a_restart() {
             t.app.ui.invoke_quiz_submit();
         }
     }
-    assert_eq!(t.app.ui.get_quiz().answered, 4);
+    assert_eq!(t.app.ui.get_quiz().done, 4);
     assert!(t.app.ui.invoke_go_back());
     assert_eq!(t.screen(), SCREEN_HOME);
     let home = t.app.ui.get_home();
@@ -1230,7 +1230,7 @@ fn leaving_reviews_halfway_can_be_resumed_even_after_a_restart() {
     assert_eq!(t.app.ui.get_home().resume_reviews, 10);
     t.press("Resume reviews (10 left)");
     assert_eq!(t.screen(), SCREEN_QUIZ);
-    assert_eq!((t.app.ui.get_quiz().answered, t.app.ui.get_quiz().total), (5, 15));
+    assert_eq!((t.app.ui.get_quiz().done, t.app.ui.get_quiz().total), (5, 15));
     t.finish_quiz(&[]);
     t.press("Home");
     let home = t.app.ui.get_home();
@@ -1253,9 +1253,10 @@ fn a_missed_review_comes_back_as_practice_and_can_be_resumed() {
         t.type_and_enter(&a);
         t.app.ui.invoke_quiz_submit();
     }
-    // every point was answered once; the missed one is practice now
+    // every point was answered once; the missed one is practice now, and not counted as done
     assert_eq!(t.app.state.borrow().session.as_ref().unwrap().point.clone().unwrap(), first);
-    assert_eq!(t.app.ui.get_quiz().answered, 15);
+    assert_eq!(t.app.ui.get_quiz().done, 14);
+    assert!(t.exists("Reviews  14 / 15"));
     assert!(t.app.ui.get_quiz().practising);
     assert!(t.exists("Missed earlier: practice only, not graded again."));
     t.app.ui.invoke_go_home();

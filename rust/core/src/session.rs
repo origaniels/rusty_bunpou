@@ -100,11 +100,6 @@ impl Session {
         self.point.is_none()
     }
 
-    /// Points answered at least once (graded), out of `total`.
-    pub fn answered(&self) -> usize {
-        self.graded.len()
-    }
-
     /// Items still to answer correctly, the current one included.
     pub fn remaining(&self) -> usize {
         self.queue.len() + usize::from(self.point.is_some())

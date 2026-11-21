@@ -38,7 +38,6 @@ export struct QuizData {
     verdict: int, // 0 = unanswered, 1 = correct, 2 = wrong
     last-answer: string, answer: string, grammar-line: string, attribution: string,
     finished: bool, summary: string, lesson: bool,
-    answered: int, // points answered at least once (graded)
     practising: bool, // the current point was missed earlier in this session
     fixing-typo: bool, // a wrong answer is being edited
     nudge: string, // "almost" hint after an answer that was nearly right (try again, not graded)
@@ -654,8 +653,8 @@ export component AppWindow inherits Window {
                 property <int> tick: root.focus-tick;
                 changed tick => { answer.focus-field(); }
                 init => { answer.focus-field(); }
-                TopBar { title: root.quiz.title + "  " + root.quiz.answered + " / " + root.quiz.total; back => { root.go-home(); } }
-                HorizontalLayout { padding-left: 16px; padding-right: 16px; ProgressBar { progress: root.quiz.total > 0 ? root.quiz.answered / root.quiz.total : 0; } }
+                TopBar { title: root.quiz.title + "  " + root.quiz.done + " / " + root.quiz.total; back => { root.go-home(); } }
+                HorizontalLayout { padding-left: 16px; padding-right: 16px; ProgressBar { progress: root.quiz.total > 0 ? root.quiz.done / root.quiz.total : 0; } }
                 Scroller {
                     vertical-stretch: 1;
                     spacing: 14px;

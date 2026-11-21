@@ -684,7 +684,6 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         done: sess.done as i32,
         total: sess.total as i32,
         lesson: sess.lesson,
-        answered: sess.answered() as i32,
         practising: sess.practising() && sess.verdict.is_none(),
         fixing_typo: sess.fixing_typo && sess.verdict.is_none(),
         nudge: match (&sess.nudge, sess.current(content)) {
