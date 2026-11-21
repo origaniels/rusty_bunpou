@@ -1329,6 +1329,42 @@ fn lesson_size_is_a_daily_goal_then_extra_lessons() {
 }
 
 #[test]
+fn tapping_the_sentence_puts_the_keyboard_in_the_answer_field() {
+    let t = setup();
+    t.press("Learn 5 new");
+    for _ in 0..4 {
+        t.press("Next");
+    }
+    t.press("Start quiz");
+    t.type_and_enter("xx");
+    assert_eq!(t.app.ui.get_quiz().verdict, 2);
+    // the notes take the focus away from the field
+    t.press("Grammar notes");
+    t.press("Close");
+    let typed = |t: &T| {
+        t.app.ui.window().dispatch_event(WindowEvent::KeyPressed { text: "a".into() });
+        t.app.ui.window().dispatch_event(WindowEvent::KeyReleased { text: "a".into() });
+        t.app.ui.get_quiz_input().to_string()
+    };
+    assert_eq!(typed(&t), "xx", "the field is not focused");
+    // a real tap on the sentence
+    let el = t.find("Answer here");
+    let (p, s) = (el.absolute_position(), el.size());
+    let at = LogicalPoint::new(p.x + s.width / 2.0, p.y + s.height / 2.0);
+    t.touch(at, TouchPhase::Started);
+    t.touch(at, TouchPhase::Ended);
+    // (the test set the text without moving the cursor: the key lands at the start)
+    assert_eq!(typed(&t).replace('a', ""), "xx");
+    assert_eq!(t.app.ui.get_quiz_input().chars().filter(|&c| c == 'a').count(), 1, "typing goes to the answer field");
+    assert!(t.app.ui.get_quiz().fixing_typo);
+    // once right, there is nothing to type
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    assert_eq!(t.app.ui.get_quiz().verdict, 1);
+    assert!(!t.exists("Answer here"));
+}
+
+#[test]
 fn the_day_starts_at_the_hour_picked_in_the_settings() {
     let t = setup();
     t.press("Settings");
@@ -1604,7 +1640,10 @@ fn press_every_control(french: bool) {
             let e = find_control(&t, &c.label, c.role).unwrap_or_else(|| panic!("{name}: '{}' is gone", c.label));
             e.invoke_accessible_default_action();
             let after = fingerprint(&t);
-            assert!(after != before || c.checked, "{name}: '{}' did nothing", c.label);
+            // tapping the sentence only moves the focus (and opens the keyboard on a phone):
+            // tested on its own, in tapping_the_sentence_puts_the_keyboard_in_the_answer_field
+            let focus_only = ["Answer here", "Répondre ici"].contains(&c.label.as_str());
+            assert!(after != before || c.checked || focus_only, "{name}: '{}' did nothing", c.label);
             audit_ok(&t, &format!("{name}, after '{}'", c.label), false);
             pressed += 1;
         }

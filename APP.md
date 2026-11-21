@@ -77,6 +77,8 @@ takes about 6 minutes (tokenization is cached in `data/build/tokens.pkl`).
   `composition_for` in `lib.rs`).
 - After a wrong answer: **Typo** (counts as right), **Retry** (try again, still counted as missed),
   or editing the field = typo fix (a right answer then counts as right).
+- Tapping the sentence (accessible label "Answer here") focuses the field and brings the keyboard
+  back if Back hid it (`open-keyboard` in `AnswerField`); not once the answer is right.
 - Check is disabled while the field is empty; the clear button is hidden once the answer is right.
 - Leaving a quiz keeps it (`Progress.paused`, saved after every answer): Home offers "Resume reviews
   (N left)" / "Resume the lesson quiz". An answer checked but not moved past counts when leaving.

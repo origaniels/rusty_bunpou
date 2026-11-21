@@ -4,6 +4,7 @@
 #  2. the Japanese keyboard: kana being composed show in the blank and are checked once, whether
 #     Check is tapped right away or after confirming with the keyboard's Enter (needs the
 #     Japanese QWERTY layout in the emulator's Gboard; skipped otherwise);
+#  3. the keyboard closed with Back comes back when the sentence is tapped;
 #   ./e2e/flows.sh [apk]
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -99,5 +100,18 @@ if keyboard ja; then
 else
   echo "  skipped: no Japanese layout in the emulator's Gboard"
 fi
+
+echo "== 3. tapping the sentence opens the keyboard"
+push_progress "$WORK/p.json"; start_app
+tap_label "Start reviews"; wait_ev '^screen=2'; sleep 1
+keyboard_shown || fail "the keyboard should open with the quiz"
+hide_keyboard
+keyboard_shown && fail "Back should have closed the keyboard"
+tap_label "Answer here"; sleep 1
+keyboard_shown || fail "tapping the sentence didn't bring the keyboard back"
+$A shell input text qqq; sleep 0.5
+[[ "$(cmd texts)" == *"Text:っっq "* ]] || fail "what is typed (qqq, shown as っっq in the blank) doesn't reach the field: $(cmd texts | cut -c1-300)"
+ok "keyboard back after a tap on the sentence, typing goes to the field"
+audit "quiz, keyboard reopened"
 
 echo "PASS: flows ($AUDITS layout audits)"

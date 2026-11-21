@@ -89,6 +89,9 @@ component SentenceView {
     in property <bool> furigana: true;
     in property <length> font-size: 24px * Theme.text-scale;
     in property <color> frame-color: mode == 2 ? Theme.good : Theme.accent;
+    /// the sentence can be tapped (in the quiz: to type the answer)
+    in property <bool> tappable;
+    callback tapped();
     property <SentenceData> d: Logic.layout(key, mode, typed, furigana, root.width / 1px, font-size / 1px);
     min-height: d.height;
     preferred-height: d.height;
@@ -130,6 +133,13 @@ component SentenceView {
         x: d.cloze-x; y: d.cloze-y; width: d.cloze-w; height: d.cloze-h;
         text: typed; font-size: root.font-size; color: Theme.accent;
         horizontal-alignment: center; vertical-alignment: center; wrap: no-wrap; overflow: elide;
+    }
+    // the whole sentence, not only the blank: a short blank is a small target
+    if tappable: Rectangle {
+        TouchArea { clicked => { root.tapped(); } }
+        accessible-role: button;
+        accessible-label: @tr("Answer here");
+        accessible-action-default => { root.tapped(); }
     }
 }
 
@@ -205,6 +215,16 @@ component AnswerField inherits Rectangle {
     callback composing(text: string, preedit: string, cursor: int);
     public function focus-field() { ti.focus(); }
     public function unfocus() { ti.clear-focus(); }
+    /// Focus the field and show the keyboard, even if the user hid it (the field kept the focus:
+    /// focusing it again would do nothing, so it is given up and taken back).
+    public function open-keyboard() {
+        if (ti.preedit-text != "") {
+            root.commit-composition();
+        } else {
+            if (ti.has-focus) { ti.clear-focus(); }
+            ti.focus();
+        }
+    }
     /// Confirm what the IME is composing (on Android, losing focus commits it), keep the keyboard.
     public function commit-composition() {
         if (ti.preedit-text != "") {
@@ -667,6 +687,9 @@ export component AppWindow inherits Window {
                         furigana: root.furigana;
                         font-size: 26px * Theme.text-scale;
                         frame-color: root.quiz.verdict == 0 ? Theme.accent : root.quiz.verdict == 1 ? Theme.good : Theme.bad;
+                        // tap the sentence to type (once right, the answer can't change)
+                        tappable: root.quiz.verdict != 1;
+                        tapped => { answer.open-keyboard(); }
                     }
                     if root.english || root.quiz.verdict != 0: Text { text: root.quiz.en; font-size: 18px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
                     HorizontalLayout { alignment: start; Pill { text: root.quiz.hint; } }

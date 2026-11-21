@@ -299,3 +299,6 @@ msgstr "Commencer la journée plus tard"
 
 msgid "For the daily goal, the streak and the stats: with 4:00, a session at 1 AM still counts for the day before."
 msgstr "Pour l’objectif du jour, la série et les statistiques : avec 4 h, une session à 1 h du matin compte encore pour la veille."
+
+msgid "Answer here"
+msgstr "Répondre ici"
