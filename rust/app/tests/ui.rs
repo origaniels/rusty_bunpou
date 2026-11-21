@@ -207,6 +207,37 @@ fn lesson_navigation_previous_next() {
 }
 
 #[test]
+fn each_lesson_page_opens_at_its_top() {
+    let t = setup();
+    t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 500.0)); // shorter than a lesson
+    t.press("Learn 5 new");
+    let title_y = |t: &T| {
+        let title = t.app.ui.get_lesson_point().title;
+        // None once scrolled out of the window
+        ElementHandle::find_by_accessible_label(&t.app.ui, &title).next().map(|e| e.absolute_position().y)
+    };
+    let top = title_y(&t);
+    assert!(top.is_some());
+    // drag the page up with a finger, as on the phone
+    let scroll = |t: &T| {
+        t.touch(LogicalPoint::new(200.0, 400.0), TouchPhase::Started);
+        for y in (100..400).rev().step_by(20) {
+            i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(16));
+            t.touch(LogicalPoint::new(200.0, y as f32), TouchPhase::Moved);
+        }
+        t.touch(LogicalPoint::new(200.0, 100.0), TouchPhase::Ended);
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(2000));
+    };
+    scroll(&t);
+    assert!(title_y(&t).map_or(true, |y| y < top.unwrap()), "the page scrolled");
+    t.press("Next");
+    assert_eq!(title_y(&t), top, "Next shows the new lesson from its top");
+    scroll(&t);
+    t.press("Previous");
+    assert_eq!(title_y(&t), top, "so does Previous");
+}
+
+#[test]
 fn wrong_answer_typo_and_retry() {
     let t = setup();
     t.press("Learn 5 new");

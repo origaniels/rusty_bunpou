@@ -724,7 +724,7 @@ export component AppWindow inherits Window {
             // ---------------------------------------------------------- lesson
             if root.screen == 1: VerticalLayout {
                 TopBar { title: @tr("Lesson {} / {}", root.lesson-index + 1, root.lesson-count); back => { root.go-back(); } }
-                Scroller {
+                lesson-scroll := Scroller {
                     vertical-stretch: 1;
                     GrammarBody { p: root.lesson-point; furigana: root.furigana; max-examples: 4; }
                 }
@@ -746,14 +746,14 @@ export component AppWindow inherits Window {
                             IconBtn {
                                 icon: Icons.previous; label: @tr("Previous");
                                 enabled: root.lesson-index > 0;
-                                clicked => { root.lesson-prev(); }
+                                clicked => { lesson-scroll.viewport-y = 0; root.lesson-prev(); } // each page opens at its top
                             }
                         }
                         Btn {
                             text: root.lesson-index < root.lesson-count - 1 ? @tr("Next") : @tr("Start quiz");
                             horizontal-stretch: 1;
                             primary: true;
-                            clicked => { root.lesson-next(); }
+                            clicked => { lesson-scroll.viewport-y = 0; root.lesson-next(); }
                         }
                     }
                 }
