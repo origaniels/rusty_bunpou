@@ -26,6 +26,9 @@ pub struct El {
     pub enabled: bool,
     /// a switch that is on, or the selected option of a segmented control
     pub checked: bool,
+    /// a fixed bar or something inside one (from the element tree, not the position: content
+    /// scrolled under a bar can sit entirely within its rectangle)
+    pub in_bar: bool,
     pub x: f32,
     pub y: f32,
     pub w: f32,
@@ -79,6 +82,19 @@ pub fn scan(ui: &AppWindow) -> (Vec<El>, bool) {
         Some(d) => d.query_descendants().find_all(),
         None => all,
     };
+    let is_bar = |e: &ElementHandle| {
+        e.accessible_role() == Some(AccessibleRole::Groupbox) && e.accessible_label().is_some_and(|l| l == "bar")
+    };
+    // what the bars hold, by label and place (handles can't be compared)
+    let key = |e: &ElementHandle| {
+        let (p, s) = (e.absolute_position(), e.size());
+        format!("{:?}|{}|{:.1},{:.1},{:.1},{:.1}", e.accessible_role(), e.accessible_label().unwrap_or_default(), p.x, p.y, s.width, s.height)
+    };
+    let in_bars: std::collections::HashSet<String> = candidates
+        .iter()
+        .filter(|e| is_bar(e))
+        .flat_map(|b| std::iter::once(key(b)).chain(b.query_descendants().find_all().iter().map(key).collect::<Vec<_>>()))
+        .collect();
     let els = candidates
         .into_iter()
         .filter_map(|e: ElementHandle| {
@@ -95,6 +111,7 @@ pub fn scan(ui: &AppWindow) -> (Vec<El>, bool) {
                 clipped: e.accessible_description().is_some_and(|d| d == "clipped"),
                 enabled: e.accessible_enabled().unwrap_or(true),
                 checked: e.accessible_checked().unwrap_or(false),
+                in_bar: in_bars.contains(&key(&e)),
                 label,
                 x: p.x,
                 y: p.y,
@@ -150,9 +167,7 @@ pub fn audit(ui: &AppWindow, opts: Options) -> Vec<String> {
     }
     // fully visible: on screen, above the keyboard, and either part of a bar or clear of all bars
     let visible = |e: &El| {
-        in_view(e)
-            && e.bottom() <= wh - kb + 0.5
-            && (bars.iter().any(|b| b.contains(e)) || bars.iter().all(|b| b.overlap(e) == 0.0))
+        in_view(e) && e.bottom() <= wh - kb + 0.5 && (e.in_bar || bars.iter().all(|b| b.overlap(e) == 0.0))
     };
     let buttons: Vec<&El> = els.iter().filter(|e| is_control(e.role) && visible(e)).collect();
     for (i, a) in buttons.iter().enumerate() {
@@ -214,7 +229,13 @@ pub fn command(ui: &AppWindow, cmd: &str) -> String {
             if issues.is_empty() {
                 format!("audit {name} ok")
             } else {
-                format!("audit {name} FAIL {}", issues.join(" | "))
+                // the fixed bars seen, to tell a layout problem from content scrolled under a bar
+                let bars: Vec<String> = els
+                    .iter()
+                    .filter(|e| e.role == AccessibleRole::Groupbox && e.label == "bar")
+                    .map(|e| format!("{:.0},{:.0} {:.0}x{:.0}", e.x, e.y, e.w, e.h))
+                    .collect();
+                format!("audit {name} FAIL {} (bars: {})", issues.join(" | "), bars.join(", "))
             }
         }
         "buttons" => {
