@@ -59,6 +59,30 @@ def all_points():
     return list(grammar_n5.POINTS) + list(patterns.POINTS)
 
 
+EN_FIXES = Path(__file__).parent / "en_fixes.tsv"
+
+
+def english_fixes():
+    """Tatoeba English translations replaced by ours (reported as wrong or misleading for the
+    grammar point): id -> (Japanese, English). The Japanese must match the sentence."""
+    out = {}
+    for line in open(EN_FIXES, encoding="utf8"):
+        if line.strip() and not line.startswith("#"):
+            sid, ja, en = line.rstrip("\n").split("\t")
+            out[int(sid)] = (ja, en)
+    return out
+
+
+def apply_english_fixes(cands):
+    for sid, (ja, en) in english_fixes().items():
+        c = cands.get(sid)
+        if c is None:
+            continue
+        if c["ja"] != ja:
+            raise SystemExit(f"en_fixes.tsv: #{sid} is now {c['ja']}, not {ja}")
+        c["en"], c["en_src"] = en, "app"
+
+
 def load_candidates():
     native = set()
     for line in open(RAW / "user_languages.csv", encoding="utf8"):
@@ -382,6 +406,8 @@ def to_sentence(sid, a, b, h, cands, toks):
         d["parts"] = answer_parts(span)
     if c.get("src"):
         d["src"] = c["src"]
+    if c.get("en_src"):
+        d["en_src"] = c["en_src"]
     if c.get("fr"):
         d["fr"], d["fr_id"], d["fr_owner"] = c["fr"], c["fr_id"], c["fr_owner"]
     return d
@@ -400,6 +426,7 @@ def main():
 
     print("loading tatoeba…", flush=True)
     cands = load_candidates()
+    apply_english_fixes(cands)
     print(f"  {len(cands)} candidate sentences with English", flush=True)
     toks = get_tokens(cands)
     print("  tokenized", flush=True)

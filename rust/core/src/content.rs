@@ -34,6 +34,9 @@ pub struct Sentence {
     /// "app" when the French translation was written for this app.
     #[serde(default)]
     pub fr_src: String,
+    /// "app" when the English translation was written for this app (Tatoeba's misled)
+    #[serde(default)]
+    pub en_src: String,
     /// Dictionary forms of the sentence's content words (for dictionary lookups).
     #[serde(default)]
     pub words: Vec<String>,
@@ -68,7 +71,9 @@ impl Sentence {
             (false, false) => format!("Tatoeba #{} by {}", self.id, self.owner),
             (false, true) => format!("Tatoeba #{} par {}", self.id, self.owner),
         };
-        if !fr || self.fr.is_empty() {
+        if !fr && self.en_src == "app" {
+            format!("{original} · translation written for this app")
+        } else if !fr || self.fr.is_empty() {
             original
         } else if self.fr_src == "app" {
             format!("{original} · traduction écrite pour cette appli")
@@ -209,6 +214,8 @@ mod tests {
         let s = sentence(r#","src":"app","fr":"C'est impossible.","fr_src":"app""#);
         assert_eq!(s.attribution(Lang::Fr), "Exemple écrit pour cette appli");
         assert_eq!(s.attribution(Lang::En), "Example written for this app");
+        let s = sentence(r#","en_src":"app""#);
+        assert_eq!(s.attribution(Lang::En), "Tatoeba #4771 by bunbuku · translation written for this app");
     }
 
     #[test]
