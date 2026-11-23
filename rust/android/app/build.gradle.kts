@@ -2,6 +2,15 @@ plugins {
     id("com.android.application")
 }
 
+// The version comes from rust/app/Cargo.toml (the one place to change it, see release.sh):
+// versionName "X.Y.Z", versionCode X*10000 + Y*100 + Z (Android only installs a higher code).
+val versionParts = Regex("""(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"""")
+    .find(rootDir.parentFile.resolve("app/Cargo.toml").readText())
+    ?.destructured?.toList()?.map { it.toInt() }
+    ?: error("no X.Y.Z version in rust/app/Cargo.toml")
+val appVersion = versionParts.joinToString(".")
+val appVersionCode = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
+
 android {
     namespace = "dev.local.bunpo.rust"
     compileSdk = 37
@@ -9,8 +18,8 @@ android {
         applicationId = "dev.local.bunpo.rust"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1-rust"
+        versionCode = appVersionCode
+        versionName = appVersion
     }
     // Release signing key: set bunpoKeystore (+ bunpoKeystorePassword, bunpoKeyAlias,
     // bunpoKeyPassword) in ~/.gradle/gradle.properties, outside the repo. The key must never
