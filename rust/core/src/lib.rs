@@ -15,3 +15,4 @@ pub mod session;
 pub mod stats;
 pub mod store;
 pub mod update;
+pub mod vocab;

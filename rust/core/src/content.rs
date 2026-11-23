@@ -103,11 +103,12 @@ impl Sentence {
 /// they are (持ち出す, もちだす gives 持/も ち 出/だ す). The whole word carries the whole reading
 /// when they can't be matched.
 pub fn ruby_split(word: &str, reading: &str) -> Vec<(String, String)> {
-    use crate::kana::{is_kana, kata_to_hira};
-    // runs of kana and of other characters (kanji, 々 ...)
+    use crate::kana::kata_to_hira;
+    // runs of kanji (read) and of anything else: kana, and symbols like ～ (matched as they are)
+    let is_kanji = |c: char| matches!(c, '\u{3400}'..='\u{4dbf}' | '\u{4e00}'..='\u{9fff}' | '々' | '〆' | 'ヶ');
     let mut runs: Vec<(String, bool)> = Vec::new();
     for c in word.chars() {
-        let k = is_kana(c);
+        let k = !is_kanji(c);
         match runs.last_mut() {
             Some((r, rk)) if *rk == k => r.push(c),
             _ => runs.push((c.to_string(), k)),
