@@ -62,9 +62,11 @@ where_on() {
         if [ "$r" = "$prev" ]; then set -- $r; echo "$3 $4"; return 0; fi
         prev=$r; misses=0; sleep 0.4 ;;
       *)
-        # not on screen: maybe the layout is still moving (keyboard); look again before scrolling
+        # not on screen (or under a bar): maybe the layout is still moving (keyboard); look
+        # again before scrolling, up when it is hidden above
         prev=""; misses=$((misses + 1))
-        if (( misses < 3 )); then sleep 0.5; else misses=0; scroll_down; fi ;;
+        if (( misses < 3 )); then sleep 0.5
+        else misses=0; if [[ "$r" == "where above "* ]]; then scroll_up; else scroll_down; fi; fi ;;
     esac
   done
   return 1

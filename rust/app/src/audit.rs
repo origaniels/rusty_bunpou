@@ -215,8 +215,17 @@ pub fn command(ui: &AppWindow, cmd: &str) -> String {
         "where" => match find(&els, arg, ww, wh) {
             Some(e) => {
                 let (cx, cy) = ((e.x + e.w / 2.0) * scale, (e.y + e.h / 2.0) * scale);
-                let on = e.y >= 0.0 && e.bottom() <= wh - ui.get_kb_height();
-                format!("where {} {:.0} {:.0} {:.0} {:.0} {:?}", if on { "on" } else { "offscreen" }, cx, cy, e.w * scale, e.h * scale, arg)
+                // under a fixed bar it isn't part of (scrolled under the top bar or the menu bar),
+                // a tap would land on the bar
+                let covered = !e.in_bar && els.iter().any(|b| b.role == AccessibleRole::Groupbox && b.label == "bar" && b.overlap(e) > 0.0);
+                let on = e.y >= 0.0 && e.bottom() <= wh - ui.get_kb_height() && !covered;
+                // where to scroll to bring it in view: "above" (scroll up) or "offscreen" (down)
+                let state = match () {
+                    _ if on => "on",
+                    _ if e.y + e.h / 2.0 < wh / 2.0 => "above",
+                    _ => "offscreen",
+                };
+                format!("where {state} {:.0} {:.0} {:.0} {:.0} {:?}", cx, cy, e.w * scale, e.h * scale, arg)
             }
             None => format!("where none {arg:?}"),
         },

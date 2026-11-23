@@ -2433,3 +2433,43 @@ fn resetting_all_progress_forgets_the_words_too() {
     let h = t.app.ui.get_home();
     assert_eq!((h.vocab_learned, h.vocab_due, h.vocab_new), (0, 0, h.vocab_total));
 }
+
+#[test]
+fn where_says_hidden_for_a_button_under_a_bar_and_which_way_to_scroll() {
+    let t = setup();
+    t.press("Settings");
+    let ui = &t.app.ui;
+    let label = "Reset all progress";
+    // a window height where the button sits partly under the menu bar at the bottom
+    let mut found = false;
+    for h in (400..2000).step_by(4) {
+        ui.window().set_size(slint::LogicalSize::new(400.0, h as f32));
+        let els = audit::elements(ui);
+        let (Some(e), Some(bar)) = (
+            els.iter().find(|e| e.label == label),
+            els.iter().filter(|b| b.label == "bar").max_by(|a, b| a.y.total_cmp(&b.y)),
+        ) else { continue };
+        let bottom = e.y + e.h;
+        if e.y < bar.y && bottom > bar.y && bottom <= h as f32 {
+            let r = audit::command(ui, &format!("where {label}"));
+            assert!(r.starts_with("where offscreen "), "half under the menu bar is not tappable: {r}");
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "no height put the button under the menu bar");
+    // far below: scroll down; once the page is dragged past it: scroll up
+    ui.window().set_size(slint::LogicalSize::new(400.0, 600.0));
+    let r = audit::command(ui, &format!("where {label}"));
+    assert!(r.starts_with("where offscreen ") || r.starts_with("where none "), "{r}");
+    assert!(audit::command(ui, "where Language").starts_with("where on "));
+    t.touch(LogicalPoint::new(200.0, 500.0), TouchPhase::Started);
+    for y in (60..500).rev().step_by(20) {
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(16));
+        t.touch(LogicalPoint::new(200.0, y as f32), TouchPhase::Moved);
+    }
+    t.touch(LogicalPoint::new(200.0, 60.0), TouchPhase::Ended);
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(2000));
+    let r = audit::command(ui, "where Language");
+    assert!(r.starts_with("where above ") || r == "where none \"Language\"", "{r}");
+}
