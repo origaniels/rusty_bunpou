@@ -201,3 +201,74 @@ fn another_point_that_fits_gets_a_nuance_hint_that_keeps_the_answer_hidden() {
     }
     assert!(n > 800, "only {n} alternative answers");
 }
+
+// ------------------------------------------------------------------ small helpers at their edges
+
+use bunpo_core::content::{ruby_split, Sentence};
+use bunpo_core::i18n::{tr, Lang};
+use bunpo_core::layout::{char_em, text_width};
+
+fn r(v: &[(&str, &str)]) -> Vec<(String, String)> {
+    v.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect()
+}
+
+#[test]
+fn language_codes_round_trip_and_anything_else_is_english() {
+    for l in [Lang::En, Lang::Fr] {
+        assert_eq!(Lang::from_code(l.code()), l);
+    }
+    for odd in ["", "FR", "fr-FR", "ja", "en"] {
+        assert_eq!(Lang::from_code(odd), Lang::En, "{odd:?}");
+    }
+    assert_eq!(Lang::default(), Lang::En);
+}
+
+#[test]
+fn rust_strings_translate_and_unknown_ones_stay_english() {
+    assert_eq!(tr(Lang::Fr, "past"), "passé");
+    assert_eq!(tr(Lang::En, "past"), "past");
+    assert_eq!(tr(Lang::Fr, "no such string"), "no such string");
+}
+
+#[test]
+fn a_hint_with_only_tags_or_nothing_has_no_word() {
+    let with = |h: &str| Sentence { hint: Some(h.into()), ..Default::default() };
+    assert_eq!(with(" · polite").hint_word(), None);
+    assert_eq!(with("").hint_word(), None);
+    assert_eq!(with("  ").hint_word(), None);
+    assert_eq!(with("だ").hint_word().unwrap(), r(&[("だ", "")]));
+}
+
+#[test]
+fn french_credit_without_a_translator_name_gives_the_number() {
+    let s = Sentence { id: 4, owner: "a".into(), fr: "x".into(), fr_id: 12, ..Default::default() };
+    assert_eq!(s.attribution(Lang::Fr), "Tatoeba #4 par a · trad. #12");
+    let anon = Sentence { id: 4, ..Default::default() };
+    assert_eq!(anon.attribution(Lang::En), "Tatoeba #4");
+    assert_eq!(anon.attribution(Lang::Fr), "Tatoeba #4");
+}
+
+#[test]
+fn readings_split_over_kanji_with_repeat_marks_katakana_and_symbols() {
+    assert_eq!(ruby_split("色々", "いろいろ"), r(&[("色々", "いろいろ")]));
+    assert_eq!(ruby_split("消しゴム", "けしゴム"), r(&[("消", "け"), ("しゴム", "")]));
+    assert_eq!(ruby_split("～円", "～えん"), r(&[("～", ""), ("円", "えん")]));
+    // katakana in the reading matches hiragana in the word
+    assert_eq!(ruby_split("見る", "ミル"), r(&[("見", "み"), ("る", "")]));
+    // kana only: nothing to read
+    assert_eq!(ruby_split("ある", "ある"), r(&[("ある", "")]));
+    // a reading that can't be the word's
+    assert_eq!(ruby_split("見る", "みた"), r(&[("見る", "みた")]));
+    assert_eq!(ruby_split("見る", ""), r(&[("見る", "")]));
+}
+
+#[test]
+fn character_widths_follow_their_shapes() {
+    assert!(char_em('W') > char_em('a') && char_em('a') > char_em('i'));
+    assert_eq!(char_em('ｱ'), 0.5, "half-width katakana");
+    assert_eq!(char_em('あ'), 1.0);
+    assert_eq!(char_em('7'), 0.62);
+    assert_eq!(text_width("", 20.0), 0.0);
+    assert_eq!(text_width("あい", 20.0), 40.0);
+    assert!(text_width("Mi", 10.0) < text_width("MM", 10.0));
+}

@@ -198,3 +198,74 @@ fn month_of_daily_use_has_bounded_workload() {
     assert!(beginners < cards.len() / 2, "most cards progressed past Beginner");
     let _ = mastered_or_expert;
 }
+
+// ------------------------------------------------------------------ self-graded (flashcards)
+
+use bunpo_core::store::scheduler::grade_self;
+
+/// Review a card when due with the same self-grade every time; returns it and how many reviews.
+fn run_with(grade_: u8, until_days: f64) -> (Card, usize) {
+    let (mut card, mut t, mut n) = (Card::default(), T0, 0);
+    while card.state < 2 || (card.due - t) as f64 / (DAY_MS as f64) < until_days {
+        t = card.due.max(t);
+        card = grade_self(&card, grade_, t, 0.9);
+        n += 1;
+        assert!(n < 200, "never got there");
+    }
+    (card, n)
+}
+
+#[test]
+fn out_of_range_self_grades_are_clamped() {
+    let new = Card::default();
+    assert_eq!(grade_self(&new, 0, T0, 0.9).due, grade_self(&new, 1, T0, 0.9).due);
+    assert_eq!(grade_self(&new, 9, T0, 0.9).due, grade_self(&new, 4, T0, 0.9).due);
+}
+
+#[test]
+fn easy_reaches_long_intervals_in_fewer_reviews_than_good() {
+    let (_, easy) = run_with(4, 30.0);
+    let (_, good) = run_with(3, 30.0);
+    assert!(easy < good, "easy {easy} vs good {good}");
+}
+
+#[test]
+fn hard_never_graduates_a_card_from_the_learning_steps() {
+    let mut card = Card::default();
+    let mut t = T0;
+    for _ in 0..10 {
+        t = card.due.max(t);
+        card = grade_self(&card, 2, t, 0.9);
+        assert_eq!((card.state, card.step), (1, 0));
+        assert!(card.due - t < LEARNING_STEPS[0]);
+    }
+}
+
+#[test]
+fn self_graded_intervals_respect_the_growth_cap_too() {
+    let mut card = learned_card(T0);
+    let mut last = 0.0f64;
+    for _ in 0..12 {
+        let t = card.due;
+        card = grade_self(&card, 4, t, 0.9);
+        let iv = (card.due - t) as f64 / DAY_MS as f64;
+        if card.state == 2 && last >= 1.0 {
+            assert!(iv <= last * MAX_GROWTH * 1.06, "{last} -> {iv}");
+        }
+        last = iv;
+    }
+}
+
+#[test]
+fn again_on_a_graduated_card_is_a_lapse_that_resumes_relearning() {
+    let (card, _) = run_with(3, 5.0);
+    let t = card.due;
+    let lapsed = grade_self(&card, 1, t, 0.9);
+    assert_eq!((lapsed.state, lapsed.step, lapsed.lapses), (1, RELEARN_FROM_STEP, card.lapses + 1));
+    assert_eq!(lapsed.due, t + RELEARN_DELAY);
+    // memory drops but isn't wiped
+    assert!(lapsed.stability < card.stability && lapsed.stability > 0.0);
+    // a grammar-style wrong answer does exactly the same
+    let wrong = grade(&card, false, t, 0.9, 0);
+    assert_eq!((wrong.state, wrong.step, wrong.due), (lapsed.state, lapsed.step, lapsed.due));
+}

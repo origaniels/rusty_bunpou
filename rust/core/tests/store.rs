@@ -156,3 +156,74 @@ fn old_progress_files_have_no_reports() {
     let p: Progress = serde_json::from_str(r#"{"cards":{}}"#).unwrap();
     assert!(p.reports.is_empty());
 }
+
+// ------------------------------------------------------------------ words, updates
+
+use bunpo_core::update::{Release, UpdateState};
+
+#[test]
+fn files_from_before_words_and_updates_load_with_defaults() {
+    let path = tmp("before-words");
+    std::fs::write(&path, r#"{"cards":{},"settings":{"furigana":false,"batch_size":3}}"#).unwrap();
+    let p = Progress::load(&path);
+    assert!(!p.settings.furigana && p.settings.batch_size == 3);
+    assert_eq!((p.settings.vocab_goal, p.settings.check_updates), (10, None));
+    assert!(p.vocab.is_empty() && p.vocab_log.is_empty());
+    assert_eq!(p.update, UpdateState::default());
+}
+
+#[test]
+fn words_and_update_state_round_trip() {
+    let path = tmp("words-roundtrip");
+    let mut p = Progress::load(&path);
+    p.vocab.insert("会う|あう#f".into(), Card { state: 1, due: 42, ..Default::default() });
+    p.vocab_log.push(LogEntry { point: "会う|あう#f".into(), sentence: 0, ts: 1, grade: 4, answer: String::new() });
+    p.settings.vocab_goal = 20;
+    p.settings.check_updates = Some(true);
+    p.update = UpdateState { checked_at: 7, etag: "\"x\"".into(), skipped: "0.9.0".into(), latest: Some(Release { version: "1.0.0".into(), notes: "n".into(), url: "https://github.com/o/r".into() }) };
+    p.save();
+    let q = Progress::load(&path);
+    assert_eq!(q.vocab["会う|あう#f"].due, 42);
+    assert_eq!(q.vocab_log[0].grade, 4);
+    assert_eq!((q.settings.vocab_goal, q.settings.check_updates), (20, Some(true)));
+    assert_eq!(q.update, p.update);
+}
+
+#[test]
+fn a_reset_forgets_words_but_keeps_settings_reports_and_update_state() {
+    let path = tmp("words-reset");
+    let mut p = Progress::load(&path);
+    p.vocab.insert("会う|あう#f".into(), Card { state: 1, ..Default::default() });
+    p.vocab_log.push(LogEntry { point: "会う|あう#f".into(), sentence: 0, ts: 1, grade: 3, answer: String::new() });
+    p.settings.vocab_goal = 5;
+    p.update.skipped = "0.9.0".into();
+    p.reset_all();
+    let q = Progress::load(&path);
+    assert!(q.vocab.is_empty() && q.vocab_log.is_empty());
+    assert_eq!((q.settings.vocab_goal, q.update.skipped.as_str()), (5, "0.9.0"));
+}
+
+#[test]
+fn an_import_brings_its_words_and_drops_the_current_ones() {
+    let path = tmp("words-import");
+    let mut p = Progress::load(&path);
+    p.vocab.insert("mine#f".into(), Card { state: 1, ..Default::default() });
+    let mut other = Progress::in_memory();
+    other.vocab.insert("theirs#r".into(), Card { state: 2, reps: 5, ..Default::default() });
+    other.vocab_log.push(LogEntry { point: "theirs#r".into(), sentence: 0, ts: 3, grade: 2, answer: String::new() });
+    p.import(&serde_json::to_string(&other).unwrap()).unwrap();
+    assert!(!p.vocab.contains_key("mine#f"));
+    assert_eq!(p.vocab["theirs#r"].reps, 5);
+    assert_eq!(Progress::load(&path).vocab_log.len(), 1, "saved");
+}
+
+#[test]
+fn saving_into_a_folder_that_is_gone_does_not_crash() {
+    let dir = std::env::temp_dir().join(format!("bunpo-store-{}-gone", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut p = Progress::load(&dir.join("progress.json"));
+    std::fs::remove_dir_all(&dir).unwrap();
+    p.settings.furigana = false;
+    p.save();
+    assert!(!dir.exists());
+}
