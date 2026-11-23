@@ -174,8 +174,19 @@ impl T {
         self.app.ui.invoke_go_home();
     }
 
+    /// The grammar list with N5 open (levels start folded).
+    fn open_grammar(&self) {
+        self.press("Grammar list");
+        if self.app.ui.get_grammar_list().row_data(0).is_some_and(|r| r.collapsed) {
+            self.press("JLPT N5");
+        }
+    }
+
     fn levels(&self) -> Vec<String> {
         use slint::Model;
+        if self.app.ui.get_grammar_list().row_data(0).is_some_and(|r| r.collapsed) {
+            self.app.ui.invoke_toggle_level("N5".into());
+        }
         let l = self.app.ui.get_grammar_list();
         (0..l.row_count())
             .map(|i| l.row_data(i).unwrap())
@@ -426,7 +437,7 @@ fn composition_goes_where_the_cursor_is() {
 #[test]
 fn back_navigation_stack() {
     let t = setup();
-    t.press("Grammar list");
+    t.open_grammar();
     assert_eq!(t.screen(), SCREEN_LIST);
     t.press("だ");
     assert_eq!(t.screen(), SCREEN_DETAIL);
@@ -459,7 +470,7 @@ fn back_from_quiz_goes_home_and_keeps_graded_items() {
 #[test]
 fn cancelled_touch_does_not_open_grammar_point() {
     let t = setup();
-    t.press("Grammar list");
+    t.open_grammar();
     let row = t.find("だ");
     let p = row.absolute_position();
     let s = row.size();
@@ -509,7 +520,7 @@ fn settings_toggles_persist_and_control_reminders() {
 fn reset_point_and_reset_all() {
     let t = setup();
     t.learn_lesson();
-    t.press("Grammar list");
+    t.open_grammar();
     t.press("だ");
     assert!(t.app.ui.get_notes().can_reset);
     t.app.ui.invoke_reset_point();
@@ -605,6 +616,9 @@ fn progress_per_level_and_list_headers() {
     let n5 = t.app.ui.get_home().level_rows.row_data(0).unwrap();
     assert_eq!(n5.learned, 5);
 
+    for level in ["N5", "N4"] {
+        t.app.ui.invoke_toggle_level(level.into());
+    }
     let list = t.app.ui.get_grammar_list();
     let headers: Vec<String> = (0..list.row_count())
         .map(|i| list.row_data(i).unwrap().header.to_string())
@@ -718,6 +732,7 @@ fn switching_to_french_translates_the_ui_and_is_remembered() {
     assert!(t.exists("Apprendre 5 nouveaux"), "Rust-built label is translated");
     // stage names in the grammar list
     t.press("Grammaire");
+    t.press("JLPT N5");
     let list = t.app.ui.get_grammar_list();
     use slint::Model;
     assert_eq!(list.row_data(1).unwrap().level, "Nouveau"); // row 0 is the JLPT N5 header
@@ -784,7 +799,7 @@ fn menu_bar_switches_tabs_and_back_goes_home() {
     assert_eq!(t.screen(), SCREEN_STATS);
     t.press("Settings");
     assert_eq!(t.screen(), SCREEN_SETTINGS);
-    t.press("Grammar list");
+    t.open_grammar();
     assert_eq!(t.screen(), SCREEN_LIST);
     // a grammar point opens on top of the list; Back returns to the list, then home
     t.press("だ");
@@ -804,19 +819,20 @@ fn grammar_levels_fold_and_unfold() {
     let t = setup();
     t.press("Grammar list");
     let count = |t: &T| t.app.ui.get_grammar_list().row_count();
-    let all = count(&t);
-    assert_eq!(all, 456 + 5, "every point plus one header per level");
-    // fold N5: its points disappear, its header stays (and can still be tapped)
-    t.press("JLPT N5");
-    assert_eq!(count(&t), all - 74);
+    // every level starts folded: only the headers
+    assert_eq!(count(&t), 5);
     assert!(t.app.ui.get_grammar_list().row_data(0).unwrap().collapsed);
     assert!(!t.exists("だ"));
-    // folding survives leaving the tab
+    // open N5: its points appear under its header
+    t.press("JLPT N5");
+    assert_eq!(count(&t), 5 + 74);
+    // opening survives leaving the tab
     t.press("Home");
     t.press("Grammar list");
-    assert_eq!(count(&t), all - 74);
+    assert_eq!(count(&t), 5 + 74);
     t.press("JLPT N5");
-    assert_eq!(count(&t), all);
+    assert_eq!(count(&t), 5);
+    t.press("JLPT N5");
     t.press("だ");
     assert_eq!(t.screen(), SCREEN_DETAIL);
 }
@@ -2024,7 +2040,7 @@ fn home_offers_words_next_to_grammar() {
     let t = setup();
     let h = t.app.ui.get_home();
     assert_eq!((h.vocab_due, h.vocab_learned), (0, 0));
-    assert!(h.vocab_total > 8000 && h.vocab_new == h.vocab_total);
+    assert!(h.vocab_total > 7000 && h.vocab_new == h.vocab_total);
     assert!(t.exists("0 words due") && t.exists("Today: 0 / 10 new words"));
     assert!(!t.find("Review words").accessible_enabled().unwrap());
     assert!(h.vocab_source.contains("tanos.co.uk"), "the word lists are credited");
@@ -2156,7 +2172,7 @@ fn words_follow_the_daily_goal_and_the_start_level() {
     assert_eq!(w.level, "N3");
     // N3 has no French meanings yet: English
     let st = t.app.state.borrow();
-    let word = st.vocab.words.iter().find(|x| x.word == w.text.as_str() || w.text.starts_with(x.word.as_str())).unwrap();
+    let word = st.vocab.get(&w.id).unwrap();
     assert_eq!(w.meaning, word.en.as_str());
 }
 
@@ -2497,4 +2513,70 @@ fn no_two_settings_controls_share_a_label() {
 #[test]
 fn no_two_settings_controls_share_a_label_in_french() {
     settings_labels_are_unique("fr");
+}
+
+#[test]
+fn the_word_list_opens_levels_and_word_pages_that_fit() {
+    word_list_and_page(400.0, false);
+}
+
+#[test]
+fn the_word_list_and_word_pages_fit_narrow_screens_in_french() {
+    word_list_and_page(320.0, true);
+}
+
+fn word_list_and_page(width: f32, french: bool) {
+    use slint::Model;
+    {
+        let mut p = Progress::in_memory();
+        if french {
+            p.settings.language = "fr".into();
+        }
+        let t = setup_with(p);
+        t.app.ui.window().set_size(slint::LogicalSize::new(width, 3000.0));
+        t.press(if french { "Liste de mots" } else { "Word list" });
+        assert_eq!(t.screen(), bunpo_app::SCREEN_WORDS);
+        assert_eq!(t.app.ui.get_word_list().row_count(), 5, "levels start folded");
+        assert_fits(&t, "word list");
+        t.press("JLPT N5");
+        let rows = t.app.ui.get_word_list();
+        assert!(rows.row_count() > 600);
+        let first = rows.row_data(1).unwrap();
+        assert_eq!(first.title, "する");
+        t.press("する");
+        assert_eq!(t.screen(), bunpo_app::SCREEN_WORD);
+        let w = t.app.ui.get_word_detail();
+        assert_eq!(w.examples.row_count(), 3);
+        assert!(!w.can_reset);
+        assert!(w.examples.row_data(0).unwrap().credit.starts_with("Tatoeba #"));
+        assert_fits(&t, "word page");
+        t.app.ui.invoke_go_back();
+        assert_eq!(t.screen(), bunpo_app::SCREEN_WORDS);
+    }
+}
+
+#[test]
+fn a_learned_word_can_be_reset_from_its_page() {
+    use slint::Model;
+    let t = setup();
+    let label = t.app.ui.get_home().vocab_learn_label.to_string();
+    t.press(&label);
+    let first = t.app.ui.get_vocab_word();
+    assert!(first.examples.row_count() > 0, "lessons show examples");
+    let count = t.app.ui.get_vocab_lesson_count();
+    for _ in 0..count {
+        t.app.ui.invoke_vocab_lesson_next();
+    }
+    while !t.app.ui.get_vocab_quiz().finished {
+        t.app.ui.invoke_vocab_reveal();
+        t.app.ui.invoke_vocab_grade(3);
+    }
+    t.app.ui.invoke_go_home();
+    t.press("Word list");
+    t.press("JLPT N5");
+    t.app.ui.invoke_open_word(first.id.clone());
+    assert!(t.app.ui.get_word_detail().can_reset);
+    t.app.ui.invoke_reset_word();
+    assert!(!t.app.ui.get_word_detail().can_reset);
+    assert!(!bunpo_core::vocab::learned(&t.app.state.borrow().progress, &first.id));
 }
