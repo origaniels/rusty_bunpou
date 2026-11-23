@@ -1,0 +1,3 @@
+# SHA-256 of the certificate every release is signed with (apksigner verify --print-certs).
+# Android refuses an update signed with another key, so release.sh checks it.
+172bb7eda3ed08f6434d21b3225a79ada549a8b160ed2d5208601d9d9467339b

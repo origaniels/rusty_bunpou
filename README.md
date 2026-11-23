@@ -52,6 +52,13 @@ See [TESTING.md](TESTING.md) for what each suite covers.
 ## Install on the phone
 Copy the APK to the phone and open it, or `adb install -r rust/android/app/build/outputs/apk/release/app-release.apk`.
 
+## Releases
+    ./release.sh 0.4.0 "What changed" --dry-run   # tests, build, checks; nothing published
+    ./release.sh 0.4.0 "What changed"             # then commit, tag, push, GitHub release + APK
+
+Release builds check GitHub once a day for a newer release (if the user agrees) and offer to
+download it. Add `--pre` for a test build that the app doesn't offer.
+
 ## Notes
 - The answer field keeps exactly what you type; the romaji→kana preview is drawn inside the blank.
   Rewriting the field text would fight the keyboard's composition (Gboard) and garble input.

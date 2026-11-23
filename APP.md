@@ -9,8 +9,8 @@ in [README.md](README.md), the test suites in [TESTING.md](TESTING.md).
 An offline Android app for learning Japanese grammar with spaced repetition. Each grammar point
 (456 of them, JLPT N5 to N1) has an explanation and example sentences with a blank; you learn points
 in lessons, then review them by typing the missing part. Everything is in English or French
-(interface, explanations, translations). No account, no network: content is embedded in the binary,
-progress is one JSON file on the phone.
+(interface, explanations, translations). No account: content is embedded in the binary, progress is
+one JSON file on the phone. The only network use is the optional daily update check (see Updates).
 
 Content sources: example sentences from Tatoeba (CC-BY 2.0 FR, credited per sentence), and texts
 written for this app (explanations, extra example sentences, French translations), marked as such.
@@ -159,6 +159,26 @@ The app follows Android's font size setting: every font size is `Npx * Theme.tex
 `Configuration.fontScale` at start and on resume, clamped to 1.0–1.3 (`set_text_scale`,
 `MAX_TEXT_SCALE`). Button labels and titles wrap instead of being cut.
 
+### Updates and releases (`core/src/update.rs`, `Updates.java`, `release.sh`)
+- Versions are `X.Y.Z`, written only in `rust/app/Cargo.toml` (`VERSION` in lib.rs); Gradle derives
+  `versionName` and `versionCode` = X*10000 + Y*100 + Z. Tags are `vX.Y.Z`.
+- `./release.sh X.Y.Z "notes" [--pre] [--dry-run]` runs the tests, sets the version, builds the arm64
+  APK with `BUNPO_UPDATE_REPO` (the GitHub "owner/name", read at compile time, never written in the
+  sources), checks it (signing key against `rust/android/release-cert.sha256`, version, arm64 only),
+  then commits, tags, pushes and creates the GitHub release with `bunpo-srs-arm64.apk` attached.
+- Builds without `BUNPO_UPDATE_REPO` (development, tests, emulator) have no update check at all.
+- In release builds, Home asks once ("New versions": `Settings.check_updates` None → Some(bool));
+  Settings has the switch, "Check now" and the version. When on, the app asks GitHub's
+  `/releases/latest` at most once a day (on start and resume; ETag sent, so an unchanged answer is
+  a 304). Pre-releases and drafts are never returned there, so `--pre` publishes a test build
+  nobody is told about. A newer release shows a Home card with the notes, "Download" (opens the
+  APK in the browser; Android installs it over the app, same key) and "Not now" (skips that
+  version). State in `Progress.update` (kept by a reset).
+- Android: `Updates.get` fetches on a thread, the app polls `Updates.result` every 500 ms (given up
+  after 30 s); errors are silent (offline: retried at the next opening; 403/404: tomorrow).
+- The key: every release must be signed with the same key or Android refuses the update. It lives
+  outside the repo (`~/.gradle/gradle.properties`); keep a backup of the keystore.
+
 ### Furigana layout (`core/src/layout.rs`)
 Sentences are laid out in Rust (each character placed, readings above kanji, readings may overhang
 kana, no line starts with closing punctuation, lines without readings get no reading band); Slint
@@ -187,6 +207,8 @@ translations: `pipeline/fr/sentences_n*.tsv` (`id<TAB>Japanese<TAB>French`, the 
 - **A progress field**: `serde(default)`, and think about import (`Progress::import`) and reset.
 - **Anything platform-specific**: add a method to the `Platform` trait (default no-op) so the
   headless tests and desktop keep working, implement it in `android.rs`.
+
+- **A release**: `./release.sh X.Y.Z "what changed"` (try `--dry-run` first).
 
 ## Things that bite
 
