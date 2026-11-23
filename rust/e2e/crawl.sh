@@ -58,11 +58,21 @@ goto_quiz_right() { goto_quiz_wrong; tap_label "$(L Typo)"; }
 goto_notes() { goto_quiz_wrong; tap_label "$(L 'Grammar note')"; }
 goto_report() { goto_quiz_wrong; tap_label "$(L Report)"; }
 goto_reviews() { tap_label "$(L 'Start reviews')"; wait_ev '^screen=2'; sleep 1; hide_keyboard; }
+goto_word_lesson() { tap_label "$(button_starting "$(L 'Learn') [0-9]+ new words|$(L 'Learn') [0-9]+ extra words|Apprendre [0-9]+ (nouveaux mots|mots de plus)")"; wait_ev '^screen=7'; }
+goto_word_quiz() {
+  goto_word_lesson
+  for _ in $(seq 1 25); do
+    cmd buttons | grep -qF "$(L 'Start quiz')" && break
+    tap_label "$(L Next)"
+  done
+  tap_label "$(L 'Start quiz')"; wait_ev '^screen=8 lesson'
+}
+goto_word_answer() { goto_word_quiz; tap_label "$(L 'Show answer')"; }
 goto_reset_point() { goto_grammar_point; tap_label "$(L Reset)"; }
 goto_reset_all() { goto_settings; tap_label "$(L 'Reset all progress')"; }
 
 ALL_STATES=(home settings grammar_list grammar_point stats lesson lesson_last quiz quiz_wrong quiz_right
-            notes report reviews reset_point reset_all)
+            notes report reviews reset_point reset_all word_lesson word_quiz word_answer)
 if [ $# -gt 0 ]; then STATES=("$@"); else STATES=("${ALL_STATES[@]}"); fi
 
 fresh() { push_progress "$WORK/p.json"; start_app; }
