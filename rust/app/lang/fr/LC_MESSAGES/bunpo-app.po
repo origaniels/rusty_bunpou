@@ -402,3 +402,9 @@ msgstr "Facile"
 
 msgid "New words per day"
 msgstr "Nouveaux mots par jour"
+
+msgid "{} new words a day"
+msgstr "{} nouveaux mots par jour"
+
+msgid "{} new points a day"
+msgstr "{} nouveaux points par jour"

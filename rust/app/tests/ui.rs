@@ -2146,7 +2146,7 @@ fn words_follow_the_daily_goal_and_the_start_level() {
     let t = setup_with(p);
     t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0));
     t.press("Réglages");
-    t.press("20");
+    t.press("20 nouveaux mots par jour");
     assert_eq!(t.app.state.borrow().progress.settings.vocab_goal, 20);
     t.press("N3");
     t.app.ui.invoke_go_home();
@@ -2472,4 +2472,29 @@ fn where_says_hidden_for_a_button_under_a_bar_and_which_way_to_scroll() {
     i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(2000));
     let r = audit::command(ui, "where Language");
     assert!(r.starts_with("where above ") || r == "where none \"Language\"", "{r}");
+}
+
+/// Every control on the settings page has its own label (the tests and screen readers tell them
+/// apart by it: the daily goals once both had a "5" and a "10").
+fn settings_labels_are_unique(lang: &str) {
+    let mut p = Progress::in_memory();
+    p.settings.language = lang.into();
+    let t = setup_with(p);
+    t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 4000.0));
+    t.app.ui.invoke_open_settings();
+    assert_eq!(t.screen(), SCREEN_SETTINGS);
+    let mut seen = std::collections::HashSet::new();
+    for e in audit::elements(&t.app.ui).iter().filter(|e| audit::is_control(e.role)) {
+        assert!(seen.insert(e.label.clone()), "[{lang}] two controls called {:?}", e.label);
+    }
+}
+
+#[test]
+fn no_two_settings_controls_share_a_label() {
+    settings_labels_are_unique("en");
+}
+
+#[test]
+fn no_two_settings_controls_share_a_label_in_french() {
+    settings_labels_are_unique("fr");
 }

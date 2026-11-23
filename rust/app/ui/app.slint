@@ -386,6 +386,8 @@ component BackBtn inherits Rectangle {
 // one row of mutually exclusive choices (3 / 5 / 10, N5 … N1, English / Français)
 component Segmented inherits Rectangle {
     in property <[string]> options;
+    /// what screen readers (and the tests) call each option, when the text alone is ambiguous
+    in property <[string]> labels;
     in property <int> selected;
     callback picked(int);
     height: 40px;
@@ -404,7 +406,7 @@ component Segmented inherits Rectangle {
             }
             t := TouchArea { clicked => { root.picked(i); } }
             accessible-role: button;
-            accessible-label: o;
+            accessible-label: i < root.labels.length ? root.labels[i] : o;
             accessible-checkable: true;
             accessible-checked: i == root.selected;
             accessible-action-default => { root.picked(i); }
@@ -1384,6 +1386,7 @@ export component AppWindow inherits Window {
                     Text { text: @tr("Daily goal (new points per day)"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                     Segmented {
                         options: ["3", "5", "10"];
+                        labels: [@tr("{} new points a day", 3), @tr("{} new points a day", 5), @tr("{} new points a day", 10)];
                         selected: root.batch-size == 3 ? 0 : root.batch-size == 10 ? 2 : 1;
                         picked(i) => { root.set-batch([3, 5, 10][i]); }
                     }
@@ -1411,6 +1414,7 @@ export component AppWindow inherits Window {
                     Text { text: @tr("New words per day"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                     Segmented {
                         options: ["5", "10", "20"];
+                        labels: [@tr("{} new words a day", 5), @tr("{} new words a day", 10), @tr("{} new words a day", 20)];
                         selected: root.vocab-goal == 5 ? 0 : root.vocab-goal == 20 ? 2 : 1;
                         picked(i) => { root.set-vocab-goal([5, 10, 20][i]); }
                     }
