@@ -110,6 +110,11 @@ impl Vocab {
         Self::parse(BUNDLED).expect("bundled vocab.json is valid")
     }
 
+    /// Where the word `id` is in `words`.
+    pub fn position(&self, id: &str) -> Option<usize> {
+        self.index.get(id).copied()
+    }
+
     pub fn get(&self, id: &str) -> Option<&Word> {
         self.index.get(id).map(|&i| &self.words[i])
     }
@@ -165,6 +170,21 @@ impl Vocab {
 /// A word counts as learned once its first card was answered.
 pub fn learned(progress: &Progress, word: &str) -> bool {
     progress.vocab.get(&card_id(word, Side::Forward)).is_some_and(|c| !c.is_new())
+}
+
+/// Move a word back to unlearned: both its cards are forgotten (its log stays).
+pub fn reset_word(progress: &mut Progress, word: &str) {
+    for side in [Side::Forward, Side::Reverse] {
+        progress.vocab.remove(&card_id(word, side));
+    }
+    progress.save();
+}
+
+/// The less advanced of a word's two cards (a new card if it has none).
+pub fn word_card(progress: &Progress, word: &str) -> Card {
+    let get = |side| progress.vocab.get(&card_id(word, side)).cloned().unwrap_or_default();
+    let (f, r) = (get(Side::Forward), get(Side::Reverse));
+    if f.is_new() || (!r.is_new() && r.interval_days() < f.interval_days()) { if f.is_new() { f } else { r } } else { f }
 }
 
 /// Words first learned today (the day starting at the chosen hour), against the daily goal.
