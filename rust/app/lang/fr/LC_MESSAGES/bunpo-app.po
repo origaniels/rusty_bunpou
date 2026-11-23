@@ -321,3 +321,33 @@ msgstr "L'explication est fausse ou peu claire"
 
 msgid "An example is wrong (say which in the note)"
 msgstr "Un exemple est faux (précisez lequel dans la note)"
+
+msgid "Version {} is available"
+msgstr "La version {} est disponible"
+
+msgid "Download"
+msgstr "Télécharger"
+
+msgid "Not now"
+msgstr "Pas maintenant"
+
+msgid "New versions"
+msgstr "Nouvelles versions"
+
+msgid "Once a day, the app can ask GitHub whether a new version is out. Nothing about you or your progress is sent. You can change this in Settings."
+msgstr "Une fois par jour, l'appli peut demander à GitHub si une nouvelle version est sortie. Rien sur vous ni sur votre progression n'est envoyé. Modifiable dans les Réglages."
+
+msgid "Check for updates"
+msgstr "Vérifier les mises à jour"
+
+msgid "No thanks"
+msgstr "Non merci"
+
+msgid "Version {}"
+msgstr "Version {}"
+
+msgid "Look for new versions on GitHub (once a day)"
+msgstr "Chercher les nouvelles versions sur GitHub (une fois par jour)"
+
+msgid "Check now"
+msgstr "Vérifier maintenant"

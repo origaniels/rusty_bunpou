@@ -10,6 +10,7 @@ use bunpo_core::clock::date_string;
 use bunpo_core::reminder::next_reminder;
 use bunpo_core::session::{find_sentence, now_ms, Session, Verdict, LESSON_EXAMPLES};
 use bunpo_core::store::{Progress, Report, LESSON_REPORT_REASONS, REPORT_REASONS};
+use bunpo_core::update;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -102,7 +103,28 @@ pub trait Platform {
     fn e2e_dir(&self) -> Option<PathBuf> {
         None
     }
+    /// The GitHub repository ("owner/name") whose releases are new versions of the app. Given at
+    /// build time (`BUNPO_UPDATE_REPO`, set by `release.sh`); without it there is no update check.
+    fn update_repo(&self) -> Option<String> {
+        option_env!("BUNPO_UPDATE_REPO").filter(|r| !r.is_empty()).map(String::from)
+    }
+    /// Start fetching `url` in the background, sending `etag` as If-None-Match when not empty.
+    /// The answer comes through [`Platform::http_result`].
+    fn http_get(&self, _url: &str, _etag: &str) {}
+    /// The answer to the last [`Platform::http_get`] once it is there: HTTP status (0 when there
+    /// was no answer), ETag and body.
+    fn http_result(&self) -> Option<(i32, String, String)> {
+        None
+    }
+    /// Open a web address (in the browser).
+    fn open_url(&self, _url: &str) {}
 }
+
+/// Version of this build (`version` in Cargo.toml; release tags are `v` + it).
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Seconds without an answer after which an update check is given up.
+const UPDATE_TIMEOUT_MS: i64 = 30_000;
 
 /// Desktop/test platform: does nothing.
 pub struct NoPlatform;
@@ -159,6 +181,12 @@ pub struct State {
     /// field text it was reported with (see [`composition_for`])
     composing: (String, usize),
     composing_with: String,
+    /// see [`Platform::update_repo`]
+    update_repo: Option<String>,
+    /// when the update check under way started
+    update_pending: Option<i64>,
+    /// the last update check got no usable answer
+    update_failed: bool,
 }
 
 /// The running app: UI + state. Keep it alive while the UI runs.
@@ -167,6 +195,7 @@ pub struct App {
     pub state: Rc<RefCell<State>>,
     pub content: Rc<Content>,
     _timer: slint::Timer,
+    _update_timer: slint::Timer,
 }
 
 fn model<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
@@ -282,7 +311,7 @@ pub fn reports_json(content: &Content, progress: &Progress) -> String {
             })
         })
         .collect();
-    serde_json::to_string_pretty(&serde_json::json!({ "reports": items })).unwrap()
+    serde_json::to_string_pretty(&serde_json::json!({ "app_version": VERSION, "reports": items })).unwrap()
 }
 
 /// Split chips into rows no wider than `width`: each chip is its text (CJK characters about
@@ -527,6 +556,9 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
             }
             _ => 0,
         },
+        ask_updates: st.update_repo.is_some() && st.progress.settings.check_updates.is_none(),
+        update_version: offered_update(st).map(|r| r.version.as_str()).unwrap_or("").into(),
+        update_notes: offered_update(st).map(|r| r.notes.as_str()).unwrap_or("").into(),
     });
     ui.set_level_pies(model(level_pies(content, &st.progress)));
     refresh_stats(ui, content, st, now);
@@ -696,6 +728,73 @@ fn refresh_settings(ui: &AppWindow, st: &State) {
     ui.set_retention_index(ri as i32);
     ui.set_language_index(if s.lang() == Lang::Fr { 1 } else { 0 });
     ui.set_report_count(st.progress.reports.len() as i32);
+    ui.set_app_version(VERSION.into());
+    ui.set_updates_possible(st.update_repo.is_some());
+    ui.set_check_updates(s.check_updates == Some(true));
+    ui.set_update_status(update_status(st).into());
+}
+
+/// The new version to offer on the home screen, if any.
+fn offered_update(st: &State) -> Option<&update::Release> {
+    if st.update_repo.is_none() || st.progress.settings.check_updates != Some(true) {
+        return None;
+    }
+    update::offer(&st.progress.update, VERSION)
+}
+
+/// One line about the update check, under its switch in the settings.
+fn update_status(st: &State) -> String {
+    let fr = st.progress.settings.lang() == Lang::Fr;
+    if st.progress.settings.check_updates != Some(true) {
+        return String::new();
+    }
+    let newer = st.progress.update.latest.as_ref().filter(|r| update::is_newer(&r.version, VERSION));
+    match (st.update_pending.is_some(), st.update_failed, newer, fr) {
+        (true, _, _, false) => "Checking…".into(),
+        (true, _, _, true) => "Vérification…".into(),
+        (_, true, _, false) => "Couldn't reach GitHub. The app will try again later.".into(),
+        (_, true, _, true) => "GitHub n'a pas pu être joint. L'appli réessaiera plus tard.".into(),
+        (_, _, Some(r), false) => format!("Version {} is available.", r.version),
+        (_, _, Some(r), true) => format!("La version {} est disponible.", r.version),
+        _ if st.progress.update.checked_at == 0 => String::new(),
+        (_, _, None, false) => "This is the latest version.".into(),
+        (_, _, None, true) => "C'est la dernière version.".into(),
+    }
+}
+
+/// Ask GitHub for the latest release, if the user agreed and (unless `force`) the last check is a
+/// day old. The answer is picked up by [`poll_update_check`].
+fn start_update_check(p: &dyn Platform, st: &mut State, force: bool) -> bool {
+    let Some(repo) = st.update_repo.clone() else { return false };
+    if st.progress.settings.check_updates != Some(true) || st.update_pending.is_some() {
+        return false;
+    }
+    let now = now_ms();
+    if !force && !update::due(&st.progress.update, now) {
+        return false;
+    }
+    st.update_pending = Some(now);
+    st.update_failed = false;
+    p.http_get(&update::latest_url(&repo), &st.progress.update.etag);
+    event("update check");
+    true
+}
+
+/// Take the answer of the update check under way, if it came (or give up after a while).
+/// Returns whether something changed.
+fn poll_update_check(p: &dyn Platform, st: &mut State) -> bool {
+    let Some(started) = st.update_pending else { return false };
+    let (status, etag, body) = match p.http_result() {
+        Some(r) => r,
+        None if now_ms() - started > UPDATE_TIMEOUT_MS => (0, String::new(), String::new()),
+        None => return false,
+    };
+    st.update_pending = None;
+    st.update_failed = !update::apply_answer(&mut st.progress.update, status, &etag, &body, now_ms());
+    st.progress.save();
+    let latest = st.progress.update.latest.as_ref().map(|r| r.version.as_str()).unwrap_or("-");
+    event(&format!("update answer status={status} latest={latest}"));
+    true
 }
 
 fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
@@ -842,6 +941,9 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         session: None,
         composing: (String::new(), 0),
         composing_with: String::new(),
+        update_repo: platform.update_repo(),
+        update_pending: None,
+        update_failed: false,
         detail: None,
         collapsed: Default::default(),
         report_target: None,
@@ -1301,6 +1403,43 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         sync_reminder(&*p, &st.progress);
     }));
 
+    // update check: the user's answer on the home screen, the settings, the release card
+    let update_changed = |ui: &AppWindow, c: &Content, st: &State| {
+        refresh_home(ui, c, st);
+        refresh_settings(ui, st);
+    };
+    // the answer on the home screen and the settings switch
+    for on in [AppWindow::on_answer_updates, AppWindow::on_set_check_updates] {
+        let w = ui.as_weak();
+        let (st, c, p) = (st.clone(), content.clone(), platform.clone());
+        on(&ui, move |yes| {
+            let (Some(ui), Ok(mut st)) = (w.upgrade(), st.try_borrow_mut()) else { return };
+            st.progress.settings.check_updates = Some(yes);
+            st.progress.save();
+            event(&format!("check updates={yes}"));
+            start_update_check(&*p, &mut st, false);
+            update_changed(&ui, &c, &st);
+        });
+    }
+    ui.on_check_updates_now(cb!(|ui, c, st, p| {
+        start_update_check(&*p, &mut st, true);
+        update_changed(&ui, &c, &st);
+    }));
+    ui.on_download_update(cb!(|ui, c, st, p| {
+        if let Some(r) = offered_update(&st) {
+            event(&format!("open update {}", r.version));
+            p.open_url(&r.url);
+        }
+        let _ = (&ui, &c);
+    }));
+    ui.on_skip_update(cb!(|ui, c, st| {
+        if let Some(v) = offered_update(&st).map(|r| r.version.clone()) {
+            st.progress.update.skipped = v;
+            st.progress.save();
+        }
+        update_changed(&ui, &c, &st);
+    }));
+
     {
         let s = st.borrow();
         apply_language(s.progress.settings.lang());
@@ -1330,6 +1469,35 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         let p = platform.clone();
         slint::Timer::single_shot(std::time::Duration::from_millis(300), move || p.on_started());
     }
+    // the daily update check, a little after start-up (and on resume, below); its answer is
+    // picked up by polling
+    let update_timer = slint::Timer::default();
+    {
+        let w = ui.as_weak();
+        let st = st.clone();
+        let c = content.clone();
+        let p = platform.clone();
+        update_timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
+            let (Some(ui), Ok(mut st)) = (w.upgrade(), st.try_borrow_mut()) else { return };
+            if poll_update_check(&*p, &mut st) {
+                refresh_home(&ui, &c, &st);
+                refresh_settings(&ui, &st);
+            }
+        });
+    }
+    {
+        let w = ui.as_weak();
+        let st = st.clone();
+        let c = content.clone();
+        let p = platform.clone();
+        slint::Timer::single_shot(std::time::Duration::from_secs(2), move || {
+            let (Some(ui), Ok(mut st)) = (w.upgrade(), st.try_borrow_mut()) else { return };
+            if start_update_check(&*p, &mut st, false) {
+                refresh_settings(&ui, &st);
+            }
+            let _ = &c;
+        });
+    }
     {
         let w = ui.as_weak();
         let st = st.clone();
@@ -1350,7 +1518,11 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
                         refresh_settings(&ui, &st);
                     }
                 }
+                if let Ok(mut st) = st_rc.try_borrow_mut() {
+                    start_update_check(&*p, &mut st, false);
+                }
                 let Ok(st) = st_rc.try_borrow() else { return };
+                refresh_settings(&ui, &st);
                 refresh_home(&ui, &c, &st);
                 refresh_list(&ui, &c, &st);
                 sync_reminder(&*p, &st.progress);
@@ -1359,7 +1531,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
     }
     set_text_scale(&ui, platform.font_scale());
     event(&format!("started text-scale={}", ui.global::<Theme>().get_text_scale()));
-    Ok(App { ui, state: st, content, _timer: timer })
+    Ok(App { ui, state: st, content, _timer: timer, _update_timer: update_timer })
 }
 
 pub fn run(progress_path: Option<PathBuf>, platform: Rc<dyn Platform>) -> Result<(), slint::PlatformError> {

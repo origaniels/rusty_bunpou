@@ -17,8 +17,28 @@ const DAY: i64 = 24 * HOUR;
 
 /// Records platform calls instead of talking to Android.
 #[derive(Default)]
-struct Recorder(RefCell<Vec<String>>);
+struct Recorder(RefCell<Vec<String>>, FakeGitHub);
+
+/// The update check's side: the repository the build would look in, and GitHub's next answer.
+#[derive(Default)]
+struct FakeGitHub {
+    repo: Option<String>,
+    answer: RefCell<Option<(i32, String, String)>>,
+}
+
 impl Platform for Recorder {
+    fn update_repo(&self) -> Option<String> {
+        self.1.repo.clone()
+    }
+    fn http_get(&self, url: &str, etag: &str) {
+        self.0.borrow_mut().push(format!("get {url} {etag}"));
+    }
+    fn http_result(&self) -> Option<(i32, String, String)> {
+        self.1.answer.borrow_mut().take()
+    }
+    fn open_url(&self, url: &str) {
+        self.0.borrow_mut().push(format!("open {url}"));
+    }
     fn schedule_reminder(&self, at_ms: i64, count: usize, _text: &str, _channel: &str) {
         self.0.borrow_mut().push(format!("schedule {at_ms} {count}"));
     }
@@ -63,9 +83,14 @@ fn setup() -> T {
 }
 
 fn setup_with(progress: Progress) -> T {
+    setup_full(progress, None)
+}
+
+/// [`setup_with`] for a build that looks for new versions in `repo`.
+fn setup_full(progress: Progress, repo: Option<&str>) -> T {
     i_slint_backend_testing::init_no_event_loop();
     clock::reset();
-    let rec = Rc::new(Recorder::default());
+    let rec = Rc::new(Recorder(Default::default(), FakeGitHub { repo: repo.map(String::from), ..Default::default() }));
     let app = build(progress, rec.clone()).expect("build ui");
     app.ui.window().set_size(slint::LogicalSize::new(400.0, 860.0));
     app.ui.show().unwrap();
@@ -1812,4 +1837,131 @@ fn latin_letters_and_digits_fit_their_boxes() {
         }
     }
     assert!(n > 20, "only {n} sentences with Latin letters or digits");
+}
+
+// ------------------------------------------------------------------ update check
+
+/// GitHub's answer about the latest release.
+fn release_json(tag: &str, prerelease: bool) -> String {
+    format!(
+        r#"{{"tag_name":"{tag}","draft":false,"prerelease":{prerelease},"body":"Faster reviews.","html_url":"https://github.com/o/r/releases/tag/{tag}",
+            "assets":[{{"name":"bunpo-srs-arm64.apk","browser_download_url":"https://github.com/o/r/releases/download/{tag}/bunpo-srs-arm64.apk"}}]}}"#
+    )
+}
+
+impl T {
+    /// GitHub answers the pending request; the app picks it up on its next poll.
+    fn github_answers(&self, status: i32, etag: &str, body: &str) {
+        *self.rec.1.answer.borrow_mut() = Some((status, etag.into(), body.into()));
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(600));
+    }
+    /// The settings, whole page in view.
+    fn open_settings(&self) {
+        self.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0));
+        self.press("Settings");
+    }
+    fn requests(&self) -> Vec<String> {
+        self.rec.0.borrow().iter().filter(|c| c.starts_with("get ")).cloned().collect()
+    }
+}
+
+#[test]
+fn a_build_without_a_repository_never_goes_online() {
+    let t = setup();
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_secs(3));
+    assert!(!t.exists("New versions"));
+    assert!(t.requests().is_empty());
+    t.open_settings();
+    assert!(t.exists(&format!("Version {VERSION}")), "the version is shown anyway");
+    assert!(!t.exists("Look for new versions on GitHub (once a day)"));
+}
+
+#[test]
+fn the_app_asks_once_and_no_means_no_request() {
+    let t = setup_full(Progress::in_memory(), Some("o/r"));
+    assert!(t.exists("New versions"));
+    t.press("No thanks");
+    assert!(!t.exists("New versions"), "asked once");
+    assert_eq!(t.app.state.borrow().progress.settings.check_updates, Some(false));
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_secs(3));
+    on_resume();
+    assert!(t.requests().is_empty());
+    t.open_settings();
+    assert!(t.exists("Look for new versions on GitHub (once a day)") && !t.app.ui.get_check_updates());
+    assert!(!t.exists("Check now"));
+}
+
+#[test]
+fn a_new_release_is_offered_on_the_home_screen() {
+    let t = setup_full(Progress::in_memory(), Some("o/r"));
+    t.press("Check for updates");
+    assert_eq!(t.requests(), ["get https://api.github.com/repos/o/r/releases/latest "]);
+    t.github_answers(200, "\"e1\"", &release_json("v99.0.0", false));
+    assert!(t.exists("Version 99.0.0 is available"));
+    assert!(t.exists("Faster reviews."), "with its notes");
+    t.press("Download");
+    assert_eq!(t.rec.last(), "open https://github.com/o/r/releases/download/v99.0.0/bunpo-srs-arm64.apk");
+    t.press("Not now");
+    assert!(!t.exists("Version 99.0.0 is available"));
+    assert_eq!(t.app.state.borrow().progress.update.skipped, "99.0.0");
+    // the settings still say it exists
+    t.open_settings();
+    assert!(t.exists("Version 99.0.0 is available."));
+}
+
+#[test]
+fn pre_releases_and_older_versions_are_not_offered() {
+    let t = setup_full(Progress::in_memory(), Some("o/r"));
+    t.press("Check for updates");
+    t.github_answers(200, "", &release_json("v99.0.0", true));
+    assert!(!t.exists("Version 99.0.0 is available"));
+    t.open_settings();
+    t.press("Check now");
+    t.github_answers(200, "", &release_json("v0.0.1", false));
+    assert!(t.exists("This is the latest version."));
+}
+
+#[test]
+fn the_check_runs_once_a_day_and_sends_the_last_etag() {
+    let t = setup_full(Progress::in_memory(), Some("o/r"));
+    t.press("Check for updates");
+    t.github_answers(200, "\"e1\"", &release_json("v0.0.1", false));
+    clock::advance(5 * HOUR);
+    on_resume();
+    assert_eq!(t.requests().len(), 1, "not again the same day");
+    clock::advance(20 * HOUR);
+    on_resume();
+    assert_eq!(t.requests().last().unwrap(), "get https://api.github.com/repos/o/r/releases/latest \"e1\"");
+    // no answer (offline): given up after a while, tried again at the next opening
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(600));
+    clock::advance(40_000);
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(600));
+    t.open_settings();
+    assert!(t.exists("Couldn't reach GitHub. The app will try again later."));
+    on_resume();
+    assert_eq!(t.requests().len(), 3);
+}
+
+/// The question and a new version's card, on a narrow phone with the largest text.
+fn update_cards_fit(french: bool) {
+    let mut p = Progress::in_memory();
+    p.settings.language = if french { "fr" } else { "en" }.into();
+    let t = setup_full(p, Some("o/r"));
+    set_text_scale(&t.app.ui, 1.3);
+    t.app.ui.window().set_size(slint::LogicalSize::new(320.0, 3000.0));
+    assert_fits(&t, "the question about updates");
+    t.app.ui.invoke_answer_updates(true);
+    t.github_answers(200, "", &release_json("v99.0.0", false));
+    assert!(t.app.ui.get_home().update_version == "99.0.0");
+    assert_fits(&t, "a new version");
+}
+
+#[test]
+fn the_update_cards_fit_narrow_screens() {
+    update_cards_fit(false);
+}
+
+#[test]
+fn the_update_cards_fit_narrow_screens_in_french() {
+    update_cards_fit(true);
 }

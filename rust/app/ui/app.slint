@@ -52,6 +52,8 @@ export struct HomeData {
     start-level: string,
     resume-reviews: int, resume-lesson: int, // items left in a saved (unfinished) quiz, 0 = none
     due-after: int, // reviews due that are not part of the saved review session
+    ask-updates: bool, // ask once whether to look for new versions
+    update-version: string, update-notes: string, // a new version to offer ("" = none)
 }
 
 export global Logic {
@@ -608,6 +610,16 @@ export component AppWindow inherits Window {
 
     callback start-learn();
     callback lesson-prev();
+    // update check (see `update.rs`): the one-time question, the settings, a new version
+    callback answer-updates(bool);
+    callback set-check-updates(bool);
+    callback check-updates-now();
+    callback download-update();
+    callback skip-update();
+    in property <string> app-version;
+    in property <bool> updates-possible; // built with a repository to look in
+    in property <bool> check-updates;
+    in property <string> update-status;
     callback lesson-next();
     callback start-reviews();
     callback resume();
@@ -684,6 +696,27 @@ export component AppWindow inherits Window {
             if root.screen == 0: Scroller {
                 Text { text: "文法 SRS"; font-size: 24px * Theme.text-scale; font-weight: 700; color: Theme.accent; wrap: word-wrap; }
                 Text { text: @tr("Japanese grammar, one sentence at a time."); color: Theme.fg; wrap: word-wrap; }
+                if root.home.update-version != "": Card {
+                    VerticalLayout {
+                        padding: 16px; spacing: 10px;
+                        Text { text: @tr("Version {} is available", root.home.update-version); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
+                        if root.home.update-notes != "": Text { text: root.home.update-notes; font-size: 14px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
+                        Btn { text: @tr("Download"); primary: true; clicked => { root.download-update(); } }
+                        Btn { text: @tr("Not now"); clicked => { root.skip-update(); } }
+                    }
+                }
+                if root.home.ask-updates: Card {
+                    VerticalLayout {
+                        padding: 16px; spacing: 10px;
+                        Text { text: @tr("New versions"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
+                        Text {
+                            text: @tr("Once a day, the app can ask GitHub whether a new version is out. Nothing about you or your progress is sent. You can change this in Settings.");
+                            font-size: 14px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
+                        }
+                        Btn { text: @tr("Check for updates"); primary: true; clicked => { root.answer-updates(true); } }
+                        Btn { text: @tr("No thanks"); clicked => { root.answer-updates(false); } }
+                    }
+                }
                 Card {
                     VerticalLayout {
                         padding: 16px; spacing: 10px;
@@ -1186,6 +1219,17 @@ export component AppWindow inherits Window {
                         Btn { text: @tr("Share reports ({})", root.report-count); clicked => { root.export-reports(); } }
                     }
                     HorizontalLayout { alignment: start; Btn { text: @tr("Reset all progress"); clicked => { root.confirm-reset = true; } } }
+                    Text { text: @tr("Version {}", root.app-version); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
+                    if root.updates-possible: ToggleRow {
+                        text: @tr("Look for new versions on GitHub (once a day)");
+                        checked: root.check-updates;
+                        toggled(v) => { root.set-check-updates(v); }
+                    }
+                    if root.updates-possible && root.check-updates: HorizontalLayout {
+                        alignment: start;
+                        Btn { text: @tr("Check now"); clicked => { root.check-updates-now(); } }
+                    }
+                    if root.update-status != "": Text { text: root.update-status; font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
                     Text {
                         text: @tr("Most example sentences come from Tatoeba (tatoeba.org), licensed CC-BY 2.0 FR, and show their Tatoeba number and contributor. A few were written for this app and are marked as such.");
                         font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;

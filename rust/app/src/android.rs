@@ -11,6 +11,7 @@ const BACKUP_CLASS: &str = "dev.local.bunpo.rust.Backup";
 const LOOKUP_CLASS: &str = "dev.local.bunpo.rust.Lookup";
 const SHARE_CLASS: &str = "dev.local.bunpo.rust.Share";
 const HAPTICS_CLASS: &str = "dev.local.bunpo.rust.Haptics";
+const UPDATES_CLASS: &str = "dev.local.bunpo.rust.Updates";
 
 pub fn log(msg: &str) {
     use std::ffi::CString;
@@ -171,6 +172,37 @@ impl Platform for AndroidPlatform {
                 1.0
             }
         }
+    }
+
+    fn http_get(&self, url: &str, etag: &str) {
+        self.with_class(UPDATES_CLASS, |env, _act, cls| {
+            let (url, etag) = (env.new_string(url)?, env.new_string(etag)?);
+            env.call_static_method(cls, "get", "(Ljava/lang/String;Ljava/lang/String;)V", &[JValue::Object(&url), JValue::Object(&etag)])
+                .map(|_| ())
+        });
+    }
+
+    fn http_result(&self) -> Option<(i32, String, String)> {
+        let r = self.with_class(UPDATES_CLASS, |env, _act, cls| {
+            let r = env.call_static_method(cls, "result", "()Ljava/lang/String;", &[])?.l()?;
+            if r.is_null() {
+                return Ok(None);
+            }
+            let s: String = env.get_string(&jni::objects::JString::from(r))?.into();
+            Ok(Some(s))
+        })??;
+        let mut parts = r.splitn(3, '\n');
+        let status = parts.next()?.parse().unwrap_or(0);
+        let etag = parts.next().unwrap_or("").to_string();
+        Some((status, etag, parts.next().unwrap_or("").to_string()))
+    }
+
+    fn open_url(&self, url: &str) {
+        self.with_class(UPDATES_CLASS, |env, act, cls| {
+            let url = env.new_string(url)?;
+            env.call_static_method(cls, "open", "(Landroid/app/Activity;Ljava/lang/String;)V", &[JValue::Object(act), JValue::Object(&url)])
+                .map(|_| ())
+        });
     }
 
     fn e2e_dir(&self) -> Option<std::path::PathBuf> {
