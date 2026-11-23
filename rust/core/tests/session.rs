@@ -140,3 +140,50 @@ fn grading_uses_the_clock() {
     clock::reset();
     assert!(card.last_review > clock::now_ms() + 99 * 86_400_000);
 }
+
+// ------------------------------------------------------------------ guards
+
+#[test]
+fn checking_twice_or_with_nothing_left_does_nothing() {
+    let c = Content::bundled();
+    let prog = Progress::in_memory();
+    let mut s = Session::new(&c, &prog, first_ids(&c, 1), false);
+    let answer = s.current(&c).unwrap().1.answers[0].clone();
+    s.on_input(&answer, false);
+    assert!(s.submit(&c));
+    assert_eq!(s.verdict, Some(Verdict::Correct));
+    assert!(!s.submit(&c), "already checked");
+    let mut empty = Session::new(&c, &prog, vec![], false);
+    assert!(empty.finished() && !empty.submit(&c));
+}
+
+#[test]
+fn typo_and_editing_only_apply_to_a_wrong_answer() {
+    let c = Content::bundled();
+    let prog = Progress::in_memory();
+    let mut s = Session::new(&c, &prog, first_ids(&c, 1), false);
+    // nothing checked yet
+    s.override_correct();
+    assert_eq!(s.verdict, None);
+    assert!(!s.edit_after_wrong());
+    // right: stays right
+    let answer = s.current(&c).unwrap().1.answers[0].clone();
+    s.on_input(&answer, false);
+    s.submit(&c);
+    assert!(!s.edit_after_wrong());
+    s.override_correct();
+    assert_eq!(s.verdict, Some(Verdict::Correct));
+}
+
+#[test]
+fn editing_a_wrong_answer_reopens_it_as_a_typo_fix() {
+    let c = Content::bundled();
+    let prog = Progress::in_memory();
+    let mut s = Session::new(&c, &prog, first_ids(&c, 1), false);
+    s.on_input("ぜんぜんちがう", false);
+    s.submit(&c);
+    assert_eq!(s.verdict, Some(Verdict::Wrong));
+    assert!(s.edit_after_wrong());
+    assert_eq!(s.verdict, None, "open again for the fix");
+    assert!(!s.edit_after_wrong(), "once");
+}
