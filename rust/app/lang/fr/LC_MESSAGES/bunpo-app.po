@@ -355,6 +355,9 @@ msgstr "Vérifier maintenant"
 msgid "Words"
 msgstr "Mots"
 
+msgid "Word list"
+msgstr "Liste de mots"
+
 msgid "{} words due"
 msgstr "{} mots à réviser"
 

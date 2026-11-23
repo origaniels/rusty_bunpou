@@ -49,11 +49,17 @@ export struct QuizData {
 /// a piece of a word: text, with its reading over it ("" for kana)
 export struct RubySeg { text: string, ruby: string }
 
+/// an example sentence of a word: its layout key (the word marked), translation and credits
+export struct WordExample { key: string, tr: string, credit: string }
+
 /// a vocabulary word as shown on a card
 export struct WordData {
+    id: string,
     segs: [RubySeg], text: string, // the word (with its suffix: 結婚（する）)
     chars: int, // its length, to size it
     also: string, meaning: string, level: string,
+    examples: [WordExample],
+    status: string, can-reset: bool, // on its page in the word list
 }
 
 /// the vocabulary flashcard on screen
@@ -427,13 +433,13 @@ component NavItem inherits Rectangle {
         HorizontalLayout {
             alignment: center;
             Rectangle {
-                width: 56px; height: 30px; border-radius: 15px;
+                width: 48px; height: 30px; border-radius: 15px;
                 background: root.active ? Theme.accent.with-alpha(0.22) : (ta.pressed ? #ffffff14 : transparent);
-                Icon { d: root.d; stroke: root.active ? Theme.accent : Theme.muted; x: 16px; y: 3px; }
+                Icon { d: root.d; stroke: root.active ? Theme.accent : Theme.muted; x: 12px; y: 3px; }
             }
         }
         FitText {
-            text: root.label; font-size: 12px * Theme.text-scale; font-weight: root.active ? 700 : 500;
+            text: root.label; font-size: 11px * min(Theme.text-scale, 1.15); font-weight: root.active ? 700 : 500;
             color: root.active ? Theme.fg : Theme.muted; horizontal-alignment: center;
         }
     }
@@ -450,6 +456,7 @@ component NavBar inherits Rectangle {
     in property <length> inset; // bottom safe area (gesture bar)
     callback home();
     callback grammar();
+    callback words();
     callback stats();
     callback settings();
     background: #1c1a22;
@@ -457,11 +464,13 @@ component NavBar inherits Rectangle {
     accessible-role: groupbox; accessible-label: "bar";
     Rectangle { y: 0; height: 1px; background: #2e2c36; }
     HorizontalLayout {
-        padding-left: 8px; padding-right: 8px; padding-bottom: root.inset;
+        padding-left: 2px; padding-right: 2px; padding-bottom: root.inset;
         NavItem { label: @tr("Home"); name: @tr("Home"); active: root.current == 0; clicked => { root.home(); }
             d: "M 4 11 L 12 4 L 20 11 M 6 9.5 L 6 20 L 18 20 L 18 9.5 M 10 20 L 10 14 L 14 14 L 14 20"; }
         NavItem { label: @tr("Grammar"); name: @tr("Grammar list"); active: root.current == 3 || root.current == 4; clicked => { root.grammar(); }
             d: "M 5 4 L 15 4 L 19 8 L 19 20 L 5 20 Z M 8 10 L 16 10 M 8 13.5 L 16 13.5 M 8 17 L 13 17"; }
+        NavItem { label: @tr("Words"); name: @tr("Word list"); active: root.current == 9 || root.current == 10; clicked => { root.words(); }
+            d: "M 4 7 L 14 7 L 14 20 L 4 20 Z M 8 4 L 20 4 L 20 17 L 17 17 M 7 12 L 11 12 M 7 15.5 L 11 15.5"; }
         NavItem { label: @tr("Stats"); name: @tr("Stats"); active: root.current == 6; clicked => { root.stats(); }
             d: "M 4 20 L 20 20 M 7 20 L 7 13 M 12 20 L 12 6 M 17 20 L 17 10"; }
         NavItem { label: @tr("Settings"); name: @tr("Settings"); active: root.current == 5; clicked => { root.settings(); }
@@ -581,6 +590,83 @@ component QuizBar inherits Rectangle {
     }
 }
 
+// a word with its level, readings, meaning and other spellings
+component WordCard inherits Rectangle {
+    in property <WordData> w;
+    background: Theme.card;
+    border-radius: 18px;
+    VerticalLayout {
+        padding: 20px; spacing: 14px;
+        HorizontalLayout { alignment: start; Pill { text: root.w.level; } }
+        RubyWord { segs: root.w.segs; text: root.w.text; chars: root.w.chars; }
+        Text { text: root.w.meaning; font-size: 20px * Theme.text-scale; color: Theme.fg; horizontal-alignment: center; wrap: word-wrap; }
+        if root.w.also != "": Text { text: @tr("Also written {}", root.w.also); font-size: 14px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
+    }
+}
+
+// a word's example sentences, the word marked, each with its translation and credits
+component WordExamples {
+    in property <[WordExample]> examples;
+    in property <bool> furigana;
+    in property <int> max: 999;
+    VerticalLayout {
+        spacing: 12px;
+        for ex[i] in root.examples: VerticalLayout {
+            spacing: 4px;
+            visible: i < root.max;
+            height: i < root.max ? self.preferred-height : 0;
+            SentenceView { key: ex.key; mode: 0; furigana: root.furigana; font-size: 20px * Theme.text-scale; }
+            Text { text: ex.tr; font-size: 15px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
+            Text { text: ex.credit; font-size: 11px * Theme.text-scale; color: Theme.muted.with-alpha(0.7); wrap: word-wrap; }
+        }
+    }
+}
+
+// the grammar or word list: one header row per JLPT level (tap to open or fold it), then its items
+component LevelList inherits ListView {
+    in property <[ListItem]> items;
+    callback toggle(string);
+    callback open(string);
+    for item in root.items: TouchArea {
+        height: col.preferred-height;
+        clicked => { if (item.header != "") { root.toggle(item.id); } else { root.open(item.id); } }
+        accessible-role: list-item;
+        accessible-label: item.header != "" ? item.header : item.title;
+        accessible-action-default => { if (item.header != "") { root.toggle(item.id); } else { root.open(item.id); } }
+        col := VerticalLayout {
+        // level header: tap to fold / unfold the level
+        if item.header != "": Rectangle {
+            height: 56px;
+            background: Theme.card;
+            HorizontalLayout {
+                padding-left: 12px; padding-right: 16px; spacing: 8px;
+                VerticalLayout {
+                    alignment: center;
+                    // chevron: down when open, right when folded
+                    Icon {
+                        d: item.collapsed ? "M 9 5 L 16 12 L 9 19" : "M 5 9 L 12 16 L 19 9";
+                        stroke: Theme.accent;
+                    }
+                }
+                FitText { text: item.header; font-size: 17px * Theme.text-scale; font-weight: 700; color: Theme.accent; vertical-alignment: center; horizontal-stretch: 1; }
+                FitText { text: item.num; font-size: 14px * Theme.text-scale; color: Theme.muted; vertical-alignment: center; }
+            }
+        }
+        if item.header == "": HorizontalLayout {
+            padding: 12px; padding-left: 16px; spacing: 12px;
+            FitText { text: item.num; width: 32px * Theme.text-scale; color: Theme.muted; vertical-alignment: center; }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                Text { text: item.title; font-size: 20px * min(Theme.text-scale, 1.15); /* big already: a long word must leave room for the stage label */ color: Theme.fg; wrap: word-wrap; } // long titles wrap instead of pushing the stage label off
+                Text { text: item.meaning; font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
+            }
+            VerticalLayout { alignment: center; Pill { text: item.level; } }
+        }
+        }
+        Rectangle { y: parent.height - 1px; height: 1px; background: #3a3846; }
+    }
+}
+
 component GrammarBody {
     in property <PointData> p;
     in property <bool> furigana;
@@ -635,7 +721,8 @@ export component AppWindow inherits Window {
     background: Theme.bg;
     default-font-size: 16px * Theme.text-scale;
 
-    in-out property <int> screen; // 0 home, 1 lesson, 2 quiz, 3 list, 4 detail, 5 settings, 6 stats
+    in-out property <int> screen; // 0 home, 1 lesson, 2 quiz, 3 list, 4 detail, 5 settings, 6 stats,
+    // 7 word lesson, 8 word flashcards, 9 word list, 10 a word's page
     in property <[LevelPie]> level-pies;
     /// colors of the SRS stages New, Beginner ... Mastered (pie slices and legend)
     in property <[color]> stage-colors;
@@ -690,6 +777,12 @@ export component AppWindow inherits Window {
     in property <int> vocab-lesson-index;
     in property <int> vocab-lesson-count;
     in property <VocabQuiz> vocab-quiz;
+    in property <[ListItem]> word-list;
+    in property <WordData> word-detail;
+    callback open-words();
+    callback toggle-word-level(string);
+    callback open-word(string);
+    callback reset-word();
     in property <int> vocab-goal: 10;
     // update check (see `update.rs`): the one-time question, the settings, a new version
     callback answer-updates(bool);
@@ -744,7 +837,7 @@ export component AppWindow inherits Window {
     /// Rust bumps this to move keyboard focus into the answer field.
     in property <int> focus-tick;
 
-    property <bool> tab-screen: root.screen == 0 || root.screen == 3 || root.screen == 4 || root.screen == 5 || root.screen == 6;
+    property <bool> tab-screen: root.screen == 0 || root.screen == 3 || root.screen == 4 || root.screen == 5 || root.screen == 6 || root.screen == 9 || root.screen == 10;
     out property <length> kb-height: self.virtual-keyboard-size.height > 0 ? max(0px, self.height - self.virtual-keyboard-position.y) : 0px;
 
     // the root scope owns keyboard focus outside the quiz so it receives the Android Back key
@@ -891,15 +984,9 @@ export component AppWindow inherits Window {
                 TopBar { title: @tr("New words {} / {}", root.vocab-lesson-index + 1, root.vocab-lesson-count); back => { root.go-back(); } }
                 vocab-scroll := Scroller {
                     vertical-stretch: 1;
-                    Card {
-                        VerticalLayout {
-                            padding: 20px; spacing: 14px;
-                            HorizontalLayout { alignment: start; Pill { text: root.vocab-word.level; } }
-                            RubyWord { segs: root.vocab-word.segs; text: root.vocab-word.text; chars: root.vocab-word.chars; }
-                            Text { text: root.vocab-word.meaning; font-size: 20px * Theme.text-scale; color: Theme.fg; horizontal-alignment: center; wrap: word-wrap; }
-                            if root.vocab-word.also != "": Text { text: @tr("Also written {}", root.vocab-word.also); font-size: 14px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
-                        }
-                    }
+                    WordCard { w: root.vocab-word; }
+                    if root.vocab-word.examples.length > 0: Text { text: @tr("Examples"); font-size: 18px * Theme.text-scale; font-weight: 600; color: Theme.fg; wrap: word-wrap; }
+                    WordExamples { examples: root.vocab-word.examples; furigana: root.furigana; }
                     Text {
                         text: @tr("Each word is then asked both ways: its meaning, then the word from its meaning. Say how well you knew it, honestly: that sets when it comes back.");
                         font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
@@ -969,6 +1056,7 @@ export component AppWindow inherits Window {
                             if root.vocab-quiz.reverse: RubyWord { segs: root.vocab-quiz.word.segs; text: root.vocab-quiz.word.text; chars: root.vocab-quiz.word.chars; }
                             if !root.vocab-quiz.reverse: Text { text: root.vocab-quiz.word.meaning; font-size: 20px * Theme.text-scale; color: Theme.fg; horizontal-alignment: center; wrap: word-wrap; }
                             if root.vocab-quiz.word.also != "": Text { text: @tr("Also written {}", root.vocab-quiz.word.also); font-size: 14px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
+                            WordExamples { examples: root.vocab-quiz.word.examples; furigana: root.furigana; max: 1; }
                             if !root.vocab-quiz.grading: Text { text: @tr("Practice: this answer doesn't change its schedule."); font-size: 13px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
                         }
                     }
@@ -1153,46 +1241,40 @@ export component AppWindow inherits Window {
             // ---------------------------------------------------------- grammar list
             if root.screen == 3: VerticalLayout {
                 TopBar { title: @tr("Grammar"); show-back: false; }
-                ListView {
+                LevelList {
                     vertical-stretch: 1;
-                    for item in root.grammar-list: TouchArea {
-                        height: col.preferred-height;
-                        clicked => { if (item.header != "") { root.toggle-level(item.id); } else { root.open-detail(item.id); } }
-                        accessible-role: list-item;
-                        accessible-label: item.header != "" ? item.header : item.title;
-                        accessible-action-default => { if (item.header != "") { root.toggle-level(item.id); } else { root.open-detail(item.id); } }
-                        col := VerticalLayout {
-                        // level header: tap to fold / unfold the level
-                        if item.header != "": Rectangle {
-                            height: 56px;
-                            background: Theme.card;
-                            HorizontalLayout {
-                                padding-left: 12px; padding-right: 16px; spacing: 8px;
-                                VerticalLayout {
-                                    alignment: center;
-                                    // chevron: down when open, right when folded
-                                    Icon {
-                                        d: item.collapsed ? "M 9 5 L 16 12 L 9 19" : "M 5 9 L 12 16 L 19 9";
-                                        stroke: Theme.accent;
-                                    }
-                                }
-                                FitText { text: item.header; font-size: 17px * Theme.text-scale; font-weight: 700; color: Theme.accent; vertical-alignment: center; horizontal-stretch: 1; }
-                                FitText { text: item.num; font-size: 14px * Theme.text-scale; color: Theme.muted; vertical-alignment: center; }
-                            }
+                    items: root.grammar-list;
+                    toggle(id) => { root.toggle-level(id); }
+                    open(id) => { root.open-detail(id); }
+                }
+            }
+
+            // ---------------------------------------------------------- word list
+            if root.screen == 9: VerticalLayout {
+                TopBar { title: @tr("Words"); show-back: false; }
+                LevelList {
+                    vertical-stretch: 1;
+                    items: root.word-list;
+                    toggle(id) => { root.toggle-word-level(id); }
+                    open(id) => { root.open-word(id); }
+                }
+            }
+
+            // ---------------------------------------------------------- a word's page
+            if root.screen == 10: VerticalLayout {
+                TopBar { title: root.word-detail.text; back => { root.go-back(); } }
+                Scroller {
+                    vertical-stretch: 1;
+                    Card {
+                        HorizontalLayout {
+                            padding: 12px; spacing: 8px;
+                            Text { text: root.word-detail.status; color: Theme.fg; wrap: word-wrap; vertical-alignment: center; }
+                            if root.word-detail.can-reset: Btn { text: @tr("Reset"); clicked => { root.confirm-reset = true; } }
                         }
-                        if item.header == "": HorizontalLayout {
-                            padding: 12px; padding-left: 16px; spacing: 12px;
-                            FitText { text: item.num; width: 32px * Theme.text-scale; color: Theme.muted; vertical-alignment: center; }
-                            VerticalLayout {
-                                horizontal-stretch: 1;
-                                Text { text: item.title; font-size: 20px * min(Theme.text-scale, 1.15); /* big already: a long word must leave room for the stage label */ color: Theme.fg; wrap: word-wrap; } // long titles wrap instead of pushing the stage label off
-                                Text { text: item.meaning; font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
-                            }
-                            VerticalLayout { alignment: center; Pill { text: item.level; } }
-                        }
-                        }
-                        Rectangle { y: parent.height - 1px; height: 1px; background: #3a3846; }
                     }
+                    WordCard { w: root.word-detail; }
+                    if root.word-detail.examples.length > 0: Text { text: @tr("Examples"); font-size: 18px * Theme.text-scale; font-weight: 600; color: Theme.fg; wrap: word-wrap; }
+                    WordExamples { examples: root.word-detail.examples; furigana: root.furigana; }
                 }
             }
 
@@ -1460,6 +1542,7 @@ export component AppWindow inherits Window {
                 height: 64px + root.safe-area-insets.bottom;
                 home => { root.go-home(); }
                 grammar => { root.open-list(); }
+                words => { root.open-words(); }
                 stats => { root.open-stats(); }
                 settings => { root.open-settings(); }
             }
@@ -1496,7 +1579,9 @@ export component AppWindow inherits Window {
                 box := VerticalLayout {
                     padding: 20px; spacing: 16px;
                     Text {
-                        text: root.screen == 4 ? @tr("Move \"{}\" back to unlearned?", root.notes.title) : @tr("Delete all SRS progress and review history?");
+                        text: root.screen == 4 ? @tr("Move \"{}\" back to unlearned?", root.notes.title)
+                            : root.screen == 10 ? @tr("Move \"{}\" back to unlearned?", root.word-detail.text)
+                            : @tr("Delete all SRS progress and review history?");
                         color: Theme.fg; wrap: word-wrap;
                     }
                     HorizontalLayout {
@@ -1506,7 +1591,7 @@ export component AppWindow inherits Window {
                             text: @tr("Reset"); primary: true;
                             clicked => {
                                 root.confirm-reset = false;
-                                if (root.screen == 4) { root.reset-point(); } else { root.reset-all(); }
+                                if (root.screen == 4) { root.reset-point(); } else if (root.screen == 10) { root.reset-word(); } else { root.reset-all(); }
                             }
                         }
                     }

@@ -32,6 +32,8 @@ pub const SCREEN_SETTINGS: i32 = 5;
 pub const SCREEN_STATS: i32 = 6;
 pub const SCREEN_VOCAB_LESSON: i32 = 7;
 pub const SCREEN_VOCAB_QUIZ: i32 = 8;
+pub const SCREEN_WORDS: i32 = 9;
+pub const SCREEN_WORD: i32 = 10;
 
 /// SRS stage colors: New (neutral grey), then Beginner → Mastered as one blue ramp that gets
 /// brighter (= further along) on the dark surface. Validated as an ordinal ramp against the
@@ -174,8 +176,12 @@ pub struct State {
     lesson_idx: usize,
     pub session: Option<Session>,
     detail: Option<String>,
-    /// JLPT levels folded in the grammar list (for this run of the app)
-    collapsed: std::collections::HashSet<String>,
+    /// JLPT levels opened in the grammar list and in the word list (for this run of the app;
+    /// all folded at first)
+    expanded: std::collections::HashSet<String>,
+    words_expanded: std::collections::HashSet<String>,
+    /// the word whose page is open
+    word_detail: Option<String>,
     /// the sentence the open report dialog is about
     report_target: Option<Report>,
     /// what the last export was ("progress" or "reports"), for its result message
@@ -723,7 +729,7 @@ fn refresh_list(ui: &AppWindow, content: &Content, st: &State) {
     // one header row per JLPT level (tap to fold it), then its points unless folded
     for row in level_rows(content, &st.progress) {
         let level = row.name.to_string();
-        let collapsed = st.collapsed.contains(&level);
+        let collapsed = !st.expanded.contains(&level);
         items.push(ListItem {
             id: level.as_str().into(),
             header: format!("JLPT {level}").into(),
@@ -748,8 +754,18 @@ fn refresh_list(ui: &AppWindow, content: &Content, st: &State) {
     ui.set_grammar_list(model(items));
 }
 
-/// A word as its cards show it.
-fn word_data(w: &Word, lang: Lang) -> WordData {
+/// Layout key of a word's `n`th example (see `layout_for`).
+fn example_key(word: usize, n: usize) -> SharedString {
+    format!("vocab:{word}:{n}").into()
+}
+
+/// A word as its cards show it, with its examples.
+fn word_data(vocab: &Vocab, w: &Word, lang: Lang) -> WordData {
+    let index = vocab.position(&w.id).unwrap_or(0);
+    let examples = (0..w.ex.len())
+        .filter_map(|n| vocab.example(w, n).map(|s| (n, s)))
+        .map(|(n, s)| WordExample { key: example_key(index, n), tr: s.translation(lang).into(), credit: s.attribution(lang).into() })
+        .collect();
     let mut segs: Vec<RubySeg> = w.ruby().into_iter().map(|(t, r)| RubySeg { text: t.into(), ruby: r.into() }).collect();
     let mut text = w.word.clone();
     if !w.suffix.is_empty() {
@@ -758,19 +774,73 @@ fn word_data(w: &Word, lang: Lang) -> WordData {
         segs.push(RubySeg { text: s.into(), ruby: "".into() });
     }
     WordData {
+        id: w.id.as_str().into(),
+        examples: model(examples),
         chars: text.chars().count() as i32,
         segs: model(segs),
         text: text.into(),
         also: w.also.as_str().into(),
         meaning: w.meaning(lang).into(),
         level: w.level.as_str().into(),
+        ..Default::default()
     }
+}
+
+/// A word's page in the word list: the word, its examples, how far it is learned.
+fn word_page(st: &State, w: &Word) -> WordData {
+    let lang = st.progress.settings.lang();
+    let card = vocab::word_card(&st.progress, &w.id);
+    let fr = lang == Lang::Fr;
+    let status = match (card.is_new(), fr) {
+        (true, false) => "Status: not learned yet".to_string(),
+        (true, true) => "Statut : pas encore appris".to_string(),
+        (false, false) => format!("Status: {} · next review {}", card.level_name(), rel_time(lang, card.due, now_ms())),
+        (false, true) => format!("Statut : {} · prochaine révision {}", tr(lang, card.level_name()), rel_time(lang, card.due, now_ms())),
+    };
+    WordData { status: status.into(), can_reset: !card.is_new(), ..word_data(&st.vocab, w, lang) }
+}
+
+/// The word list: a header per level (folded until opened), then its words.
+fn refresh_word_list(ui: &AppWindow, st: &State) {
+    let lang = st.progress.settings.lang();
+    let learned = st.vocab.learned_per_level(&st.progress);
+    let mut items = vec![];
+    for (li, level) in JLPT_LEVELS.iter().enumerate() {
+        let words: Vec<&Word> = st.vocab.words.iter().filter(|w| w.level == *level).collect();
+        if words.is_empty() {
+            continue;
+        }
+        let collapsed = !st.words_expanded.contains(*level);
+        items.push(ListItem {
+            id: (*level).into(),
+            header: format!("JLPT {level}").into(),
+            num: format!("{} / {}", learned[li], words.len()).into(),
+            collapsed,
+            ..Default::default()
+        });
+        if collapsed {
+            continue;
+        }
+        for (n, w) in words.iter().enumerate() {
+            let text = if w.suffix.is_empty() { w.word.clone() } else { format!("{}（{}）", w.word, w.suffix) };
+            let meaning = if w.reading == w.word { w.meaning(lang).to_string() } else { format!("{} · {}", w.reading, w.meaning(lang)) };
+            items.push(ListItem {
+                id: w.id.as_str().into(),
+                num: (n + 1).to_string().into(),
+                title: text.into(),
+                meaning: meaning.into(),
+                level: tr(lang, vocab::word_card(&st.progress, &w.id).level_name()).into(),
+                ..Default::default()
+            });
+        }
+    }
+    ui.set_word_list(model(items));
 }
 
 fn refresh_vocab_lesson(ui: &AppWindow, st: &State) {
     let lang = st.progress.settings.lang();
     if let Some(w) = st.vocab_lesson.get(st.vocab_lesson_idx).and_then(|id| st.vocab.get(id)) {
-        ui.set_vocab_word(word_data(w, lang));
+        ui.set_vocab_word(word_data(&st.vocab, w, lang));
     }
     ui.set_vocab_lesson_index(st.vocab_lesson_idx as i32);
     ui.set_vocab_lesson_count(st.vocab_lesson.len() as i32);
@@ -803,7 +873,7 @@ fn refresh_vocab_quiz(ui: &AppWindow, st: &State) {
     };
     if let Some((w, side)) = s.current().and_then(|id| st.vocab.word_of(id)) {
         q.reverse = side == Side::Reverse;
-        q.word = word_data(w, lang);
+        q.word = word_data(&st.vocab, w, lang);
         if s.grading() {
             let id = s.current().unwrap_or_default();
             let card = st.progress.vocab.get(id).cloned().unwrap_or_default();
@@ -963,7 +1033,7 @@ fn show(ui: &AppWindow, st: &mut State, screen: i32) {
     let cur = ui.get_screen();
     if screen == SCREEN_HOME {
         st.stack.clear();
-    } else if [SCREEN_LIST, SCREEN_STATS, SCREEN_SETTINGS].contains(&screen) {
+    } else if [SCREEN_LIST, SCREEN_WORDS, SCREEN_STATS, SCREEN_SETTINGS].contains(&screen) {
         // menu-bar tabs: switching tabs doesn't pile up history, Back goes home
         st.stack = vec![SCREEN_HOME];
     } else if cur != screen {
@@ -991,11 +1061,19 @@ fn sync_reminder(platform: &dyn Platform, progress: &Progress) {
     }
 }
 
-fn layout_for(content: &Content, key: &str, mode: i32, typed: &str, furigana: bool, width: f32, font: f32) -> SentenceData {
-    let Some((pid, sid)) = key.split_once(':') else { return SentenceData::default() };
-    let Some(s) = content.get(pid).and_then(|p| find_sentence(p, sid.parse().unwrap_or(0))) else {
-        return SentenceData::default();
+/// Lay out the sentence `key` names: "point:sentence id" (grammar) or "vocab:word index:n" (the
+/// `n`th example of a word).
+fn layout_for(content: &Content, vocab: &Vocab, key: &str, mode: i32, typed: &str, furigana: bool, width: f32, font: f32) -> SentenceData {
+    let s = if let Some(rest) = key.strip_prefix("vocab:") {
+        let (w, n) = rest.split_once(':').unwrap_or_default();
+        let (Ok(w), Ok(n)) = (w.parse::<usize>(), n.parse::<usize>()) else { return SentenceData::default() };
+        vocab.words.get(w).and_then(|w| vocab.example(w, n)).map(std::borrow::Cow::Owned)
+    } else {
+        let Some((pid, sid)) = key.split_once(':') else { return SentenceData::default() };
+        content.get(pid).and_then(|p| find_sentence(p, sid.parse().unwrap_or(0))).map(std::borrow::Cow::Borrowed)
     };
+    let Some(s) = s else { return SentenceData::default() };
+    let s = &s;
     let mode = match mode {
         1 => ClozeMode::Blank,
         2 => ClozeMode::Revealed,
@@ -1036,6 +1114,7 @@ fn layout_for(content: &Content, key: &str, mode: i32, typed: &str, furigana: bo
 /// Create the UI and wire every callback. Does not start the event loop.
 pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slint::PlatformError> {
     let content = Rc::new(Content::bundled());
+    let vocab = Rc::new(Vocab::bundled());
     let st = Rc::new(RefCell::new(State {
         progress,
         stack: vec![],
@@ -1045,14 +1124,16 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         composing: (String::new(), 0),
         composing_with: String::new(),
         update_repo: platform.update_repo(),
-        vocab: Rc::new(Vocab::bundled()),
+        vocab: vocab.clone(),
         vocab_session: None,
         vocab_lesson: vec![],
         vocab_lesson_idx: 0,
         update_pending: None,
         update_failed: false,
         detail: None,
-        collapsed: Default::default(),
+        expanded: Default::default(),
+        words_expanded: Default::default(),
+        word_detail: None,
         report_target: None,
         exporting: "progress",
     }));
@@ -1061,8 +1142,9 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
 
     {
         let c = content.clone();
+        let v = vocab.clone();
         ui.global::<Logic>().on_layout(move |key, mode, typed, furi, width, font| {
-            layout_for(&c, &key, mode, &typed, furi, width, font)
+            layout_for(&c, &v, &key, mode, &typed, furi, width, font)
         });
         ui.global::<Logic>().on_chip_rows(|words, width, font| {
             let words: Vec<String> = words.iter().map(|w| w.to_string()).collect();
@@ -1299,6 +1381,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             event(&format!("screen={prev} back"));
             refresh_home(&ui, &c, &st);
             refresh_list(&ui, &c, &st);
+            refresh_word_list(&ui, &st);
             if prev == SCREEN_DETAIL {
                 if let Some(id) = st.detail.clone() {
                     ui.set_notes(point_data(&c, &st, &id));
@@ -1313,6 +1396,52 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         show(&ui, &mut st, SCREEN_LIST);
     }));
 
+    // the word list and a word's page
+    ui.on_open_words(cb!(|ui, c, st| {
+        refresh_word_list(&ui, &st);
+        show(&ui, &mut st, SCREEN_WORDS);
+        let _ = &c;
+    }));
+    {
+        let w = ui.as_weak();
+        let st = st.clone();
+        ui.on_toggle_word_level(move |level| {
+            let Some(ui) = w.upgrade() else { return };
+            let mut st = st.borrow_mut();
+            let level = level.to_string();
+            if !st.words_expanded.remove(&level) {
+                st.words_expanded.insert(level);
+            }
+            refresh_word_list(&ui, &st);
+        });
+    }
+    {
+        let w = ui.as_weak();
+        let st = st.clone();
+        ui.on_open_word(move |id| {
+            let Some(ui) = w.upgrade() else { return };
+            let mut st = st.borrow_mut();
+            let vocab = st.vocab.clone();
+            let Some(word) = vocab.get(&id) else { return };
+            st.word_detail = Some(id.to_string());
+            ui.set_word_detail(word_page(&st, word));
+            show(&ui, &mut st, SCREEN_WORD);
+        });
+    }
+    ui.on_reset_word(cb!(|ui, c, st, p| {
+        if let Some(id) = st.word_detail.clone() {
+            event(&format!("reset word {id}"));
+            vocab::reset_word(&mut st.progress, &id);
+            let vocab = st.vocab.clone();
+            if let Some(word) = vocab.get(&id) {
+                ui.set_word_detail(word_page(&st, word));
+            }
+            refresh_word_list(&ui, &st);
+            refresh_home(&ui, &c, &st);
+            sync_reminder(&*p, &st.progress);
+        }
+    }));
+
     {
         let w = ui.as_weak();
         let st = st.clone();
@@ -1321,8 +1450,8 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             let Some(ui) = w.upgrade() else { return };
             let mut st = st.borrow_mut();
             let level = level.to_string();
-            if !st.collapsed.remove(&level) {
-                st.collapsed.insert(level);
+            if !st.expanded.remove(&level) {
+                st.expanded.insert(level);
             }
             refresh_list(&ui, &c, &st);
         });
