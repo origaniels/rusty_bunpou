@@ -65,6 +65,8 @@ pub struct Settings {
     /// Hour (0-23) the day starts at, for the daily goal, streak and stats: with 4, a review at
     /// 1 AM still counts for the day before.
     pub day_start: u32,
+    /// Look for a new version on GitHub once a day; None until the user was asked.
+    pub check_updates: Option<bool>,
 }
 
 impl Settings {
@@ -75,7 +77,7 @@ impl Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into(), language: "en".into(), haptics: true, day_start: 0 }
+        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into(), language: "en".into(), haptics: true, day_start: 0, check_updates: None }
     }
 }
 
@@ -120,6 +122,8 @@ pub struct Progress {
     pub reports: Vec<Report>,
     /// the unfinished quiz (lesson or reviews), to resume it
     pub paused: Option<crate::session::Session>,
+    /// the update check's memory (last check, newest release seen, version skipped)
+    pub update: crate::update::UpdateState,
     #[serde(skip)]
     path: Option<PathBuf>,
 }

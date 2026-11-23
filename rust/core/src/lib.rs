@@ -14,3 +14,4 @@ pub mod reminder;
 pub mod session;
 pub mod stats;
 pub mod store;
+pub mod update;
