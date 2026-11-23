@@ -94,7 +94,9 @@ grep -q "versionName='$version'" <<<"$badging" || die "the APK's version isn't $
 echo "  $(grep -o "versionCode='[0-9]*' versionName='[^']*'" <<<"$badging")"
 libs=$(unzip -l "$apk" | grep -o 'lib/[^/]*/' | sort -u | tr '\n' ' ')
 [ "$libs" = "lib/arm64-v8a/ " ] || die "the APK should only hold the arm64 library, not: $libs"
-unzip -p "$apk" lib/arm64-v8a/libbunpo_app.so | grep -qa "$repo" || die "the update check's repository isn't in the build"
+# (grep -c reads it all: grep -q would stop early and fail the pipe under pipefail)
+[ "$(unzip -p "$apk" lib/arm64-v8a/libbunpo_app.so | grep -ac "$repo")" -gt 0 ] ||
+  die "the update check's repository isn't in the build"
 echo "  arm64 only, update check on $repo"
 echo "  $(du -h "$apk" | cut -f1)  sha256 $(sha256sum "$apk" | cut -d' ' -f1)"
 
