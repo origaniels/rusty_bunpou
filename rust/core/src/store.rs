@@ -67,6 +67,8 @@ pub struct Settings {
     pub day_start: u32,
     /// Look for a new version on GitHub once a day; None until the user was asked.
     pub check_updates: Option<bool>,
+    /// New words a day (vocabulary lessons), like `batch_size` for grammar points.
+    pub vocab_goal: u32,
 }
 
 impl Settings {
@@ -77,7 +79,7 @@ impl Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into(), language: "en".into(), haptics: true, day_start: 0, check_updates: None }
+        Settings { furigana: true, english: true, romaji: true, batch_size: 5, retention: 0.9, notifications: true, start_level: "N5".into(), language: "en".into(), haptics: true, day_start: 0, check_updates: None, vocab_goal: 10 }
     }
 }
 
@@ -124,6 +126,10 @@ pub struct Progress {
     pub paused: Option<crate::session::Session>,
     /// the update check's memory (last check, newest release seen, version skipped)
     pub update: crate::update::UpdateState,
+    /// vocabulary flashcards, two per word (see `vocab::card_id`)
+    pub vocab: HashMap<String, Card>,
+    /// self-graded vocabulary answers (`point` is the card id, `grade` 1-4)
+    pub vocab_log: Vec<LogEntry>,
     #[serde(skip)]
     path: Option<PathBuf>,
 }
@@ -186,6 +192,8 @@ impl Progress {
         self.cards = new.cards;
         self.settings = new.settings;
         self.log = new.log;
+        self.vocab = new.vocab;
+        self.vocab_log = new.vocab_log;
         self.paused = None;
         for r in new.reports {
             if !self.reports.contains(&r) {
@@ -208,6 +216,8 @@ impl Progress {
     pub fn reset_all(&mut self) {
         self.cards.clear();
         self.log.clear();
+        self.vocab.clear();
+        self.vocab_log.clear();
         self.paused = None;
         self.save();
     }
@@ -237,8 +247,19 @@ pub mod scheduler {
     /// An FSRS interval may be at most this many times the previous interval.
     pub const MAX_GROWTH: f64 = 3.0;
 
+    /// A typed answer (grammar): right is "Good", wrong is "Again".
     pub fn grade(card: &Card, correct: bool, now: i64, retention: f64, sentence: u64) -> Card {
-        let g = if correct { 3 } else { 1 };
+        schedule(card, if correct { 3 } else { 1 }, now, retention, sentence)
+    }
+
+    /// A self-graded answer (vocabulary flashcards): 1 Again, 2 Hard, 3 Good, 4 Easy.
+    /// Again and Good do what a wrong and a right grammar answer do; Hard stays at the current
+    /// learning step (or gets a shorter FSRS interval), Easy skips a step (or a longer interval).
+    pub fn grade_self(card: &Card, grade: u8, now: i64, retention: f64) -> Card {
+        schedule(card, grade.clamp(1, 4), now, retention, 0)
+    }
+
+    fn schedule(card: &Card, g: u8, now: i64, retention: f64, sentence: u64) -> Card {
         let elapsed = if card.last_review == 0 { 0.0 } else { (now - card.last_review) as f64 / DAY_MS as f64 };
         let prev = (card.reps > 0).then_some(fsrs::Memory { stability: card.stability, difficulty: card.difficulty });
         let mem = fsrs::review(prev, elapsed, g);
@@ -253,7 +274,9 @@ pub mod scheduler {
         if card.is_new() {
             c.learned_at = now;
         }
-        if !correct {
+        let step = card.step as usize;
+        let learning = card.state <= 1 && step < LEARNING_STEPS.len();
+        if g == 1 {
             if card.state == 2 {
                 c.lapses += 1;
                 c.step = RELEARN_FROM_STEP;
@@ -262,10 +285,16 @@ pub mod scheduler {
             }
             c.state = 1;
             c.due = now + RELEARN_DELAY;
-        } else if card.state <= 1 && (card.step as usize) < LEARNING_STEPS.len() {
+        } else if learning && g == 2 {
+            // the current step again (the previous step's delay; the first one for a new card)
             c.state = 1;
-            c.due = now + LEARNING_STEPS[card.step as usize];
-            c.step = card.step + 1;
+            c.due = now + LEARNING_STEPS[step.saturating_sub(1)];
+        } else if learning && (g == 3 || step + 1 < LEARNING_STEPS.len()) {
+            // Good: the next step; Easy: the one after, while there is one
+            let next = if g == 4 { step + 1 } else { step };
+            c.state = 1;
+            c.due = now + LEARNING_STEPS[next];
+            c.step = next as u32 + 1;
         } else {
             let fuzz = 1.0 + (fastrand::f64() - 0.5) * 0.1;
             let days = fsrs::interval_days(mem.stability, retention, 365.0);
@@ -311,6 +340,34 @@ mod tests {
         t = card.due;
         card = grade(&card, false, t, 0.9, 1);
         assert_eq!((card.state, card.lapses, card.due), (1, 1, t + RELEARN_DELAY));
+    }
+
+    #[test]
+    fn self_grades_move_through_the_learning_steps() {
+        let t = 1_000_000_000_000i64;
+        let new = Card::default();
+        // Good is a right typed answer, Again a wrong one
+        assert_eq!(grade_self(&new, 3, t, 0.9).due, grade(&new, true, t, 0.9, 0).due);
+        assert_eq!(grade_self(&new, 1, t, 0.9).due, t + RELEARN_DELAY);
+        // Hard stays on the step, Easy skips one
+        let hard = grade_self(&new, 2, t, 0.9);
+        assert_eq!((hard.step, hard.due), (0, t + LEARNING_STEPS[0]));
+        let easy = grade_self(&new, 4, t, 0.9);
+        assert_eq!((easy.step, easy.due), (2, t + LEARNING_STEPS[1]));
+        let good = grade_self(&new, 3, t, 0.9);
+        let hard2 = grade_self(&good, 2, t + 10, 0.9);
+        assert_eq!((hard2.step, hard2.due), (1, t + 10 + LEARNING_STEPS[0]));
+        // Easy on the last step graduates
+        let last = Card { state: 1, step: (LEARNING_STEPS.len() - 1) as u32, reps: 4, stability: 3.0, difficulty: 5.0, last_review: t, ..Default::default() };
+        assert_eq!(grade_self(&last, 4, t + 3 * DAY_MS, 0.9).state, 2);
+        // in review: Hard < Good < Easy
+        let rev = Card { state: 2, step: 4, reps: 6, stability: 10.0, difficulty: 5.0, last_review: t, due: t + 10 * DAY_MS, ..Default::default() };
+        let at = t + 10 * DAY_MS;
+        let iv = |g| (0..20).map(|_| grade_self(&rev, g, at, 0.9).due - at).sum::<i64>();
+        // (Good and Easy may both reach the growth cap; the fuzz then decides)
+        let (hard, good, easy) = (iv(2), iv(3), iv(4));
+        assert!(hard < good && easy * 100 >= good * 95, "{hard} {good} {easy}");
+        assert_eq!(grade_self(&rev, 1, at, 0.9).lapses, 1);
     }
 
     #[test]
