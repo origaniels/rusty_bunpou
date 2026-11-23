@@ -53,7 +53,7 @@ export struct RubySeg { text: string, ruby: string }
 export struct WordData {
     segs: [RubySeg], text: string, // the word (with its suffix: 結婚（する）)
     chars: int, // its length, to size it
-    reading: string, also: string, meaning: string, level: string,
+    also: string, meaning: string, level: string,
 }
 
 /// the vocabulary flashcard on screen
@@ -894,7 +894,6 @@ export component AppWindow inherits Window {
                             padding: 20px; spacing: 14px;
                             HorizontalLayout { alignment: start; Pill { text: root.vocab-word.level; } }
                             RubyWord { segs: root.vocab-word.segs; text: root.vocab-word.text; chars: root.vocab-word.chars; }
-                            Text { text: root.vocab-word.reading; font-size: 18px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
                             Text { text: root.vocab-word.meaning; font-size: 20px * Theme.text-scale; color: Theme.fg; horizontal-alignment: center; wrap: word-wrap; }
                             if root.vocab-word.also != "": Text { text: @tr("Also written {}", root.vocab-word.also); font-size: 14px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
                         }
@@ -966,7 +965,6 @@ export component AppWindow inherits Window {
                         VerticalLayout {
                             padding: 20px; spacing: 10px;
                             if root.vocab-quiz.reverse: RubyWord { segs: root.vocab-quiz.word.segs; text: root.vocab-quiz.word.text; chars: root.vocab-quiz.word.chars; }
-                            Text { text: root.vocab-quiz.word.reading; font-size: 18px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
                             if !root.vocab-quiz.reverse: Text { text: root.vocab-quiz.word.meaning; font-size: 20px * Theme.text-scale; color: Theme.fg; horizontal-alignment: center; wrap: word-wrap; }
                             if root.vocab-quiz.word.also != "": Text { text: @tr("Also written {}", root.vocab-quiz.word.also); font-size: 14px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
                             if !root.vocab-quiz.grading: Text { text: @tr("Practice: this answer doesn't change its schedule."); font-size: 13px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
@@ -977,7 +975,8 @@ export component AppWindow inherits Window {
                     accessible-role: groupbox; accessible-label: "bar";
                     vertical-stretch: 0;
                     background: Theme.bg;
-                    property <bool> two-rows: self.width < 430px * Theme.text-scale;
+                    // four in a row when they fit (a 400 px wide phone at normal text size), else two rows
+                    property <bool> two-rows: self.width < 400px * Theme.text-scale;
                     VerticalLayout {
                         padding: 16px; spacing: 8px;
                         if !root.vocab-quiz.revealed: Btn { text: @tr("Show answer"); primary: true; clicked => { root.vocab-reveal(); } }

@@ -761,7 +761,6 @@ fn word_data(w: &Word, lang: Lang) -> WordData {
         chars: text.chars().count() as i32,
         segs: model(segs),
         text: text.into(),
-        reading: if w.word == w.reading { String::new() } else { w.reading.clone() }.into(),
         also: w.also.as_str().into(),
         meaning: w.meaning(lang).into(),
         level: w.level.as_str().into(),
