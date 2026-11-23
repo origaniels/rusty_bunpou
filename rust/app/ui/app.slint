@@ -747,14 +747,14 @@ export component AppWindow inherits Window {
                             IconBtn {
                                 icon: Icons.previous; label: @tr("Previous");
                                 enabled: root.lesson-index > 0;
-                                clicked => { lesson-scroll.viewport-y = 0; root.lesson-prev(); } // each page opens at its top
+                                clicked => { lesson-scroll.content-y = 0; root.lesson-prev(); } // each page opens at its top
                             }
                         }
                         Btn {
                             text: root.lesson-index < root.lesson-count - 1 ? @tr("Next") : @tr("Start quiz");
                             horizontal-stretch: 1;
                             primary: true;
-                            clicked => { lesson-scroll.viewport-y = 0; root.lesson-next(); }
+                            clicked => { lesson-scroll.content-y = 0; root.lesson-next(); }
                         }
                     }
                 }
