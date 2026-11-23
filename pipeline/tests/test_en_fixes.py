@@ -1,7 +1,11 @@
 """English translations written for the app replace Tatoeba's (see en_fixes.tsv)."""
+import sys
+from pathlib import Path
+
 import pytest
 
-import build
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import build  # noqa: E402
 
 
 def test_the_fixes_file_is_well_formed():
