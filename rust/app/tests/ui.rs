@@ -2171,3 +2171,265 @@ fn french_meanings_are_shown_in_french() {
     let word = st.vocab.words.iter().find(|x| x.level == "N5").unwrap();
     assert_eq!((w.meaning.as_str(), w.text.as_str()), (word.fr.as_str(), word.word.as_str()));
 }
+
+// ------------------------------------------------------------------ more edges: hints, backups, audit
+
+#[test]
+fn almost_hints_read_right_in_both_languages() {
+    use bunpo_core::hints::{Aspect, Nudge};
+    use bunpo_core::i18n::Lang;
+    let c = bunpo_core::content::Content::bundled();
+    let with = c.points.iter().find(|p| p.nuance.is_some()).unwrap();
+    let without = c.points.iter().find(|p| p.nuance.is_none()).unwrap();
+    let (en, fr) = (Lang::En, Lang::Fr);
+    let (e, f) = with.nuance.clone().unwrap();
+    assert_eq!(nudge_text(en, &Nudge::Nuance, with), format!("That could work, but here we're looking for {e}."));
+    assert_eq!(nudge_text(fr, &Nudge::Nuance, with), format!("Ça pourrait aller, mais ici on cherche {f}."));
+    assert!(nudge_text(en, &Nudge::Nuance, without).contains("not the grammar point practised here"));
+    assert!(nudge_text(fr, &Nudge::Nuance, without).contains("pas le point de grammaire"));
+    assert_eq!(nudge_text(en, &Nudge::Particle, with), "Almost! Check the particle.");
+    assert_eq!(nudge_text(fr, &Nudge::Particle, with), "Presque ! Vérifie la particule.");
+    assert_eq!(nudge_text(en, &Nudge::Form(vec![]), with), "Almost! Right word, but check its form.");
+    assert!(nudge_text(fr, &Nudge::Form(vec![]), with).starts_with("Presque !"));
+    let all = Nudge::Form(vec![Aspect::Tense, Aspect::Politeness, Aspect::TeForm, Aspect::Negative]);
+    let en_all = nudge_text(en, &all, with);
+    for name in ["tense", "politeness", "て-form", "positive or negative"] {
+        assert!(en_all.contains(name), "{en_all}");
+    }
+    let fr_all = nudge_text(fr, &all, with);
+    for name in ["temps", "politesse", "forme en て", "affirmatif ou négatif"] {
+        assert!(fr_all.contains(name), "{fr_all}");
+    }
+}
+
+#[test]
+fn backup_outcomes_are_reported_in_the_app_language() {
+    let dir = tmp_dir("outcomes");
+    let t = setup_with(Progress::load(&dir.join("progress.json")));
+    for (lang, outcome, want) in [
+        ("en", "cancelled", "Cancelled."),
+        ("fr", "cancelled", "Annulé."),
+        ("fr", "exported", "Progression exportée."),
+        ("en", "error: no space", "Something went wrong, nothing was changed."),
+        ("fr", "", "Une erreur s'est produite, rien n'a été modifié."),
+    ] {
+        t.app.state.borrow_mut().progress.settings.language = lang.into();
+        std::fs::write(dir.join("backup-result.txt"), outcome).unwrap();
+        let msg = check_backup_files(&mut t.app.state.borrow_mut());
+        assert_eq!(msg.as_deref(), Some(want), "{lang} {outcome:?}");
+        assert!(check_backup_files(&mut t.app.state.borrow_mut()).is_none(), "read once");
+    }
+}
+
+#[test]
+fn nothing_to_pick_up_without_a_progress_file() {
+    let t = setup();
+    assert!(check_backup_files(&mut t.app.state.borrow_mut()).is_none());
+}
+
+#[test]
+fn the_update_status_is_french_too() {
+    let mut p = Progress::in_memory();
+    p.settings.language = "fr".into();
+    let t = setup_full(p, Some("o/r"));
+    t.app.ui.invoke_answer_updates(true);
+    t.github_answers(0, "", "");
+    assert_eq!(t.app.ui.get_update_status(), "GitHub n'a pas pu être joint. L'appli réessaiera plus tard.");
+    t.app.ui.invoke_check_updates_now();
+    assert_eq!(t.app.ui.get_update_status(), "Vérification…");
+    t.github_answers(200, "", &release_json("v0.0.1", false));
+    assert_eq!(t.app.ui.get_update_status(), "C'est la dernière version.");
+    t.app.ui.invoke_check_updates_now();
+    t.github_answers(200, "", &release_json("v99.1.0", false));
+    assert_eq!(t.app.ui.get_update_status(), "La version 99.1.0 est disponible.");
+    assert!(t.exists("La version 99.1.0 est disponible"), "the home card, translated");
+}
+
+#[test]
+fn turning_the_update_check_off_hides_the_offer_and_stops_checking() {
+    let t = setup_full(Progress::in_memory(), Some("o/r"));
+    t.press("Check for updates");
+    t.github_answers(200, "", &release_json("v99.0.0", false));
+    assert!(t.exists("Version 99.0.0 is available"));
+    t.app.ui.invoke_set_check_updates(false);
+    assert!(!t.exists("Version 99.0.0 is available"));
+    assert_eq!(t.app.ui.get_update_status(), "");
+    clock::advance(3 * DAY);
+    on_resume();
+    t.app.ui.invoke_check_updates_now();
+    assert_eq!(t.requests().len(), 1, "no request while it is off");
+}
+
+#[test]
+fn the_audit_catches_a_screen_that_does_not_fit() {
+    let t = setup();
+    // far too narrow for the home screen: texts cut or buttons off the side
+    t.app.ui.window().set_size(slint::LogicalSize::new(120.0, 860.0));
+    let issues = audit::audit(&t.app.ui, audit::Options { strict_vertical: false });
+    assert!(!issues.is_empty(), "a 120 px wide window passed the audit");
+    assert!(audit::command(&t.app.ui, "audit home").starts_with("audit home FAIL"));
+    // back to a phone's width: clean again
+    t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 860.0));
+    assert!(audit::audit(&t.app.ui, audit::Options { strict_vertical: false }).is_empty());
+}
+
+#[test]
+fn e2e_commands_answer_and_unknown_ones_say_so() {
+    let t = setup();
+    let ui = &t.app.ui;
+    assert!(audit::command(ui, "where Settings").starts_with("where on "));
+    assert_eq!(audit::command(ui, "where No such button"), "where none \"No such button\"");
+    assert_eq!(audit::command(ui, "audit home"), "audit home ok");
+    assert!(audit::command(ui, "buttons").contains("Learn 5 new"));
+    assert!(audit::command(ui, "texts").contains("Reviews"));
+    assert!(audit::command(ui, "count").starts_with("count all="));
+    assert_eq!(audit::command(ui, "frobnicate"), "unknown command \"frobnicate\"");
+    // the digest changes with the screen and only then
+    let d1 = audit::command(ui, "digest");
+    assert_eq!(audit::command(ui, "digest"), d1);
+    t.press("Settings");
+    assert_ne!(audit::command(ui, "digest"), d1);
+}
+
+// ------------------------------------------------------------------ more edges: words
+
+#[test]
+fn a_grade_before_the_answer_is_shown_does_nothing() {
+    let t = setup();
+    t.read_word_lesson();
+    t.app.ui.invoke_vocab_grade(4);
+    let q = t.app.ui.get_vocab_quiz();
+    assert_eq!((q.done, q.revealed), (0, false));
+    assert!(t.app.state.borrow().progress.vocab_log.is_empty());
+}
+
+#[test]
+fn word_reviews_with_nothing_due_do_not_start() {
+    let t = setup();
+    t.app.ui.invoke_start_vocab_reviews();
+    assert_eq!(t.screen(), SCREEN_HOME);
+    assert!(t.app.state.borrow().vocab_session.is_none());
+}
+
+#[test]
+fn leaving_a_word_lesson_before_its_cards_learns_nothing() {
+    let t = setup();
+    let before = t.app.ui.get_home().vocab_new;
+    t.press("Learn 10 new words");
+    assert!(!t.find("Previous").accessible_enabled().unwrap(), "nothing before the first word");
+    t.press("Next");
+    assert!(t.app.ui.invoke_go_back());
+    assert_eq!(t.screen(), SCREEN_HOME);
+    assert_eq!(t.app.ui.get_home().vocab_new, before);
+    assert!(t.app.state.borrow().progress.vocab.is_empty());
+}
+
+#[test]
+fn leaving_word_cards_halfway_keeps_the_answers_given() {
+    let t = setup();
+    t.read_word_lesson();
+    for _ in 0..3 {
+        t.grade_word("Good");
+    }
+    assert!(t.app.ui.invoke_go_back());
+    assert_eq!(t.screen(), SCREEN_HOME);
+    let st = t.app.state.borrow();
+    assert!(st.vocab_session.is_none());
+    assert_eq!(st.progress.vocab_log.len(), 3);
+    drop(st);
+    let h = t.app.ui.get_home();
+    assert_eq!(h.vocab_learned, 3, "three words answered forward");
+    assert!(t.exists("Today: 3 / 10 new words") && t.exists("Learn 7 new words"));
+}
+
+#[test]
+fn the_finished_word_screen_leads_home() {
+    let t = setup();
+    t.read_word_lesson();
+    for _ in 0..20 {
+        t.grade_word("Easy");
+    }
+    assert!(t.exists("20 / 20 cards known on the first try."));
+    t.press("Home");
+    assert_eq!(t.screen(), SCREEN_HOME);
+}
+
+#[test]
+fn a_word_card_shows_its_note_and_other_spellings() {
+    let t = setup();
+    {
+        let mut st = t.app.state.borrow_mut();
+        st.vocab_session = Some(bunpo_core::vocab::VocabSession::new(vec!["結婚|けっこん (する)#f".into(), "足; 脚|あし#r".into()], false));
+    }
+    t.app.ui.set_screen(SCREEN_VOCAB_QUIZ);
+    t.press("Show answer");
+    let w = t.app.ui.get_vocab_quiz().word;
+    assert_eq!(w.text, "結婚（する）");
+    let segs: Vec<(String, String)> = w.segs.iter().map(|s| (s.text.to_string(), s.ruby.to_string())).collect();
+    assert_eq!(segs.last().unwrap(), &("（する）".to_string(), String::new()));
+    assert_eq!(segs[0], ("結婚".to_string(), "けっこん".to_string()));
+    t.press("Good");
+    let q = t.app.ui.get_vocab_quiz();
+    assert!(q.reverse && q.word.text == "足" && q.word.meaning == "foot; leg");
+    t.press("Show answer");
+    assert!(t.exists("Also written 脚"));
+}
+
+#[test]
+fn word_reviews_in_french() {
+    let mut p = Progress::in_memory();
+    p.settings.language = "fr".into();
+    let t = setup_with(p);
+    t.press("Apprendre 10 nouveaux mots");
+    while t.screen() == SCREEN_VOCAB_LESSON {
+        t.app.ui.invoke_vocab_lesson_next();
+    }
+    assert_eq!(t.app.ui.get_vocab_quiz().title, "Nouveaux mots");
+    for i in 0..20 {
+        t.press("Voir la réponse");
+        t.press(if i == 0 { "À revoir" } else { "Correct" });
+    }
+    t.press("Voir la réponse");
+    t.press("Facile");
+    assert!(t.exists("Mots terminés !") && t.exists("19 / 20 cartes sues du premier coup."));
+    t.press("Accueil");
+    clock::advance(5 * HOUR);
+    on_resume();
+    t.press("Réviser les mots");
+    assert_eq!(t.app.ui.get_vocab_quiz().title, "Mots");
+}
+
+#[test]
+fn one_reminder_counts_grammar_and_word_reviews_together() {
+    let t = setup();
+    t.learn_lesson();
+    t.read_word_lesson();
+    for _ in 0..20 {
+        t.grade_word("Good");
+    }
+    let last = t.rec.0.borrow().iter().filter(|c| c.starts_with("schedule")).last().cloned().unwrap();
+    assert!(last.ends_with(" 25"), "5 points + 20 word cards: {last}");
+}
+
+#[test]
+fn the_word_goal_is_saved_with_the_settings() {
+    let dir = tmp_dir("vocab-goal");
+    let t = setup_with(Progress::load(&dir.join("progress.json")));
+    t.app.ui.invoke_set_vocab_goal(5);
+    assert_eq!(Progress::load(&dir.join("progress.json")).settings.vocab_goal, 5);
+    assert!(t.exists("Learn 5 new words"));
+    t.app.ui.invoke_set_vocab_goal(500);
+    assert_eq!(t.app.state.borrow().progress.settings.vocab_goal, 50, "kept reasonable");
+}
+
+#[test]
+fn resetting_all_progress_forgets_the_words_too() {
+    let t = setup();
+    t.read_word_lesson();
+    for _ in 0..20 {
+        t.grade_word("Good");
+    }
+    t.app.ui.invoke_reset_all();
+    let h = t.app.ui.get_home();
+    assert_eq!((h.vocab_learned, h.vocab_due, h.vocab_new), (0, 0, h.vocab_total));
+}
