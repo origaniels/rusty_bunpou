@@ -153,8 +153,8 @@ msgstr "Objectif quotidien (nouveaux points par jour)"
 msgid "Start lessons at"
 msgstr "Commencer les leçons au"
 
-msgid "Lessons teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again."
-msgstr "Les leçons enseignent ce niveau, puis les suivants. Les niveaux inférieurs restent non appris (et ne sont pas révisés) jusqu'à ce que vous les choisissiez de nouveau."
+msgid "Lessons (grammar and words) teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again."
+msgstr "Les leçons (grammaire et mots) enseignent ce niveau, puis les suivants. Les niveaux inférieurs restent non appris (et ne sont pas révisés) jusqu'à ce que vous les choisissiez de nouveau."
 
 msgid "Target retention (FSRS)"
 msgstr "Rétention visée (FSRS)"
@@ -351,3 +351,54 @@ msgstr "Chercher les nouvelles versions sur GitHub (une fois par jour)"
 
 msgid "Check now"
 msgstr "Vérifier maintenant"
+
+msgid "Words"
+msgstr "Mots"
+
+msgid "{} words due"
+msgstr "{} mots à réviser"
+
+msgid "Review words"
+msgstr "Réviser les mots"
+
+msgid "{} / {} words learned"
+msgstr "{} / {} mots appris"
+
+msgid "New words {} / {}"
+msgstr "Nouveaux mots {} / {}"
+
+msgid "Also written {}"
+msgstr "S'écrit aussi {}"
+
+msgid "Each word is then asked both ways: its meaning, then the word from its meaning. Say how well you knew it, honestly: that sets when it comes back."
+msgstr "Chaque mot est ensuite demandé dans les deux sens : son sens, puis le mot à partir de son sens. Dites honnêtement si vous le saviez : cela fixe quand il reviendra."
+
+msgid "Words done!"
+msgstr "Mots terminés !"
+
+msgid "Which word means this?"
+msgstr "Quel mot a ce sens ?"
+
+msgid "What does this word mean?"
+msgstr "Que veut dire ce mot ?"
+
+msgid "Practice: this answer doesn't change its schedule."
+msgstr "Entraînement : cette réponse ne change pas son calendrier."
+
+msgid "Show answer"
+msgstr "Voir la réponse"
+
+msgid "Again"
+msgstr "À revoir"
+
+msgid "Hard"
+msgstr "Difficile"
+
+msgid "Good"
+msgstr "Correct"
+
+msgid "Easy"
+msgstr "Facile"
+
+msgid "New words per day"
+msgstr "Nouveaux mots par jour"

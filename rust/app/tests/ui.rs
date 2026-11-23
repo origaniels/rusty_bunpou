@@ -971,6 +971,41 @@ fn check_every_screen_at(width: f32, french: bool, text_scale: f32) {
     t.app.ui.invoke_set_start_level(4);
     t.app.ui.invoke_go_home();
     check("home, lessons from N1");
+
+    // words: a lesson's pages, then its flashcards in every state
+    t.app.ui.invoke_start_vocab_learn();
+    assert_eq!(t.screen(), SCREEN_VOCAB_LESSON);
+    for i in 0..t.app.ui.get_vocab_lesson_count() {
+        check(&format!("word lesson page {}", i + 1));
+        t.app.ui.invoke_vocab_lesson_next();
+    }
+    assert_eq!(t.screen(), SCREEN_VOCAB_QUIZ);
+    check("word card, forward");
+    t.app.ui.invoke_vocab_reveal();
+    check("word card, forward, answer shown");
+    // the longest meaning and the longest word there are, both ways
+    {
+        let v = &t.app.state.borrow().vocab;
+        let lang = if french { bunpo_core::i18n::Lang::Fr } else { bunpo_core::i18n::Lang::En };
+        let meaning = v.words.iter().map(|w| w.meaning(lang)).max_by_key(|m| m.chars().count()).unwrap().to_string();
+        let long = v.words.iter().max_by_key(|w| w.word.chars().count()).unwrap();
+        let mut q = t.app.ui.get_vocab_quiz();
+        q.word.meaning = meaning.as_str().into();
+        q.word.text = long.word.as_str().into();
+        q.word.chars = long.word.chars().count() as i32;
+        q.word.segs = slint::ModelRc::new(slint::VecModel::from(vec![RubySeg { text: long.word.as_str().into(), ruby: long.reading.as_str().into() }]));
+        q.word.also = "足、脚（あし）、肢".into();
+        for reverse in [false, true] {
+            q.reverse = reverse;
+            t.app.ui.set_vocab_quiz(q.clone());
+            check(&format!("word card with the longest meaning and word, reverse={reverse}"));
+        }
+    }
+    while t.screen() == SCREEN_VOCAB_QUIZ && !t.app.ui.get_vocab_quiz().finished {
+        t.app.ui.invoke_vocab_reveal();
+        t.app.ui.invoke_vocab_grade(3);
+    }
+    check("words done");
 }
 
 #[test]
@@ -1964,4 +1999,175 @@ fn the_update_cards_fit_narrow_screens() {
 #[test]
 fn the_update_cards_fit_narrow_screens_in_french() {
     update_cards_fit(true);
+}
+
+// ------------------------------------------------------------------ vocabulary
+
+impl T {
+    /// Read a word lesson to its end and start its flashcards.
+    fn read_word_lesson(&self) {
+        self.press("Learn 10 new words");
+        assert_eq!(self.screen(), SCREEN_VOCAB_LESSON);
+        while self.screen() == SCREEN_VOCAB_LESSON {
+            self.app.ui.invoke_vocab_lesson_next();
+        }
+    }
+    /// Show the answer, then grade it.
+    fn grade_word(&self, grade: &str) {
+        self.press("Show answer");
+        self.press(grade);
+    }
+}
+
+#[test]
+fn home_offers_words_next_to_grammar() {
+    let t = setup();
+    let h = t.app.ui.get_home();
+    assert_eq!((h.vocab_due, h.vocab_learned), (0, 0));
+    assert!(h.vocab_total > 8000 && h.vocab_new == h.vocab_total);
+    assert!(t.exists("0 words due") && t.exists("Today: 0 / 10 new words"));
+    assert!(!t.find("Review words").accessible_enabled().unwrap());
+    assert!(h.vocab_source.contains("tanos.co.uk"), "the word lists are credited");
+}
+
+#[test]
+fn a_word_lesson_shows_each_word_then_asks_it_both_ways() {
+    let t = setup();
+    t.press("Learn 10 new words");
+    assert_eq!(t.app.ui.get_vocab_lesson_count(), 10);
+    let first = t.app.ui.get_vocab_word();
+    assert!(!first.meaning.is_empty() && first.level == "N5");
+    t.press("Next");
+    assert_ne!(t.app.ui.get_vocab_word().text, first.text);
+    t.press("Previous");
+    assert_eq!(t.app.ui.get_vocab_word().text, first.text);
+    for _ in 0..9 {
+        t.press("Next");
+    }
+    t.press("Start quiz");
+    assert_eq!(t.screen(), SCREEN_VOCAB_QUIZ);
+    let q = t.app.ui.get_vocab_quiz();
+    assert_eq!((q.total, q.done, q.reverse, q.revealed), (20, 0, false, false));
+    assert_eq!(q.word.text, first.text, "the first word comes first, its meaning asked");
+    assert!(!t.exists("Good"), "grades only once the answer is shown");
+    t.press("Show answer");
+    let q = t.app.ui.get_vocab_quiz();
+    assert!(q.revealed);
+    // when each grade brings it back
+    let delays: Vec<String> = q.delays.iter().map(|d| d.to_string()).collect();
+    assert_eq!(delays, ["1 h", "3 h", "4 h", "8 h"]);
+    t.press("Good");
+    assert_eq!(t.app.ui.get_vocab_quiz().done, 1);
+    // forward cards first, then the same words the other way
+    for _ in 1..10 {
+        t.grade_word("Good");
+    }
+    let q = t.app.ui.get_vocab_quiz();
+    assert!(q.reverse && q.word.text == first.text);
+}
+
+#[test]
+fn a_word_answered_again_comes_back_until_known() {
+    let t = setup();
+    t.read_word_lesson();
+    let first = t.app.ui.get_vocab_quiz().word.text;
+    t.grade_word("Again");
+    assert_eq!(t.app.ui.get_vocab_quiz().done, 0, "not cleared");
+    for _ in 0..19 {
+        t.grade_word("Easy");
+    }
+    let q = t.app.ui.get_vocab_quiz();
+    assert_eq!((q.word.text, q.grading), (first, false), "back at the end, as practice");
+    t.press("Show answer");
+    assert!(t.exists("Practice: this answer doesn't change its schedule."));
+    assert!(t.app.ui.get_vocab_quiz().delays.iter().all(|d| d.is_empty()));
+    t.press("Good");
+    assert!(t.app.ui.get_vocab_quiz().finished);
+    assert!(t.exists("Words done!") && t.exists("19 / 20 cards known on the first try."));
+    t.press("Home");
+    let h = t.app.ui.get_home();
+    assert_eq!((h.vocab_learned, h.vocab_due), (10, 0));
+    assert!(t.exists("Today: 10 / 10 new words") && t.exists("Learn 10 extra words"));
+    // the missed card is due in an hour, the others later
+    clock::advance(HOUR + 60_000);
+    on_resume();
+    assert_eq!(t.app.ui.get_home().vocab_due, 1);
+    clock::advance(8 * HOUR);
+    on_resume();
+    assert_eq!(t.app.ui.get_home().vocab_due, 20);
+}
+
+#[test]
+fn word_reviews_grade_the_cards_due() {
+    let t = setup();
+    t.read_word_lesson();
+    for _ in 0..20 {
+        t.grade_word("Good");
+    }
+    t.press("Home");
+    clock::advance(5 * HOUR);
+    on_resume();
+    assert!(t.exists("20 words due"));
+    t.press("Review words");
+    let q = t.app.ui.get_vocab_quiz();
+    assert_eq!((q.title.as_str(), q.total), ("Words", 20));
+    let card = |t: &T| {
+        let s = t.app.state.borrow();
+        let id = s.vocab_session.as_ref().unwrap().current().unwrap().to_string();
+        s.progress.vocab[&id].clone()
+    };
+    let before = card(&t);
+    t.grade_word("Hard");
+    // Hard keeps it on its step
+    let st = t.app.state.borrow();
+    let after = st.progress.vocab.values().find(|c| c.reps == 2).unwrap();
+    assert_eq!(after.step, before.step);
+    drop(st);
+    // leaving halfway keeps what was answered; the rest stays due
+    t.app.ui.invoke_go_home();
+    assert_eq!(t.app.ui.get_home().vocab_due, 19);
+}
+
+#[test]
+fn the_reminder_counts_word_reviews_too() {
+    let t = setup();
+    t.read_word_lesson();
+    for _ in 0..20 {
+        t.grade_word("Good");
+    }
+    let schedules: Vec<String> = t.rec.0.borrow().iter().filter(|c| c.starts_with("schedule")).cloned().collect();
+    assert!(schedules.last().unwrap().ends_with(" 20"), "{schedules:?}");
+}
+
+#[test]
+fn words_follow_the_daily_goal_and_the_start_level() {
+    let mut p = Progress::in_memory();
+    p.settings.language = "fr".into();
+    let t = setup_with(p);
+    t.app.ui.window().set_size(slint::LogicalSize::new(400.0, 3000.0));
+    t.press("Réglages");
+    t.press("20");
+    assert_eq!(t.app.state.borrow().progress.settings.vocab_goal, 20);
+    t.press("N3");
+    t.app.ui.invoke_go_home();
+    assert!(t.exists("Apprendre 20 nouveaux mots"));
+    t.press("Apprendre 20 nouveaux mots");
+    let w = t.app.ui.get_vocab_word();
+    assert_eq!(w.level, "N3");
+    // N3 has no French meanings yet: English
+    let st = t.app.state.borrow();
+    let word = st.vocab.words.iter().find(|x| x.word == w.text.as_str() || w.text.starts_with(x.word.as_str())).unwrap();
+    assert_eq!(w.meaning, word.en.as_str());
+}
+
+#[test]
+fn french_meanings_are_shown_in_french() {
+    let mut p = Progress::in_memory();
+    p.settings.language = "fr".into();
+    let t = setup_with(p);
+    t.press("Apprendre 10 nouveaux mots");
+    let w = t.app.ui.get_vocab_word();
+    let st = t.app.state.borrow();
+    let word = st.vocab.words.iter().find(|x| x.level == "N5").unwrap();
+    assert_eq!((w.meaning.as_str(), w.text.as_str()), (word.fr.as_str(), word.word.as_str()));
 }

@@ -66,6 +66,21 @@ takes about 6 minutes (tokenization is cached in `data/build/tokens.pkl`).
 - A lesson shows each point's explanation and 4 examples, then a quiz on other sentences
   (`LESSON_EXAMPLES` in `session.rs`).
 
+### Vocabulary (`core/src/vocab.rs`, `pipeline/vocab.py`)
+- The JLPT word lists (`pipeline/vocab/`, ~8,000 words N5–N1, MIT, after Jonathan Waller's lists,
+  CC BY; credited on Home) become `data/build/vocab.json`: each word once at its easiest level,
+  most frequent in Tatoeba first, other spellings and する notes apart. French meanings for N5/N4
+  are written for the app (`pipeline/vocab/fr.tsv`); other levels show English.
+- Each word has two flashcards, `<word id>#f` (word → meaning) and `#r` (meaning → word), in
+  `Progress.vocab` (log in `vocab_log`). The learner shows the answer and grades it: Again, Hard,
+  Good, Easy (`scheduler::grade_self`: Again/Good are a wrong/right grammar answer; Hard stays on its
+  learning step, back halfway; Easy skips a step). The buttons show when the card comes back.
+- Home has a Words card: reviews due, "Learn N new words" by the daily goal (Settings, "New words
+  per day": 5/10/20; levels from "Start lessons at"). A lesson shows each word (furigana, reading,
+  meaning), then asks all of them forward, then in reverse. As for grammar, a card is graded on its
+  first answer and an Again comes back at the end as practice. Answers are saved as they are given,
+  so leaving halfway just leaves the rest due. The review reminder counts word cards too.
+
 ### Quiz and reviews (`core/src/session.rs`)
 - The header counts points cleared (answered right); a missed point counts once it is cleared.
 - Each point is graded on its first answer of the session; a missed point comes back at the end

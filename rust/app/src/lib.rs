@@ -11,6 +11,7 @@ use bunpo_core::reminder::next_reminder;
 use bunpo_core::session::{find_sentence, now_ms, Session, Verdict, LESSON_EXAMPLES};
 use bunpo_core::store::{Progress, Report, LESSON_REPORT_REASONS, REPORT_REASONS};
 use bunpo_core::update;
+use bunpo_core::vocab::{self, Side, Vocab, VocabSession, Word};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -29,6 +30,8 @@ pub const SCREEN_LIST: i32 = 3;
 pub const SCREEN_DETAIL: i32 = 4;
 pub const SCREEN_SETTINGS: i32 = 5;
 pub const SCREEN_STATS: i32 = 6;
+pub const SCREEN_VOCAB_LESSON: i32 = 7;
+pub const SCREEN_VOCAB_QUIZ: i32 = 8;
 
 /// SRS stage colors: New (neutral grey), then Beginner → Mastered as one blue ramp that gets
 /// brighter (= further along) on the dark surface. Validated as an ordinal ramp against the
@@ -183,6 +186,12 @@ pub struct State {
     composing_with: String,
     /// see [`Platform::update_repo`]
     update_repo: Option<String>,
+    pub vocab: Rc<Vocab>,
+    /// the flashcards under way (a word lesson's quiz or the word reviews)
+    pub vocab_session: Option<VocabSession>,
+    /// the words of the word lesson being read, and the page shown
+    vocab_lesson: Vec<String>,
+    vocab_lesson_idx: usize,
     /// when the update check under way started
     update_pending: Option<i64>,
     /// the last update check got no usable answer
@@ -501,6 +510,8 @@ fn leave_session(content: &Content, st: &mut State) {
         save_session(st);
     }
     st.session = None;
+    // answers are saved as they are given: what is left of a flashcard run is simply still due
+    st.vocab_session = None;
 }
 
 fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
@@ -556,6 +567,30 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
             }
             _ => 0,
         },
+        vocab_due: st.vocab.due_cards(&st.progress, now).len() as i32,
+        vocab_new: st.vocab.new_words(&st.progress).len() as i32,
+        vocab_learned: st.vocab.learned_per_level(&st.progress).iter().sum::<usize>() as i32,
+        vocab_total: st.vocab.words.len() as i32,
+        vocab_learn_label: {
+            let (n, extra) = vocab::next_lesson_size(&st.progress, now);
+            let n = n.min(st.vocab.new_words(&st.progress).len());
+            match (lang, extra) {
+                (Lang::En, false) => format!("Learn {n} new words"),
+                (Lang::En, true) => format!("Learn {n} extra words"),
+                (Lang::Fr, false) => format!("Apprendre {n} nouveaux mots"),
+                (Lang::Fr, true) => format!("Apprendre {n} mots de plus"),
+            }
+        }
+        .into(),
+        vocab_goal_line: {
+            let (today, goal) = (vocab::learned_today(&st.progress, now), st.progress.settings.vocab_goal);
+            match lang {
+                Lang::En => format!("Today: {today} / {goal} new words"),
+                Lang::Fr => format!("Aujourd'hui : {today} / {goal} nouveaux mots"),
+            }
+        }
+        .into(),
+        vocab_source: st.vocab.source_in(lang).into(),
         ask_updates: st.update_repo.is_some() && st.progress.settings.check_updates.is_none(),
         update_version: offered_update(st).map(|r| r.version.as_str()).unwrap_or("").into(),
         update_notes: offered_update(st).map(|r| r.notes.as_str()).unwrap_or("").into(),
@@ -713,6 +748,74 @@ fn refresh_list(ui: &AppWindow, content: &Content, st: &State) {
     ui.set_grammar_list(model(items));
 }
 
+/// A word as its cards show it.
+fn word_data(w: &Word, lang: Lang) -> WordData {
+    let mut segs: Vec<RubySeg> = w.ruby().into_iter().map(|(t, r)| RubySeg { text: t.into(), ruby: r.into() }).collect();
+    let mut text = w.word.clone();
+    if !w.suffix.is_empty() {
+        let s = format!("（{}）", w.suffix);
+        text.push_str(&s);
+        segs.push(RubySeg { text: s.into(), ruby: "".into() });
+    }
+    WordData {
+        chars: text.chars().count() as i32,
+        segs: model(segs),
+        text: text.into(),
+        reading: if w.word == w.reading { String::new() } else { w.reading.clone() }.into(),
+        also: w.also.as_str().into(),
+        meaning: w.meaning(lang).into(),
+        level: w.level.as_str().into(),
+    }
+}
+
+fn refresh_vocab_lesson(ui: &AppWindow, st: &State) {
+    let lang = st.progress.settings.lang();
+    if let Some(w) = st.vocab_lesson.get(st.vocab_lesson_idx).and_then(|id| st.vocab.get(id)) {
+        ui.set_vocab_word(word_data(w, lang));
+    }
+    ui.set_vocab_lesson_index(st.vocab_lesson_idx as i32);
+    ui.set_vocab_lesson_count(st.vocab_lesson.len() as i32);
+}
+
+fn refresh_vocab_quiz(ui: &AppWindow, st: &State) {
+    let Some(s) = &st.vocab_session else { return };
+    let lang = st.progress.settings.lang();
+    let fr = lang == Lang::Fr;
+    let mut q = VocabQuiz {
+        title: match (s.lesson, fr) {
+            (true, false) => "New words",
+            (true, true) => "Nouveaux mots",
+            (false, false) => "Words",
+            (false, true) => "Mots",
+        }
+        .into(),
+        done: s.done as i32,
+        total: s.total as i32,
+        revealed: s.revealed,
+        grading: s.grading(),
+        finished: s.finished(),
+        summary: match fr {
+            false => format!("{} / {} cards known on the first try.", s.total - s.missed, s.total),
+            true => format!("{} / {} cartes sues du premier coup.", s.total - s.missed, s.total),
+        }
+        .into(),
+        delays: model(vec![SharedString::new(); 4]),
+        ..Default::default()
+    };
+    if let Some((w, side)) = s.current().and_then(|id| st.vocab.word_of(id)) {
+        q.reverse = side == Side::Reverse;
+        q.word = word_data(w, lang);
+        if s.grading() {
+            let id = s.current().unwrap_or_default();
+            let card = st.progress.vocab.get(id).cloned().unwrap_or_default();
+            let now = now_ms();
+            let due = vocab::next_due(&card, now, st.progress.settings.retention);
+            q.delays = model(due.iter().map(|d| SharedString::from(vocab::short_delay(d - now, lang))).collect());
+        }
+    }
+    ui.set_vocab_quiz(q);
+}
+
 fn refresh_settings(ui: &AppWindow, st: &State) {
     let s = &st.progress.settings;
     ui.set_furigana(s.furigana);
@@ -728,6 +831,7 @@ fn refresh_settings(ui: &AppWindow, st: &State) {
     ui.set_retention_index(ri as i32);
     ui.set_language_index(if s.lang() == Lang::Fr { 1 } else { 0 });
     ui.set_report_count(st.progress.reports.len() as i32);
+    ui.set_vocab_goal(s.vocab_goal as i32);
     ui.set_app_version(VERSION.into());
     ui.set_updates_possible(st.update_repo.is_some());
     ui.set_check_updates(s.check_updates == Some(true));
@@ -877,7 +981,7 @@ fn sync_reminder(platform: &dyn Platform, progress: &Progress) {
         platform.cancel_reminder();
         return;
     }
-    match next_reminder(progress.cards.values(), now_ms()) {
+    match next_reminder(progress.cards.values().chain(progress.vocab.values()), now_ms()) {
         Some((at, count)) => {
             event(&format!("reminder at={at} count={count}"));
             let lang = progress.settings.lang();
@@ -942,6 +1046,10 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         composing: (String::new(), 0),
         composing_with: String::new(),
         update_repo: platform.update_repo(),
+        vocab: Rc::new(Vocab::bundled()),
+        vocab_session: None,
+        vocab_lesson: vec![],
+        vocab_lesson_idx: 0,
         update_pending: None,
         update_failed: false,
         detail: None,
@@ -1182,7 +1290,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             if cur == SCREEN_HOME {
                 return false;
             }
-            let prev = if cur == SCREEN_QUIZ { SCREEN_HOME } else { st.stack.pop().unwrap_or(SCREEN_HOME) };
+            let prev = if cur == SCREEN_QUIZ || cur == SCREEN_VOCAB_QUIZ { SCREEN_HOME } else { st.stack.pop().unwrap_or(SCREEN_HOME) };
             if prev == SCREEN_HOME {
                 st.stack.clear();
                 leave_session(&c, &mut st);
@@ -1268,6 +1376,7 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
     setting!(on_set_english, bool, |s, v| s.english = v);
     setting!(on_set_romaji, bool, |s, v| s.romaji = v);
     setting!(on_set_batch, i32, |s, v| s.batch_size = v.clamp(1, 20) as u32);
+    setting!(on_set_vocab_goal, i32, |s, v| s.vocab_goal = v.clamp(1, 50) as u32);
     setting!(on_set_day_start, i32, |s, v| s.day_start = v.rem_euclid(24) as u32);
     setting!(on_set_retention, i32, |s, v| s.retention = RETENTIONS[(v as usize).min(2)]);
     setting!(on_set_start_level, i32, |s, v| s.start_level = JLPT_LEVELS[(v.max(0) as usize).min(4)].into());
@@ -1402,6 +1511,77 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         refresh_list(&ui, &c, &st);
         sync_reminder(&*p, &st.progress);
     }));
+
+    // vocabulary: a lesson (pages, then its flashcards), the reviews, the grades
+    ui.on_start_vocab_learn(cb!(|ui, c, st| {
+        let (size, _) = vocab::next_lesson_size(&st.progress, now_ms());
+        let ids: Vec<String> = st.vocab.new_words(&st.progress).iter().take(size).map(|w| w.id.clone()).collect();
+        if ids.is_empty() {
+            return;
+        }
+        leave_session(&c, &mut st);
+        st.vocab_lesson = ids;
+        st.vocab_lesson_idx = 0;
+        refresh_vocab_lesson(&ui, &st);
+        show(&ui, &mut st, SCREEN_VOCAB_LESSON);
+    }));
+    ui.on_vocab_lesson_prev(cb!(|ui, c, st| {
+        st.vocab_lesson_idx = st.vocab_lesson_idx.saturating_sub(1);
+        refresh_vocab_lesson(&ui, &st);
+        let _ = &c;
+    }));
+    ui.on_vocab_lesson_next(cb!(|ui, c, st| {
+        if st.vocab_lesson_idx + 1 < st.vocab_lesson.len() {
+            st.vocab_lesson_idx += 1;
+            refresh_vocab_lesson(&ui, &st);
+            return;
+        }
+        let vocab = st.vocab.clone();
+        let words: Vec<&Word> = st.vocab_lesson.iter().filter_map(|id| vocab.get(id)).collect();
+        st.vocab_session = Some(VocabSession::lesson(&words));
+        st.stack = vec![SCREEN_HOME];
+        ui.set_screen(SCREEN_VOCAB_QUIZ);
+        event("screen=8 lesson");
+        refresh_vocab_quiz(&ui, &st);
+        let _ = &c;
+    }));
+    ui.on_start_vocab_reviews(cb!(|ui, c, st| {
+        let due = st.vocab.due_cards(&st.progress, now_ms());
+        if due.is_empty() {
+            return;
+        }
+        leave_session(&c, &mut st);
+        st.vocab_session = Some(VocabSession::new(due, false));
+        refresh_vocab_quiz(&ui, &st);
+        show(&ui, &mut st, SCREEN_VOCAB_QUIZ);
+    }));
+    ui.on_vocab_reveal(cb!(|ui, c, st| {
+        if let Some(s) = st.vocab_session.as_mut() {
+            s.revealed = true;
+        }
+        refresh_vocab_quiz(&ui, &st);
+        let _ = &c;
+    }));
+    {
+        let w = ui.as_weak();
+        let (st, c, p) = (st.clone(), content.clone(), platform.clone());
+        ui.on_vocab_grade(move |grade| {
+            let (Some(ui), Ok(mut st)) = (w.upgrade(), st.try_borrow_mut()) else { return };
+            let st = &mut *st;
+            let Some(s) = st.vocab_session.as_mut() else { return };
+            if !s.revealed {
+                return;
+            }
+            let id = s.current().unwrap_or_default().to_string();
+            s.answer(&mut st.progress, grade.clamp(1, 4) as u8, now_ms());
+            event(&format!("vocab card={id} grade={grade}"));
+            refresh_vocab_quiz(&ui, st);
+            if st.vocab_session.as_ref().is_some_and(|s| s.finished()) {
+                refresh_home(&ui, &c, st);
+                sync_reminder(&*p, &st.progress);
+            }
+        });
+    }
 
     // update check: the user's answer on the home screen, the settings, the release card
     let update_changed = |ui: &AppWindow, c: &Content, st: &State| {

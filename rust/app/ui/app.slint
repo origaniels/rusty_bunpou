@@ -46,12 +46,35 @@ export struct QuizData {
     words: [string], // dictionary forms, shown as lookup chips after answering
 }
 
+/// a piece of a word: text, with its reading over it ("" for kana)
+export struct RubySeg { text: string, ruby: string }
+
+/// a vocabulary word as shown on a card
+export struct WordData {
+    segs: [RubySeg], text: string, // the word (with its suffix: 結婚（する）)
+    chars: int, // its length, to size it
+    reading: string, also: string, meaning: string, level: string,
+}
+
+/// the vocabulary flashcard on screen
+export struct VocabQuiz {
+    title: string, done: int, total: int,
+    reverse: bool, // the meaning is shown and the word asked
+    revealed: bool,
+    grading: bool, // its first answer: graded (else practice)
+    word: WordData,
+    delays: [string], // when it comes back for Again, Hard, Good, Easy
+    finished: bool, summary: string,
+}
+
 export struct HomeData {
     due: int, new-count: int, learned: int, total: int, next-due: string, next-titles: string,
     learn-label: string, goal-line: string, levels: [int], reviews-24h: int, source: string, level-rows: [LevelRow],
     start-level: string,
     resume-reviews: int, resume-lesson: int, // items left in a saved (unfinished) quiz, 0 = none
     due-after: int, // reviews due that are not part of the saved review session
+    vocab-due: int, vocab-new: int, vocab-learned: int, vocab-total: int,
+    vocab-learn-label: string, vocab-goal-line: string, vocab-source: string,
     ask-updates: bool, // ask once whether to look for new versions
     update-version: string, update-notes: string, // a new version to offer ("" = none)
 }
@@ -489,6 +512,49 @@ component TopBar inherits Rectangle {
 
 // the quiz's bar: tinted, set off by a shadow, title on the left, count on the right, the progress
 // along its bottom edge
+// a word with its readings over the kanji, as big as fits
+component RubyWord {
+    in property <[RubySeg]> segs;
+    in property <string> text;
+    in property <int> chars: 1;
+    in property <bool> readings: true;
+    in property <length> size: 44px * Theme.text-scale;
+    property <length> fit: min(root.size, (root.width - 8px) / max(1, root.chars));
+    HorizontalLayout {
+        alignment: center;
+        for seg in root.segs: VerticalLayout {
+            Text {
+                text: root.readings ? seg.ruby : "";
+                font-size: root.fit * 0.42; color: Theme.muted;
+                horizontal-alignment: center; height: root.fit * 0.6;
+            }
+            Text { text: seg.text; font-size: root.fit; color: Theme.fg; horizontal-alignment: center; }
+        }
+    }
+}
+
+// a grade button under a flashcard: its name and when the card comes back
+component GradeBtn inherits Rectangle {
+    in property <string> text;
+    in property <string> delay;
+    in property <color> tone;
+    callback clicked();
+    min-height: 56px;
+    horizontal-stretch: 1;
+    border-radius: 12px;
+    background: ta.pressed ? root.tone.with-alpha(0.35) : root.tone.with-alpha(0.18);
+    border-width: 1px; border-color: root.tone.with-alpha(0.6);
+    VerticalLayout {
+        alignment: center; padding: 4px;
+        FitText { text: root.text; font-size: 15px * Theme.text-scale; font-weight: 600; color: Theme.fg; horizontal-alignment: center; }
+        if root.delay != "": FitText { text: root.delay; font-size: 12px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; }
+    }
+    ta := TouchArea { clicked => { root.clicked(); } }
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+}
+
 component QuizBar inherits Rectangle {
     in property <string> title;
     in property <string> count;
@@ -610,6 +676,19 @@ export component AppWindow inherits Window {
 
     callback start-learn();
     callback lesson-prev();
+    // vocabulary: lessons of new words, then flashcards graded by the learner
+    callback start-vocab-learn();
+    callback start-vocab-reviews();
+    callback vocab-lesson-prev();
+    callback vocab-lesson-next();
+    callback vocab-reveal();
+    callback vocab-grade(int);
+    callback set-vocab-goal(int);
+    in property <WordData> vocab-word; // the word of the lesson page
+    in property <int> vocab-lesson-index;
+    in property <int> vocab-lesson-count;
+    in property <VocabQuiz> vocab-quiz;
+    in property <int> vocab-goal: 10;
     // update check (see `update.rs`): the one-time question, the settings, a new version
     callback answer-updates(bool);
     callback set-check-updates(bool);
@@ -752,7 +831,19 @@ export component AppWindow inherits Window {
                         if root.home.resume-lesson == 0: Btn { text: root.home.learn-label; primary: true; enabled: root.home.new-count > 0; clicked => { root.start-learn(); } }
                     }
                 }
+                Card {
+                    VerticalLayout {
+                        padding: 16px; spacing: 10px;
+                        Text { text: @tr("Words"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
+                        Text { text: @tr("{} words due", root.home.vocab-due); font-size: 28px * Theme.text-scale; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
+                        Btn { text: @tr("Review words"); primary: true; enabled: root.home.vocab-due > 0; clicked => { root.start-vocab-reviews(); } }
+                        Text { text: root.home.vocab-goal-line; font-size: 14px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
+                        Btn { text: root.home.vocab-learn-label; enabled: root.home.vocab-new > 0; clicked => { root.start-vocab-learn(); } }
+                        Text { text: @tr("{} / {} words learned", root.home.vocab-learned, root.home.vocab-total); font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
+                    }
+                }
                 Text { text: @tr("Example sentences: {}", root.home.source); font-size: 12px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
+                Text { text: root.home.vocab-source; font-size: 12px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
             }
 
             // ---------------------------------------------------------- lesson
@@ -788,6 +879,124 @@ export component AppWindow inherits Window {
                             horizontal-stretch: 1;
                             primary: true;
                             clicked => { lesson-scroll.content-y = 0; root.lesson-next(); }
+                        }
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------- vocabulary lesson
+            if root.screen == 7: VerticalLayout {
+                TopBar { title: @tr("New words {} / {}", root.vocab-lesson-index + 1, root.vocab-lesson-count); back => { root.go-back(); } }
+                vocab-scroll := Scroller {
+                    vertical-stretch: 1;
+                    Card {
+                        VerticalLayout {
+                            padding: 20px; spacing: 14px;
+                            HorizontalLayout { alignment: start; Pill { text: root.vocab-word.level; } }
+                            RubyWord { segs: root.vocab-word.segs; text: root.vocab-word.text; chars: root.vocab-word.chars; }
+                            Text { text: root.vocab-word.reading; font-size: 18px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
+                            Text { text: root.vocab-word.meaning; font-size: 20px * Theme.text-scale; color: Theme.fg; horizontal-alignment: center; wrap: word-wrap; }
+                            if root.vocab-word.also != "": Text { text: @tr("Also written {}", root.vocab-word.also); font-size: 14px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
+                        }
+                    }
+                    Text {
+                        text: @tr("Each word is then asked both ways: its meaning, then the word from its meaning. Say how well you knew it, honestly: that sets when it comes back.");
+                        font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
+                    }
+                }
+                Rectangle {
+                    accessible-role: groupbox; accessible-label: "bar";
+                    HorizontalLayout {
+                        padding: 16px; spacing: 12px;
+                        VerticalLayout {
+                            alignment: center;
+                            IconBtn {
+                                icon: Icons.previous; label: @tr("Previous"); tip-side: -1;
+                                enabled: root.vocab-lesson-index > 0;
+                                clicked => { vocab-scroll.content-y = 0; root.vocab-lesson-prev(); }
+                            }
+                        }
+                        Btn {
+                            text: root.vocab-lesson-index < root.vocab-lesson-count - 1 ? @tr("Next") : @tr("Start quiz");
+                            horizontal-stretch: 1;
+                            primary: true;
+                            clicked => { vocab-scroll.content-y = 0; root.vocab-lesson-next(); }
+                        }
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------- vocabulary flashcards
+            if root.screen == 8 && root.vocab-quiz.finished: VerticalLayout {
+                padding: 24px; spacing: 16px; alignment: start;
+                Text { text: @tr("Words done!"); font-size: 30px * Theme.text-scale; font-weight: 700; color: Theme.fg; wrap: word-wrap; }
+                Text { text: root.vocab-quiz.summary; color: Theme.fg; wrap: word-wrap; }
+                Btn { text: @tr("Home"); primary: true; clicked => { root.go-home(); } }
+            }
+            if root.screen == 8 && !root.vocab-quiz.finished: VerticalLayout {
+                QuizBar {
+                    title: root.vocab-quiz.title;
+                    count: root.vocab-quiz.done + " / " + root.vocab-quiz.total;
+                    progress: root.vocab-quiz.total > 0 ? root.vocab-quiz.done / root.vocab-quiz.total : 0;
+                    back => { root.go-home(); }
+                }
+                Scroller {
+                    vertical-stretch: 1;
+                    Card {
+                        VerticalLayout {
+                            padding: 20px; spacing: 14px;
+                            Text {
+                                text: root.vocab-quiz.reverse ? @tr("Which word means this?") : @tr("What does this word mean?");
+                                font-size: 14px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
+                            }
+                            // forward: the word (its readings once revealed); reverse: the meaning
+                            if !root.vocab-quiz.reverse: RubyWord {
+                                segs: root.vocab-quiz.word.segs; text: root.vocab-quiz.word.text; chars: root.vocab-quiz.word.chars;
+                                readings: root.vocab-quiz.revealed;
+                            }
+                            if root.vocab-quiz.reverse: Text {
+                                text: root.vocab-quiz.word.meaning; font-size: 24px * Theme.text-scale; font-weight: 600;
+                                color: Theme.fg; horizontal-alignment: center; wrap: word-wrap;
+                            }
+                        }
+                    }
+                    if root.vocab-quiz.revealed: Rectangle {
+                        border-radius: 16px;
+                        background: Theme.accent.with-alpha(0.08);
+                        VerticalLayout {
+                            padding: 20px; spacing: 10px;
+                            if root.vocab-quiz.reverse: RubyWord { segs: root.vocab-quiz.word.segs; text: root.vocab-quiz.word.text; chars: root.vocab-quiz.word.chars; }
+                            Text { text: root.vocab-quiz.word.reading; font-size: 18px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
+                            if !root.vocab-quiz.reverse: Text { text: root.vocab-quiz.word.meaning; font-size: 20px * Theme.text-scale; color: Theme.fg; horizontal-alignment: center; wrap: word-wrap; }
+                            if root.vocab-quiz.word.also != "": Text { text: @tr("Also written {}", root.vocab-quiz.word.also); font-size: 14px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
+                            if !root.vocab-quiz.grading: Text { text: @tr("Practice: this answer doesn't change its schedule."); font-size: 13px * Theme.text-scale; color: Theme.muted; horizontal-alignment: center; wrap: word-wrap; }
+                        }
+                    }
+                }
+                grades := Rectangle {
+                    accessible-role: groupbox; accessible-label: "bar";
+                    vertical-stretch: 0;
+                    background: Theme.bg;
+                    property <bool> two-rows: self.width < 430px * Theme.text-scale;
+                    VerticalLayout {
+                        padding: 16px; spacing: 8px;
+                        if !root.vocab-quiz.revealed: Btn { text: @tr("Show answer"); primary: true; clicked => { root.vocab-reveal(); } }
+                        if root.vocab-quiz.revealed && !grades.two-rows: HorizontalLayout {
+                            spacing: 8px;
+                            GradeBtn { text: @tr("Again"); delay: root.vocab-quiz.delays[0]; tone: Theme.bad; clicked => { root.vocab-grade(1); } }
+                            GradeBtn { text: @tr("Hard"); delay: root.vocab-quiz.delays[1]; tone: Theme.gold; clicked => { root.vocab-grade(2); } }
+                            GradeBtn { text: @tr("Good"); delay: root.vocab-quiz.delays[2]; tone: Theme.good; clicked => { root.vocab-grade(3); } }
+                            GradeBtn { text: @tr("Easy"); delay: root.vocab-quiz.delays[3]; tone: Theme.accent; clicked => { root.vocab-grade(4); } }
+                        }
+                        if root.vocab-quiz.revealed && grades.two-rows: HorizontalLayout {
+                            spacing: 8px;
+                            GradeBtn { text: @tr("Again"); delay: root.vocab-quiz.delays[0]; tone: Theme.bad; clicked => { root.vocab-grade(1); } }
+                            GradeBtn { text: @tr("Hard"); delay: root.vocab-quiz.delays[1]; tone: Theme.gold; clicked => { root.vocab-grade(2); } }
+                        }
+                        if root.vocab-quiz.revealed && grades.two-rows: HorizontalLayout {
+                            spacing: 8px;
+                            GradeBtn { text: @tr("Good"); delay: root.vocab-quiz.delays[2]; tone: Theme.good; clicked => { root.vocab-grade(3); } }
+                            GradeBtn { text: @tr("Easy"); delay: root.vocab-quiz.delays[3]; tone: Theme.accent; clicked => { root.vocab-grade(4); } }
                         }
                     }
                 }
@@ -1197,8 +1406,14 @@ export component AppWindow inherits Window {
                     Text { text: @tr("Start lessons at"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                     Segmented { options: ["N5", "N4", "N3", "N2", "N1"]; selected: root.start-level-index; picked(i) => { root.set-start-level(i); } }
                     Text {
-                        text: @tr("Lessons teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again.");
+                        text: @tr("Lessons (grammar and words) teach this level, then the ones above. Lower levels stay unlearned (not reviewed) until you pick them again.");
                         font-size: 13px * Theme.text-scale; color: Theme.muted; wrap: word-wrap;
+                    }
+                    Text { text: @tr("New words per day"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
+                    Segmented {
+                        options: ["5", "10", "20"];
+                        selected: root.vocab-goal == 5 ? 0 : root.vocab-goal == 20 ? 2 : 1;
+                        picked(i) => { root.set-vocab-goal([5, 10, 20][i]); }
                     }
                     Text { text: @tr("Target retention (FSRS)"); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                     Segmented { options: ["85%", "90%", "95%"]; selected: root.retention-index; picked(i) => { root.set-retention(i); } }
