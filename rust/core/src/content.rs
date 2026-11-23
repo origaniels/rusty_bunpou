@@ -17,7 +17,9 @@ pub struct Sentence {
     pub owner: String,
     pub furi: Vec<Seg>,
     /// Character (not byte) offsets of the blank.
+    #[serde(default)]
     pub cloze: [usize; 2],
+    #[serde(default)]
     pub answers: Vec<String>,
     pub hint: Option<String>,
     /// "app" for example sentences written for this app (not from Tatoeba).

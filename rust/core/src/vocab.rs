@@ -1,7 +1,9 @@
 //! Vocabulary: the JLPT words (data/build/vocab.json), learned with two flashcards each and
 //! graded by the learner, like Anki: "forward" shows the word and asks its meaning, "reverse"
 //! shows the meaning and asks the word. Both are scheduled like grammar points (`grade_self`).
+//! Each word has a few example sentences from Tatoeba, the word marked in them.
 
+use crate::content::Sentence;
 use crate::i18n::Lang;
 use crate::store::{scheduler, Card, LogEntry, Progress};
 use serde::{Deserialize, Serialize};
@@ -26,6 +28,9 @@ pub struct Word {
     pub en: String,
     #[serde(default)]
     pub fr: String,
+    /// examples: (index in `Vocab::sentences`, first char of the word in it, char after it)
+    #[serde(default)]
+    pub ex: Vec<(usize, usize, usize)>,
 }
 
 impl Word {
@@ -67,6 +72,8 @@ pub struct Vocab {
     pub words: Vec<Word>,
     pub source: String,
     pub source_fr: String,
+    /// the example sentences, shared by the words using them
+    pub sentences: Vec<Sentence>,
     index: HashMap<String, usize>,
 }
 
@@ -77,11 +84,26 @@ impl Vocab {
             source: String,
             #[serde(default)]
             source_fr: String,
+            #[serde(default)]
+            sentences: Vec<Sentence>,
             words: Vec<Word>,
         }
-        let f: File = serde_json::from_str(json)?;
+        let mut f: File = serde_json::from_str(json)?;
+        // an example out of range (a file edited by hand) is left out rather than shown wrong
+        for w in &mut f.words {
+            let sentences = &f.sentences;
+            w.ex.retain(|&(i, a, b)| sentences.get(i).is_some_and(|s| a < b && b <= s.ja.chars().count()));
+        }
         let index = f.words.iter().enumerate().map(|(i, w)| (w.id.clone(), i)).collect();
-        Ok(Vocab { words: f.words, source: f.source, source_fr: f.source_fr, index })
+        Ok(Vocab { words: f.words, source: f.source, source_fr: f.source_fr, sentences: f.sentences, index })
+    }
+
+    /// The `n`th example of `word`, the word marked (as a grammar example marks its point).
+    pub fn example(&self, word: &Word, n: usize) -> Option<Sentence> {
+        let &(i, a, b) = word.ex.get(n)?;
+        let mut s = self.sentences.get(i)?.clone();
+        s.cloze = [a, b];
+        Some(s)
     }
 
     pub fn bundled() -> Vocab {
@@ -261,18 +283,41 @@ mod tests {
     #[test]
     fn the_bundled_words_load_with_readings_on_their_kanji() {
         let v = Vocab::bundled();
-        assert!(v.words.len() > 8000);
+        assert!(v.words.len() > 7000);
         let w = v.get("会う|あう").unwrap();
         assert_eq!(w.ruby(), vec![("会".to_string(), "あ".to_string()), ("う".to_string(), String::new())]);
         assert_eq!(w.meaning(Lang::Fr), "rencontrer, voir (quelqu'un)");
-        // symbols are kept as they are, not read
-        let counter = v.words.iter().find(|w| w.word == "～円").unwrap();
-        assert_eq!(counter.ruby(), vec![("～".to_string(), String::new()), ("円".to_string(), "えん".to_string())]);
+        // word parts (お～, ～円) are for a kanji section, not here
+        assert!(v.words.iter().all(|w| !w.word.contains('～')));
         let kana = v.get("あそこ|あそこ").unwrap();
         assert_eq!(kana.ruby(), vec![("あそこ".to_string(), String::new())]);
         // N3 and up have no French yet: English
         let n3 = v.words.iter().find(|w| w.level == "N3").unwrap();
         assert_eq!(n3.meaning(Lang::Fr), n3.en);
+    }
+
+    #[test]
+    fn examples_mark_the_word() {
+        let v = Vocab::bundled();
+        let w = v.get("会う|あう").unwrap();
+        assert!(!w.ex.is_empty());
+        for n in 0..w.ex.len() {
+            let s = v.example(w, n).unwrap();
+            let marked: String = s.ja.chars().skip(s.cloze[0]).take(s.cloze[1] - s.cloze[0]).collect();
+            assert!(marked.starts_with('会') || marked.starts_with('あ'), "{marked} in {}", s.ja);
+            assert!(s.attribution(Lang::En).starts_with("Tatoeba #"));
+        }
+        assert!(v.example(w, w.ex.len()).is_none());
+    }
+
+    #[test]
+    fn examples_out_of_range_are_left_out() {
+        let json = r#"{"source":"s","sentences":[{"id":1,"ja":"猫だ。","en":"A cat.","furi":[["猫","ねこ"],["だ。",""]]}],
+            "words":[{"id":"猫|ねこ","level":"N5","word":"猫","reading":"ねこ","en":"cat","ex":[[0,0,1],[0,2,9],[3,0,1],[0,1,1]]}]}"#;
+        let v = Vocab::parse(json).unwrap();
+        let w = &v.words[0];
+        assert_eq!(w.ex, [(0, 0, 1)]);
+        assert_eq!(v.example(w, 0).unwrap().cloze, [0, 1]);
     }
 
     #[test]
