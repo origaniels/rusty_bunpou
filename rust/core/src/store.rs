@@ -254,7 +254,8 @@ pub mod scheduler {
 
     /// A self-graded answer (vocabulary flashcards): 1 Again, 2 Hard, 3 Good, 4 Easy.
     /// Again and Good do what a wrong and a right grammar answer do; Hard stays at the current
-    /// learning step (or gets a shorter FSRS interval), Easy skips a step (or a longer interval).
+    /// learning step, back halfway between Again and Good (or gets a shorter FSRS interval), Easy
+    /// skips a step (or gets a longer interval).
     pub fn grade_self(card: &Card, grade: u8, now: i64, retention: f64) -> Card {
         schedule(card, grade.clamp(1, 4), now, retention, 0)
     }
@@ -286,9 +287,9 @@ pub mod scheduler {
             c.state = 1;
             c.due = now + RELEARN_DELAY;
         } else if learning && g == 2 {
-            // the current step again (the previous step's delay; the first one for a new card)
+            // stays on its step, back halfway between Again and Good
             c.state = 1;
-            c.due = now + LEARNING_STEPS[step.saturating_sub(1)];
+            c.due = now + (RELEARN_DELAY + LEARNING_STEPS[step]) / 2;
         } else if learning && (g == 3 || step + 1 < LEARNING_STEPS.len()) {
             // Good: the next step; Easy: the one after, while there is one
             let next = if g == 4 { step + 1 } else { step };
@@ -351,12 +352,12 @@ mod tests {
         assert_eq!(grade_self(&new, 1, t, 0.9).due, t + RELEARN_DELAY);
         // Hard stays on the step, Easy skips one
         let hard = grade_self(&new, 2, t, 0.9);
-        assert_eq!((hard.step, hard.due), (0, t + LEARNING_STEPS[0]));
+        assert_eq!((hard.step, hard.due), (0, t + (RELEARN_DELAY + LEARNING_STEPS[0]) / 2));
         let easy = grade_self(&new, 4, t, 0.9);
         assert_eq!((easy.step, easy.due), (2, t + LEARNING_STEPS[1]));
         let good = grade_self(&new, 3, t, 0.9);
         let hard2 = grade_self(&good, 2, t + 10, 0.9);
-        assert_eq!((hard2.step, hard2.due), (1, t + 10 + LEARNING_STEPS[0]));
+        assert_eq!((hard2.step, hard2.due), (1, t + 10 + (RELEARN_DELAY + LEARNING_STEPS[1]) / 2));
         // Easy on the last step graduates
         let last = Card { state: 1, step: (LEARNING_STEPS.len() - 1) as u32, reps: 4, stability: 3.0, difficulty: 5.0, last_review: t, ..Default::default() };
         assert_eq!(grade_self(&last, 4, t + 3 * DAY_MS, 0.9).state, 2);
