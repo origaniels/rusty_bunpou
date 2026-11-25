@@ -92,6 +92,9 @@ takes about 6 minutes (tokenization is cached in `data/build/tokens.pkl`).
 - Each point is graded on its first answer of the session; a missed point comes back at the end
   (practice, not graded again) **with the same sentence**; the next session uses another sentence
   (`chosen` map; `Card.last_sentence` is avoided).
+- A right answer is rated Again / Hard / Good / Easy (`Session::rate`, buttons in place of Next,
+  two rows below 400 px; Enter doesn't skip it). The rating is only logged: the schedule is that of
+  a right answer whatever the rating. A wrong (or retried) answer goes on with Next, logged as Again.
 - Answer field: romaji is converted to kana (`core/src/kana.rs`); the field keeps what was typed and
   the kana preview is drawn in the blank. The keyboard's composition (Japanese IME, before Enter) is
   shown in the blank too and checked on Check (`AnswerField` in `app.slint`, `with_composition`,
@@ -132,8 +135,11 @@ year). A mistake on a learned point: retry after 1h, then 1d → 3d → back to 
 
 ### Progress file (`core/src/store.rs`)
 `progress.json` in the app's internal files: `cards` (per point id: state, stability, difficulty,
-due, last review, reps, lapses, step, last sentence, learned_at), `settings`, `log` (every graded
-answer), `reports`, `paused` (the unfinished quiz). Atomic writes; an unreadable file is moved to
+due, last review, reps, lapses, step, last sentence, learned_at), `settings`, `log` (every time a
+grammar point is seen: point, sentence, `ts` UTC ms, `grade` given to the scheduler, `answer`,
+`rating` 1-4 (0 = left unrated, or older entries), `ms` thinking time from the sentence appearing to
+the first check (0 = unknown), `level` before the answer, `practice` for repeats after a miss, which
+stats ignore; `Progress::history(point)`; kept when a point is reset, cleared by "reset all"), `reports`, `paused` (the unfinished quiz). Atomic writes; an unreadable file is moved to
 `progress.json.bad`, never overwritten. All fields use `serde(default)`: add fields that way so old
 files still load.
 
