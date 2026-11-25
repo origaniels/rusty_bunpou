@@ -67,9 +67,15 @@ takes about 6 minutes (tokenization is cached in `data/build/tokens.pkl`).
   (`LESSON_EXAMPLES` in `session.rs`).
 
 ### Vocabulary (`core/src/vocab.rs`, `pipeline/vocab.py`)
-- The JLPT word lists (`pipeline/vocab/`, ~8,000 words N5–N1, MIT, after Jonathan Waller's lists,
-  CC BY; credited on Home) become `data/build/vocab.json`: each word once at its easiest level,
-  most frequent in Tatoeba first, other spellings and する notes apart. French meanings for N5/N4
+- The JLPT word lists (`pipeline/vocab/`, 7,604 words N5–N1 kept, MIT, after Jonathan Waller's
+  lists, CC BY; credited on Home) become `data/build/vocab.json`: each word once at its easiest
+  level, other spellings and する notes apart. Words are found in Tatoeba by token (any form, with
+  their reading, longest match: 自転車 not 自転); that count orders the lessons and gives each word
+  up to 3 examples (easy for its level, French when Tatoeba has it, no near copies; shared
+  sentences stored once). Prefixes/suffixes (お～, ～人) and lone kanji used alone fewer than 5
+  times are left out, for a future kanji section.
+- A Words tab lists them like the grammar list (levels folded at first), each word with a page:
+  status, Reset, examples. Lessons show the examples; a flashcard shows one once revealed. French meanings for N5/N4
   are written for the app (`pipeline/vocab/fr.tsv`); other levels show English.
 - Each word has two flashcards, `<word id>#f` (word → meaning) and `#r` (meaning → word), in
   `Progress.vocab` (log in `vocab_log`). The learner shows the answer and grades it: Again, Hard,
@@ -186,9 +192,12 @@ The app follows Android's font size setting: every font size is `Npx * Theme.tex
   Settings has the switch, "Check now" and the version. When on, the app asks GitHub's
   `/releases/latest` at most once a day (on start and resume; ETag sent, so an unchanged answer is
   a 304). Pre-releases and drafts are never returned there, so `--pre` publishes a test build
-  nobody is told about. A newer release shows a Home card with the notes, "Download" (opens the
-  APK in the browser; Android installs it over the app, same key) and "Not now" (skips that
-  version). State in `Progress.update` (kept by a reset).
+  nobody is told about. A newer release shows a Home card with the notes, "Download and install"
+  and "Not now" (skips that version). The app downloads the APK itself (`Updates.download`, into
+  `files/share/update.apk`), checks it is this package at the offered version, and opens the
+  installer through `SharedFiles` (REQUEST_INSTALL_PACKAGES; the user confirms, same key so it
+  installs over the app). Progress is polled with the update check; a failed download opens the
+  release in the browser instead. The file is removed at the next start. State in `Progress.update` (kept by a reset).
 - Android: `Updates.get` fetches on a thread, the app polls `Updates.result` every 500 ms (given up
   after 30 s); errors are silent (offline: retried at the next opening; 403/404: tomorrow).
 - The key: every release must be signed with the same key or Android refuses the update. It lives
