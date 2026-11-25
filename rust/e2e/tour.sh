@@ -61,6 +61,8 @@ tap_label "$(L Cancel)"
 tap_label "$(L "Grammar list")"; wait_ev '^screen=3'
 audit_scrolled "grammar list"; ok "grammar list"
 first=$(python3 -c "import json; print(json.load(open('../data/build/content.json'))['points'][0]['title'])")
+has_label "$first" || tap_label "JLPT N5"   # levels start folded
+audit_scrolled "grammar list, N5 open"; ok "grammar list, N5 open"
 tap_label "$first"; wait_ev '^screen=4'
 audit_scrolled "grammar point"; ok "grammar point"
 tap_label "$(L Reset)"

@@ -80,7 +80,7 @@ if keyboard ja; then
   for attempt in 1 2 3 4 5 6; do
     ans=$(kana_answer); keys=$(python3 e2e/romaji.py "$ans")
     if [ -z "$keys" ]; then   # can't type this one: skip it
-      $A shell input tap ${KEY[x]}; tap_label Check; tap_label Typo; tap_label Next; sleep 0.5; continue
+      $A shell input tap ${KEY[x]}; tap_label Check; tap_label Typo; tap_label Good; sleep 0.5; continue
     fi
     nv=$(count_ev '^verdict=')
     type_keys "$keys"; sleep 0.5
@@ -92,7 +92,7 @@ if keyboard ja; then
     [[ "$v" == "verdict=Correct"*"kana=\"$ans\""* ]] || fail "typed $ans ($keys): $v"
     ok "$ans typed as $keys, shown in the blank, checked once ($how)"
     done_items=$((done_items + 1))
-    tap_label Next; sleep 0.5
+    tap_label Good; sleep 0.5
     (( done_items == 2 )) && break
   done
   (( done_items == 2 )) || fail "could not type two answers"

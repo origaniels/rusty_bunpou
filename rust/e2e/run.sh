@@ -69,7 +69,16 @@ answer_session() {  # answer items until the session finishes
     for _ in $(seq 1 20); do [ "$(ev | grep -c '^verdict' || true)" -gt "$before" ] && break; sleep 0.25; done
     v=$(last_ev '^verdict'); echo "    $p <- $a : $v"
     [[ "$v" == *"raw=\"$a\""* ]] || fail "typed '$a' but the app received: $v"
-    $A shell input keyevent 66; sleep 0.7
+    if [[ "$v" == verdict=Correct* ]]; then
+      # a right answer is rated (Again … Easy), Enter doesn't go on
+      local rated; rated=$(count_ev '^rated=')
+      tap_label "$(L Good)"
+      for _ in $(seq 1 20); do [ "$(count_ev '^rated=')" -gt "$rated" ] && break; sleep 0.25; done
+      [ "$(count_ev '^rated=')" -gt "$rated" ] || fail "the Good button did not rate $p"
+      sleep 0.5
+    else
+      $A shell input keyevent 66; sleep 0.7
+    fi
   done
   fail "session did not finish"
 }

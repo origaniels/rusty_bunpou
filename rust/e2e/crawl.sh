@@ -39,7 +39,7 @@ external() { [[ "$1" =~ ^($(L 'Export progress')|$(L 'Import progress')|Export|E
 goto_home() { :; }
 goto_settings() { tap_label "$(L Settings)"; wait_ev '^screen=5'; }
 goto_grammar_list() { tap_label "$(L 'Grammar list')"; wait_ev '^screen=3'; }
-goto_grammar_point() { goto_grammar_list; tap_label "$FIRST"; wait_ev '^screen=4'; }
+goto_grammar_point() { goto_grammar_list; has_label "$FIRST" || tap_label "JLPT N5"; tap_label "$FIRST"; wait_ev '^screen=4'; }
 goto_stats() { tap_label "$(L Stats)"; wait_ev '^screen=6'; }
 goto_lesson() { tap_label "$(button_starting 'Learn|Apprendre')"; wait_ev '^screen=1'; }
 goto_lesson_last() {
