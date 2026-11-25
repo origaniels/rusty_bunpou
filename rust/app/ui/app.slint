@@ -44,6 +44,7 @@ export struct QuizData {
     nudge: string, // "almost" hint after an answer that was nearly right (try again, not graded)
     reported: bool, // this sentence was already reported
     words: [string], // dictionary forms, shown as lookup chips after answering
+    rate: bool, // a right answer: the user rates it (Again … Easy) to go on
 }
 
 /// a piece of a word: text, with its reading over it ("" for kana)
@@ -811,6 +812,7 @@ export component AppWindow inherits Window {
     callback quiz-submit();
     callback quiz-typo();
     callback quiz-retry();
+    callback quiz-rate(int); // 1 Again … 4 Easy
     callback open-notes();
     callback go-home();
     callback go-back() -> bool;
@@ -1193,9 +1195,10 @@ export component AppWindow inherits Window {
                 }
                 // docked at the bottom (above the keyboard when it is open): what to do with the
                 // answer, then the field
-                Rectangle {
+                rates := Rectangle {
                     vertical-stretch: 0;
                     accessible-role: groupbox; accessible-label: "bar";
+                    property <bool> two-rows: self.width < 400px * Theme.text-scale;
                     VerticalLayout {
                         padding-left: 16px; padding-right: 16px; padding-top: 8px; padding-bottom: 16px; spacing: 10px;
                         // report on its own on the left, the rest on the right
@@ -1234,15 +1237,42 @@ export component AppWindow inherits Window {
                                     if (n != t) { self.text = n; }
                                 }
                                 composing(t, p, c) => { root.quiz-composing(t, p, c); }
-                                accepted(t) => { root.quiz-submit(); }
+                                accepted(t) => {
+                                    root.quiz-submit();
+                                    // rating with the buttons: the keyboard would only hide them
+                                    if (root.quiz.rate) { answer.unfocus(); }
+                                }
                             }
-                            Btn {
+                            if !root.quiz.rate: Btn {
                                 text: root.quiz.verdict == 0 ? @tr("Check") : @tr("Next");
                                 primary: true;
                                 // nothing to check yet (what the keyboard is composing counts)
                                 enabled: root.quiz.verdict != 0 || answer.text != "" || answer.preedit != "";
-                                clicked => { answer.commit-composition(); root.quiz-submit(); }
+                                clicked => {
+                                    answer.commit-composition();
+                                    root.quiz-submit();
+                                    if (root.quiz.rate) { answer.unfocus(); }
+                                }
                             }
+                        }
+                        // a right answer: how easy was it? (only logged for now, the schedule is
+                        // the same); four in a row when they fit, else two rows
+                        if root.quiz.rate && !rates.two-rows: HorizontalLayout {
+                            spacing: 8px;
+                            GradeBtn { text: @tr("Again"); tone: Theme.bad; clicked => { root.quiz-rate(1); } }
+                            GradeBtn { text: @tr("Hard"); tone: Theme.gold; clicked => { root.quiz-rate(2); } }
+                            GradeBtn { text: @tr("Good"); tone: Theme.good; clicked => { root.quiz-rate(3); } }
+                            GradeBtn { text: @tr("Easy"); tone: Theme.accent; clicked => { root.quiz-rate(4); } }
+                        }
+                        if root.quiz.rate && rates.two-rows: HorizontalLayout {
+                            spacing: 8px;
+                            GradeBtn { text: @tr("Again"); tone: Theme.bad; clicked => { root.quiz-rate(1); } }
+                            GradeBtn { text: @tr("Hard"); tone: Theme.gold; clicked => { root.quiz-rate(2); } }
+                        }
+                        if root.quiz.rate && rates.two-rows: HorizontalLayout {
+                            spacing: 8px;
+                            GradeBtn { text: @tr("Good"); tone: Theme.good; clicked => { root.quiz-rate(3); } }
+                            GradeBtn { text: @tr("Easy"); tone: Theme.accent; clicked => { root.quiz-rate(4); } }
                         }
                     }
                 }

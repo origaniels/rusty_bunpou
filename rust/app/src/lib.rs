@@ -1023,6 +1023,18 @@ fn poll_update_check(p: &dyn Platform, st: &mut State) -> bool {
     true
 }
 
+/// An answer was committed (Next or a rating): save, and focus the field for the next item.
+fn after_answer(ui: &AppWindow, p: &dyn Platform, st: &mut State) {
+    if let Some(sess) = &st.session {
+        if sess.finished() {
+            event(&format!("session-finished correct_first_try={} total={}", sess.correct_first_try, sess.total));
+        }
+    }
+    save_session(st);
+    sync_reminder(p, &st.progress);
+    ui.set_focus_tick(ui.get_focus_tick() + 1);
+}
+
 fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
     let Some(sess) = &st.session else { return };
     let lang = st.progress.settings.lang();
@@ -1072,6 +1084,7 @@ fn refresh_quiz(ui: &AppWindow, content: &Content, st: &State) {
         q.grammar_line = format!("{} — {}", p.title_in(lang), p.meaning_in(lang)).into();
         q.attribution = s.attribution(lang).into();
         q.words = model(s.words.iter().map(|w| SharedString::from(w.as_str())).collect());
+        q.rate = sess.needs_rating();
         q.reported = st.progress.reports.iter().any(|r| r.point == p.id && r.sentence == s.id);
         ui.set_notes(point_data(content, st, &p.id));
     }
@@ -1357,17 +1370,32 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
                     sess.input
                 ));
             }
-        } else {
+        } else if !sess.needs_rating() {
+            // (a right answer goes on with a rating button, not with Enter)
             sess.next(&c, &mut st.progress);
-            if sess.finished() {
-                event(&format!("session-finished correct_first_try={} total={}", sess.correct_first_try, sess.total));
-            }
-            save_session(st);
-            sync_reminder(&*p, &st.progress);
-            ui.set_focus_tick(ui.get_focus_tick() + 1);
+            after_answer(&ui, &*p, st);
         }
         refresh_quiz(&ui, &c, st);
     }));
+
+    {
+        let w = ui.as_weak();
+        let st = st.clone();
+        let c = content.clone();
+        let p = platform.clone();
+        ui.on_quiz_rate(move |rating| {
+            let (Some(ui), Ok(mut st)) = (w.upgrade(), st.try_borrow_mut()) else { return };
+            let st = &mut *st;
+            let Some(sess) = st.session.as_mut() else { return };
+            if !sess.needs_rating() {
+                return;
+            }
+            event(&format!("rated={rating} point={}", sess.point.as_deref().unwrap_or("")));
+            sess.rate(&c, &mut st.progress, rating.clamp(1, 4) as u8);
+            after_answer(&ui, &*p, st);
+            refresh_quiz(&ui, &c, st);
+        });
+    }
 
     ui.on_quiz_typo(cb!(|ui, c, st| {
         if let Some(s) = st.session.as_mut() {
@@ -1390,8 +1418,9 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
 
     ui.on_resume(cb!(|ui, c, st| {
         match st.progress.paused.clone() {
-            Some(s) if s.resumable(&c) => {
+            Some(mut s) if s.resumable(&c) => {
                 let lesson = s.lesson;
+                s.start_clock();
                 st.session = Some(s);
                 st.stack.clear();
                 st.stack.push(SCREEN_HOME);
