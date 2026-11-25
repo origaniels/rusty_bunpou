@@ -24,6 +24,8 @@ struct Recorder(RefCell<Vec<String>>, FakeGitHub);
 struct FakeGitHub {
     repo: Option<String>,
     answer: RefCell<Option<(i32, String, String)>>,
+    /// where the update download stands (see `Platform::download_state`)
+    download: RefCell<String>,
 }
 
 impl Platform for Recorder {
@@ -38,6 +40,13 @@ impl Platform for Recorder {
     }
     fn open_url(&self, url: &str) {
         self.0.borrow_mut().push(format!("open {url}"));
+    }
+    fn download_update(&self, url: &str, version: &str) {
+        self.0.borrow_mut().push(format!("download {url} {version}"));
+        *self.1.download.borrow_mut() = "downloading -1".into();
+    }
+    fn download_state(&self) -> String {
+        self.1.download.borrow().clone()
     }
     fn schedule_reminder(&self, at_ms: i64, count: usize, _text: &str, _channel: &str) {
         self.0.borrow_mut().push(format!("schedule {at_ms} {count}"));
@@ -1950,8 +1959,10 @@ fn a_new_release_is_offered_on_the_home_screen() {
     t.github_answers(200, "\"e1\"", &release_json("v99.0.0", false));
     assert!(t.exists("Version 99.0.0 is available"));
     assert!(t.exists("Faster reviews."), "with its notes");
-    t.press("Download");
-    assert_eq!(t.rec.last(), "open https://github.com/o/r/releases/download/v99.0.0/bunpo-srs-arm64.apk");
+    t.press("Download and install");
+    assert_eq!(t.rec.last(), "download https://github.com/o/r/releases/download/v99.0.0/bunpo-srs-arm64.apk 99.0.0");
+    *t.rec.1.download.borrow_mut() = String::new(); // the installer took it (and the user said no)
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(600));
     t.press("Not now");
     assert!(!t.exists("Version 99.0.0 is available"));
     assert_eq!(t.app.state.borrow().progress.update.skipped, "99.0.0");
@@ -2579,4 +2590,76 @@ fn a_learned_word_can_be_reset_from_its_page() {
     t.app.ui.invoke_reset_word();
     assert!(!t.app.ui.get_word_detail().can_reset);
     assert!(!bunpo_core::vocab::learned(&t.app.state.borrow().progress, &first.id));
+}
+
+#[test]
+fn the_quiz_count_and_hint_bubble_follow_their_text() {
+    let t = setup();
+    let mut q = t.app.ui.get_quiz();
+    q.title = "Reviews".into();
+    q.total = 11;
+    t.app.ui.set_screen(SCREEN_QUIZ);
+    let mut widths = vec![];
+    for (done, hint) in [(9, "if (we assume)"), (10, "on the occasion of"), (11, "x")] {
+        q.done = done;
+        q.hint = hint.into();
+        t.app.ui.set_quiz(q.clone());
+        let els = audit::elements(&t.app.ui);
+        let count = els.iter().find(|e| e.label == format!("{done} / 11")).expect("count");
+        assert!(!count.clipped && count.w >= 60.0, "room for any count: {count:?}");
+        widths.push(els.iter().find(|e| e.label == hint).expect("hint").w);
+    }
+    assert!(widths[1] > widths[0] && widths[2] < widths[0], "{widths:?}");
+}
+
+
+impl T {
+    /// The download of a new version moves on; the app sees it on its next poll.
+    fn download_is(&self, state: &str) {
+        *self.rec.1.download.borrow_mut() = state.into();
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(600));
+    }
+}
+
+#[test]
+fn the_new_version_downloads_shows_its_progress_and_opens_the_installer() {
+    let t = setup_full(Progress::in_memory(), Some("o/r"));
+    t.press("Check for updates");
+    t.github_answers(200, "", &release_json("v99.0.0", false));
+    t.press("Download and install");
+    assert!(t.exists("Downloading…"));
+    assert!(!t.find("Download and install").accessible_enabled().unwrap_or(true), "one download at a time");
+    t.app.ui.invoke_download_update();
+    assert_eq!(t.rec.0.borrow().iter().filter(|c| c.starts_with("download ")).count(), 1);
+    t.download_is("downloading 42");
+    assert!(t.exists("Downloading… 42%"));
+    t.download_is("installing");
+    assert!(!t.exists("Downloading… 42%"));
+    assert!(t.find("Download and install").accessible_enabled().unwrap_or(true));
+    assert!(!t.rec.0.borrow().iter().any(|c| c.starts_with("open ")));
+}
+
+#[test]
+fn a_failed_download_opens_the_release_in_the_browser() {
+    let mut p = Progress::in_memory();
+    p.settings.language = "fr".into();
+    let t = setup_full(p, Some("o/r"));
+    t.press("Vérifier les mises à jour");
+    t.github_answers(200, "", &release_json("v99.0.0", false));
+    t.press("Télécharger et installer");
+    assert!(t.exists("Téléchargement…"));
+    t.download_is("failed");
+    assert!(t.exists("Le téléchargement a échoué : la page de la version s'ouvre dans le navigateur."));
+    assert_eq!(t.rec.last(), "open https://github.com/o/r/releases/download/v99.0.0/bunpo-srs-arm64.apk");
+}
+
+#[test]
+fn a_release_without_its_apk_opens_its_page() {
+    let t = setup_full(Progress::in_memory(), Some("o/r"));
+    t.press("Check for updates");
+    let json = release_json("v99.0.0", false).replace("bunpo-srs-arm64.apk", "other.zip");
+    t.github_answers(200, "", &json);
+    t.press("Download and install");
+    assert!(t.rec.last().starts_with("open https://github.com/"), "{}", t.rec.last());
+    assert!(!t.exists("Downloading…"));
 }
