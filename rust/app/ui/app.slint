@@ -83,6 +83,7 @@ export struct HomeData {
     vocab-learn-label: string, vocab-goal-line: string, vocab-source: string,
     ask-updates: bool, // ask once whether to look for new versions
     update-version: string, update-notes: string, // a new version to offer ("" = none)
+    update-progress: string, update-busy: bool, // its download: where it stands, under way
 }
 
 export global Logic {
@@ -875,8 +876,9 @@ export component AppWindow inherits Window {
                         padding: 16px; spacing: 10px;
                         Text { text: @tr("Version {} is available", root.home.update-version); font-size: 17px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
                         if root.home.update-notes != "": Text { text: root.home.update-notes; font-size: 14px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
-                        Btn { text: @tr("Download"); primary: true; clicked => { root.download-update(); } }
-                        Btn { text: @tr("Not now"); clicked => { root.skip-update(); } }
+                        if root.home.update-progress != "": Text { text: root.home.update-progress; font-size: 14px * Theme.text-scale; color: Theme.fg; wrap: word-wrap; }
+                        Btn { text: @tr("Download and install"); primary: true; enabled: !root.home.update-busy; clicked => { root.download-update(); } }
+                        Btn { text: @tr("Not now"); enabled: !root.home.update-busy; clicked => { root.skip-update(); } }
                     }
                 }
                 if root.home.ask-updates: Card {

@@ -205,6 +205,29 @@ impl Platform for AndroidPlatform {
         });
     }
 
+    fn download_update(&self, url: &str, version: &str) {
+        self.with_class(UPDATES_CLASS, |env, act, cls| {
+            let (url, version) = (env.new_string(url)?, env.new_string(version)?);
+            env.call_static_method(
+                cls,
+                "download",
+                "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;)V",
+                &[JValue::Object(act), JValue::Object(&url), JValue::Object(&version)],
+            )
+            .map(|_| ())
+        });
+    }
+
+    fn download_state(&self) -> String {
+        self.with_class(UPDATES_CLASS, |env, _act, cls| {
+            let r = env.call_static_method(cls, "downloadState", "()Ljava/lang/String;", &[])?.l()?;
+            let s: String = env.get_string(&jni::objects::JString::from(r))?.into();
+            Ok(s)
+        })
+        // no answer from Java: treat it as failed rather than downloading forever
+        .unwrap_or_else(|| "failed".into())
+    }
+
     fn e2e_dir(&self) -> Option<std::path::PathBuf> {
         self.app.external_data_path()
     }
@@ -212,6 +235,10 @@ impl Platform for AndroidPlatform {
     fn on_started(&self) {
         // Android may restore the keyboard if the app was killed while it was open (e.g. mid-quiz)
         self.app.hide_soft_input(false);
+        // an update downloaded earlier is installed (or was cancelled): its file can go
+        self.with_class(UPDATES_CLASS, |env, act, cls| {
+            env.call_static_method(cls, "cleanUp", "(Landroid/app/Activity;)V", &[JValue::Object(act)]).map(|_| ())
+        });
     }
 }
 

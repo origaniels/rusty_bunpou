@@ -411,3 +411,6 @@ msgstr "{} nouveaux mots par jour"
 
 msgid "{} new points a day"
 msgstr "{} nouveaux points par jour"
+
+msgid "Download and install"
+msgstr "Télécharger et installer"

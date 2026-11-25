@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- only for the update check, when the user agreed to it (one request to GitHub a day) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- to hand a downloaded update to Android's installer (the user confirms it there) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Android 11+ only lets apps see the apps they name here: Takoboto (dictionary lookups,
          see Lookup.java) and a browser for its website -->
     <queries>

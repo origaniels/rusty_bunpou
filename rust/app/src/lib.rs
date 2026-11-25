@@ -123,6 +123,14 @@ pub trait Platform {
     }
     /// Open a web address (in the browser).
     fn open_url(&self, _url: &str) {}
+    /// Download the new version's APK at `url` and hand it to the system installer once it is
+    /// checked to be this app at `version`. Its progress comes through
+    /// [`Platform::download_state`].
+    fn download_update(&self, _url: &str, _version: &str) {}
+    /// "downloading N" (percent, -1 unknown), "installing", "failed", or "" (nothing under way).
+    fn download_state(&self) -> String {
+        String::new()
+    }
 }
 
 /// Version of this build (`version` in Cargo.toml; release tags are `v` + it).
@@ -202,6 +210,9 @@ pub struct State {
     update_pending: Option<i64>,
     /// the last update check got no usable answer
     update_failed: bool,
+    /// the new version's download: under way (since when), and its progress line on the home screen
+    download_started: Option<i64>,
+    download_line: String,
 }
 
 /// The running app: UI + state. Keep it alive while the UI runs.
@@ -600,6 +611,8 @@ fn refresh_home(ui: &AppWindow, content: &Content, st: &State) {
         ask_updates: st.update_repo.is_some() && st.progress.settings.check_updates.is_none(),
         update_version: offered_update(st).map(|r| r.version.as_str()).unwrap_or("").into(),
         update_notes: offered_update(st).map(|r| r.notes.as_str()).unwrap_or("").into(),
+        update_progress: st.download_line.as_str().into(),
+        update_busy: st.download_started.is_some(),
     });
     ui.set_level_pies(model(level_pies(content, &st.progress)));
     refresh_stats(ui, content, st, now);
@@ -953,6 +966,46 @@ fn start_update_check(p: &dyn Platform, st: &mut State, force: bool) -> bool {
     true
 }
 
+/// The home screen's line about the download, from [`Platform::download_state`].
+fn download_line(lang: Lang, state: &str) -> String {
+    let fr = lang == Lang::Fr;
+    match state.strip_prefix("downloading ").map(|n| n.parse::<i32>().unwrap_or(-1)) {
+        Some(n) if n >= 0 => if fr { format!("Téléchargement… {n} %") } else { format!("Downloading… {n}%") },
+        Some(_) => (if fr { "Téléchargement…" } else { "Downloading…" }).into(),
+        None if state == "failed" => (if fr {
+            "Le téléchargement a échoué : la page de la version s'ouvre dans le navigateur."
+        } else {
+            "The download failed: the release opens in the browser instead."
+        })
+        .into(),
+        None => String::new(),
+    }
+}
+
+/// Follow the download of a new version. Returns whether the home screen needs refreshing.
+fn poll_download(p: &dyn Platform, st: &mut State) -> bool {
+    if st.download_started.is_none() {
+        return false;
+    }
+    let state = p.download_state();
+    let line = download_line(st.progress.settings.lang(), &state);
+    if state.starts_with("downloading") {
+        let changed = line != st.download_line;
+        st.download_line = line;
+        return changed;
+    }
+    // done: the installer is open ("installing", then ""), or it failed
+    st.download_started = None;
+    event(&format!("update download {}", if state.is_empty() { "installing" } else { &state }));
+    if state == "failed" {
+        if let Some(r) = offered_update(st) {
+            p.open_url(&r.url);
+        }
+    }
+    st.download_line = line;
+    true
+}
+
 /// Take the answer of the update check under way, if it came (or give up after a while).
 /// Returns whether something changed.
 fn poll_update_check(p: &dyn Platform, st: &mut State) -> bool {
@@ -1130,6 +1183,8 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         vocab_lesson_idx: 0,
         update_pending: None,
         update_failed: false,
+        download_started: None,
+        download_line: String::new(),
         detail: None,
         expanded: Default::default(),
         words_expanded: Default::default(),
@@ -1734,11 +1789,21 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
         update_changed(&ui, &c, &st);
     }));
     ui.on_download_update(cb!(|ui, c, st, p| {
-        if let Some(r) = offered_update(&st) {
+        let Some(r) = offered_update(&st).cloned() else { return };
+        if st.download_started.is_some() {
+            return;
+        }
+        if r.url.ends_with(".apk") {
+            event(&format!("download update {}", r.version));
+            p.download_update(&r.url, &r.version);
+            st.download_started = Some(now_ms());
+            st.download_line = download_line(st.progress.settings.lang(), "downloading -1");
+        } else {
+            // a release without its APK: its page, in the browser
             event(&format!("open update {}", r.version));
             p.open_url(&r.url);
         }
-        let _ = (&ui, &c);
+        refresh_home(&ui, &c, &st);
     }));
     ui.on_skip_update(cb!(|ui, c, st| {
         if let Some(v) = offered_update(&st).map(|r| r.version.clone()) {
@@ -1790,6 +1855,9 @@ pub fn build(progress: Progress, platform: Rc<dyn Platform>) -> Result<App, slin
             if poll_update_check(&*p, &mut st) {
                 refresh_home(&ui, &c, &st);
                 refresh_settings(&ui, &st);
+            }
+            if poll_download(&*p, &mut st) {
+                refresh_home(&ui, &c, &st);
             }
         });
     }
