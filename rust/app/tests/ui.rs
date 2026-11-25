@@ -133,6 +133,15 @@ impl T {
         self.app.ui.invoke_quiz_submit();
     }
 
+    /// After a checked answer: rate a right one Good (Enter doesn't go on), else Next.
+    fn go_on(&self) {
+        if self.app.ui.get_quiz().rate {
+            self.app.ui.invoke_quiz_rate(3);
+        } else {
+            self.app.ui.invoke_quiz_submit();
+        }
+    }
+
     fn correct_answer(&self) -> String {
         let st = self.app.state.borrow();
         st.session.as_ref().unwrap().current(&self.app.content).unwrap().1.answer()
@@ -155,7 +164,7 @@ impl T {
                 self.type_and_enter(&a);
                 assert_eq!(self.app.ui.get_quiz().verdict, 1, "answer {a} rejected");
             }
-            self.app.ui.invoke_quiz_submit(); // Enter again = next
+            self.go_on();
         }
         panic!("quiz did not finish");
     }
@@ -353,6 +362,59 @@ fn start_lesson_quiz(t: &T) {
     t.press("Start quiz");
 }
 
+#[test]
+fn a_right_answer_is_rated_with_four_buttons_and_logged_with_its_metadata() {
+    let t = setup();
+    start_lesson_quiz(&t);
+    let id = t.app.state.borrow().session.as_ref().unwrap().point.clone().unwrap();
+    clock::advance(2_500);
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    let q = t.app.ui.get_quiz();
+    assert!(q.verdict == 1 && q.rate);
+    assert!(!t.exists("Next"), "a rating, not Next");
+    for b in ["Again", "Hard", "Good", "Easy"] {
+        assert!(t.exists(b), "{b}");
+    }
+    // Enter doesn't skip the rating
+    t.app.ui.invoke_quiz_submit();
+    assert_eq!(t.app.state.borrow().session.as_ref().unwrap().point.as_deref(), Some(id.as_str()));
+    assert!(t.app.state.borrow().progress.log.is_empty());
+    t.press("Hard");
+    let due_hard = {
+        let st = t.app.state.borrow();
+        let e = st.progress.log.last().unwrap().clone();
+        assert_eq!((e.point.as_str(), e.rating, e.grade, e.level.as_str()), (id.as_str(), 2, 3, "New"));
+        assert!(e.ms >= 2_500, "thinking time {}", e.ms);
+        st.progress.card(&id).due - e.ts
+    };
+    assert_ne!(t.app.state.borrow().session.as_ref().unwrap().point.as_deref(), Some(id.as_str()), "next item");
+    assert!(!t.app.ui.get_quiz().rate);
+    // the schedule is that of a right answer, whatever the rating
+    let p = Progress::in_memory();
+    let right = bunpo_core::store::scheduler::grade(&p.card(&id), true, 0, p.settings.retention, 0);
+    assert_eq!(due_hard, right.due);
+    // a wrong answer goes on with Next, logged as Again
+    t.type_and_enter("ぜんぜんちがう");
+    assert!(!t.app.ui.get_quiz().rate && t.exists("Next"));
+    t.press("Next");
+    let st = t.app.state.borrow();
+    assert_eq!((st.progress.log.last().unwrap().rating, st.progress.log.last().unwrap().grade), (1, 1));
+}
+
+#[test]
+fn the_rating_buttons_fit_in_two_rows_on_narrow_screens() {
+    let t = setup();
+    t.app.ui.window().set_size(slint::LogicalSize::new(320.0, 700.0));
+    start_lesson_quiz(&t);
+    let a = t.correct_answer();
+    t.type_and_enter(&a);
+    let y = |l: &str| t.find(l).absolute_position().y;
+    assert!(y("Good") > y("Again") && y("Easy") == y("Good") && y("Hard") == y("Again"));
+    t.app.ui.window().set_size(slint::LogicalSize::new(420.0, 700.0));
+    assert!(y("Good") == y("Again"), "one row when wide enough");
+}
+
 fn last_grade(t: &T) -> u8 {
     t.app.state.borrow().progress.log.last().unwrap().grade
 }
@@ -373,7 +435,7 @@ fn editing_a_wrong_answer_is_a_typo_fix() {
     assert!(t.exists("Fixing a typo: if the answer is right now, it counts as right."));
     t.app.ui.invoke_quiz_submit();
     assert_eq!(t.app.ui.get_quiz().verdict, 1);
-    t.app.ui.invoke_quiz_submit();
+    t.go_on();
     assert_eq!(last_grade(&t), 3, "counted as right");
 }
 
@@ -389,7 +451,7 @@ fn retry_after_a_wrong_answer_still_counts_as_missed() {
     let a = t.correct_answer();
     t.type_and_enter(&a);
     assert_eq!(t.app.ui.get_quiz().verdict, 1);
-    t.app.ui.invoke_quiz_submit();
+    t.go_on();
     assert_eq!(last_grade(&t), 1, "missed");
     assert_eq!(t.app.ui.get_quiz().done, 0, "it comes back later");
     let st = t.app.state.borrow();
@@ -468,7 +530,7 @@ fn back_from_quiz_goes_home_and_keeps_graded_items() {
     t.press("Start quiz");
     let a = t.correct_answer();
     t.type_and_enter(&a);
-    t.app.ui.invoke_quiz_submit();
+    t.go_on();
     assert!(t.app.ui.invoke_go_back());
     assert_eq!(t.screen(), SCREEN_HOME);
     assert_eq!(t.app.ui.get_home().learned, 1, "the answered point is learned, the rest stay new");
@@ -932,7 +994,7 @@ fn check_every_screen_at(width: f32, french: bool, text_scale: f32) {
     let a = t.correct_answer();
     t.type_and_enter(&a);
     check("quiz, correct answer");
-    t.app.ui.invoke_quiz_submit();
+    t.go_on();
     t.finish_quiz(&[]);
     check("quiz finished");
     t.app.ui.invoke_go_home();
@@ -948,12 +1010,12 @@ fn check_every_screen_at(width: f32, french: bool, text_scale: f32) {
     check("home with reviews to resume");
     t.app.ui.invoke_resume();
     t.type_and_enter("ぜんぜんちがう");
-    t.app.ui.invoke_quiz_submit();
+    t.go_on();
     // answer the others until the missed one comes back as practice
     while !t.app.ui.get_quiz().practising {
         let a = t.correct_answer();
         t.type_and_enter(&a);
-        t.app.ui.invoke_quiz_submit();
+        t.go_on();
     }
     check("reviews, practising a missed point");
     t.app.ui.invoke_go_home();
@@ -1251,7 +1313,7 @@ fn make_leech(p: &mut Progress, id: &str) {
     let now = clock::now_ms();
     p.cards.insert(id.into(), bunpo_core::store::Card { state: 1, due: now + HOUR, learned_at: now - 10 * DAY, ..Default::default() });
     for i in 0..4 {
-        p.log.push(bunpo_core::store::LogEntry { point: id.into(), sentence: 1, ts: now - 9 * DAY + i * DAY, grade: if i == 2 { 3 } else { 1 }, answer: "".into() });
+        p.log.push(bunpo_core::store::LogEntry { point: id.into(), sentence: 1, ts: now - 9 * DAY + i * DAY, grade: if i == 2 { 3 } else { 1 }, ..Default::default() });
     }
 }
 
@@ -1345,7 +1407,7 @@ fn checked_answers_vibrate_unless_turned_off() {
     let a = t.correct_answer();
     t.type_and_enter(&a);
     assert_eq!(t.rec.last(), "haptic true");
-    t.app.ui.invoke_quiz_submit();
+    t.go_on();
 
     assert!(t.app.ui.get_haptics(), "on by default");
     t.app.ui.invoke_set_haptics(false);
@@ -1379,7 +1441,7 @@ fn leaving_reviews_halfway_can_be_resumed_even_after_a_restart() {
         let a = t.correct_answer();
         t.type_and_enter(&a);
         if i < 4 {
-            t.app.ui.invoke_quiz_submit();
+            t.go_on();
         }
     }
     assert_eq!(t.app.ui.get_quiz().done, 4);
@@ -1417,12 +1479,12 @@ fn a_missed_review_comes_back_as_practice_and_can_be_resumed() {
     t.press("Start reviews");
     let first = t.app.state.borrow().session.as_ref().unwrap().point.clone().unwrap();
     t.type_and_enter("ぜんぜんちがう");
-    t.app.ui.invoke_quiz_submit();
+    t.go_on();
     for _ in 0..14 {
         assert!(!t.app.ui.get_quiz().practising);
         let a = t.correct_answer();
         t.type_and_enter(&a);
-        t.app.ui.invoke_quiz_submit();
+        t.go_on();
     }
     // every point was answered once; the missed one is practice now, and not counted as done
     assert_eq!(t.app.state.borrow().session.as_ref().unwrap().point.clone().unwrap(), first);
@@ -1446,7 +1508,7 @@ fn a_missed_review_comes_back_as_practice_and_can_be_resumed() {
     t.press("Resume reviews (1 left)");
     let a = t.correct_answer();
     t.type_and_enter(&a);
-    t.app.ui.invoke_quiz_submit();
+    t.go_on();
     assert!(t.app.ui.get_quiz().finished);
     std::fs::remove_dir_all(dir).ok();
 }
@@ -1461,7 +1523,7 @@ fn a_lesson_quiz_left_halfway_can_be_resumed() {
     t.press("Start quiz");
     let a = t.correct_answer();
     t.type_and_enter(&a);
-    t.app.ui.invoke_quiz_submit();
+    t.go_on();
     t.app.ui.invoke_go_home();
     assert_eq!(t.app.ui.get_home().resume_lesson, 4);
     t.press("Resume the lesson quiz (4 left)");
@@ -1490,7 +1552,7 @@ fn lesson_size_is_a_daily_goal_then_extra_lessons() {
     for _ in 0..2 {
         let a = t.correct_answer();
         t.type_and_enter(&a);
-        t.app.ui.invoke_quiz_submit();
+        t.go_on();
     }
     t.app.ui.invoke_go_home();
     t.app.state.borrow_mut().progress.paused = None; // not resumed: a new lesson
@@ -1669,7 +1731,7 @@ fn missing_particle_and_wrong_form_get_a_hint_then_count_if_right() {
     let a = t.correct_answer();
     t.type_and_enter(&a);
     assert_eq!(t.app.ui.get_quiz().verdict, 1);
-    t.app.ui.invoke_quiz_submit();
+    t.go_on();
     assert_eq!(last_grade(&t), 3, "a free retry: right on the second try counts as right");
 
     let t2 = &t;
