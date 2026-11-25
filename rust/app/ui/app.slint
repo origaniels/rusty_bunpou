@@ -1213,7 +1213,8 @@ export component AppWindow inherits Window {
                             Rectangle { horizontal-stretch: 1; }
                             if root.quiz.verdict == 2: IconBtn {
                                 icon: Icons.typo; label: @tr("Typo"); highlight: true;
-                                clicked => { root.quiz-typo(); }
+                                // now right: rated with the buttons, the keyboard would hide them
+                                clicked => { root.quiz-typo(); answer.unfocus(); }
                             }
                             if root.quiz.verdict == 2: IconBtn {
                                 icon: Icons.retry; label: @tr("Retry"); highlight: true;
