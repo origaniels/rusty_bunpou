@@ -83,13 +83,29 @@ impl Default for Settings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// One answer. `ts` is UTC (milliseconds since the Unix epoch). The fields after `answer` were
+/// added later: entries from older files have their defaults.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LogEntry {
     pub point: String,
     pub sentence: u64,
     pub ts: i64,
+    /// what the scheduler was given: 1 wrong, 3 right (grammar); 1-4 (vocabulary)
     pub grade: u8,
     pub answer: String,
+    /// the user's own rating of a right grammar answer, 1 Again … 4 Easy (not used for
+    /// scheduling); 1 for a wrong answer, 0 when not rated (the quiz was left before rating)
+    #[serde(default)]
+    pub rating: u8,
+    /// how long the user thought: from the sentence appearing to the first check, 0 if unknown
+    #[serde(default)]
+    pub ms: i64,
+    /// the card's level before this answer ("New", "Beginner", "Adept" … see [`Card::level_name`])
+    #[serde(default)]
+    pub level: String,
+    /// seen again after a miss in the same session: not graded, not counted as a review
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub practice: bool,
 }
 
 /// A problem the user noticed with a sentence, to be fixed in the content later.
@@ -210,7 +226,12 @@ impl Progress {
     }
 
     pub fn reviews_since(&self, ts: i64) -> usize {
-        self.log.iter().filter(|e| e.ts >= ts).count()
+        self.log.iter().filter(|e| e.ts >= ts && !e.practice).count()
+    }
+
+    /// Every time the point was seen, oldest first, kept when the point is reset.
+    pub fn history<'a>(&'a self, point: &'a str) -> impl Iterator<Item = &'a LogEntry> + 'a {
+        self.log.iter().filter(move |e| e.point == point)
     }
 
     pub fn reset_all(&mut self) {

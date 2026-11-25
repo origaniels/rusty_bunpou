@@ -35,13 +35,29 @@ fn older_files_without_new_fields_still_load() {
 }
 
 #[test]
+fn log_entries_from_before_ratings_still_load_and_new_ones_round_trip() {
+    let path = tmp("oldlog");
+    std::fs::write(&path, r#"{"cards":{},"log":[{"point":"da","sentence":1,"ts":5,"grade":3,"answer":"だ"}]}"#).unwrap();
+    let mut p = Progress::load(&path);
+    let e = &p.log[0];
+    assert_eq!((e.rating, e.ms, e.level.as_str(), e.practice), (0, 0, "", false));
+    let new = LogEntry { point: "wa".into(), sentence: 2, ts: 6, grade: 3, answer: "は".into(), rating: 4, ms: 3_210, level: "Adept".into(), practice: true };
+    p.log.push(new.clone());
+    p.save();
+    let q = Progress::load(&path);
+    assert_eq!(q.log[1], new);
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(text.matches("practice").count(), 1, "only written when true");
+}
+
+#[test]
 fn save_round_trip_and_no_tmp_left() {
     let path = tmp("roundtrip");
     let mut p = Progress::load(&path);
     p.cards.insert("da".into(), Card { state: 2, stability: 12.5, due: 99, reps: 4, ..Default::default() });
     p.settings.retention = 0.95;
     p.settings.notifications = true;
-    p.log.push(LogEntry { point: "da".into(), sentence: 1, ts: 5, grade: 3, answer: "だ".into() });
+    p.log.push(LogEntry { point: "da".into(), sentence: 1, ts: 5, grade: 3, answer: "だ".into(), ..Default::default() });
     p.save();
     assert!(!path.with_extension("tmp").exists());
     let q = Progress::load(&path);
@@ -177,7 +193,7 @@ fn words_and_update_state_round_trip() {
     let path = tmp("words-roundtrip");
     let mut p = Progress::load(&path);
     p.vocab.insert("会う|あう#f".into(), Card { state: 1, due: 42, ..Default::default() });
-    p.vocab_log.push(LogEntry { point: "会う|あう#f".into(), sentence: 0, ts: 1, grade: 4, answer: String::new() });
+    p.vocab_log.push(LogEntry { point: "会う|あう#f".into(), sentence: 0, ts: 1, grade: 4, ..Default::default() });
     p.settings.vocab_goal = 20;
     p.settings.check_updates = Some(true);
     p.update = UpdateState { checked_at: 7, etag: "\"x\"".into(), skipped: "0.9.0".into(), latest: Some(Release { version: "1.0.0".into(), notes: "n".into(), url: "https://github.com/o/r".into() }) };
@@ -194,7 +210,7 @@ fn a_reset_forgets_words_but_keeps_settings_reports_and_update_state() {
     let path = tmp("words-reset");
     let mut p = Progress::load(&path);
     p.vocab.insert("会う|あう#f".into(), Card { state: 1, ..Default::default() });
-    p.vocab_log.push(LogEntry { point: "会う|あう#f".into(), sentence: 0, ts: 1, grade: 3, answer: String::new() });
+    p.vocab_log.push(LogEntry { point: "会う|あう#f".into(), sentence: 0, ts: 1, grade: 3, ..Default::default() });
     p.settings.vocab_goal = 5;
     p.update.skipped = "0.9.0".into();
     p.reset_all();
@@ -210,7 +226,7 @@ fn an_import_brings_its_words_and_drops_the_current_ones() {
     p.vocab.insert("mine#f".into(), Card { state: 1, ..Default::default() });
     let mut other = Progress::in_memory();
     other.vocab.insert("theirs#r".into(), Card { state: 2, reps: 5, ..Default::default() });
-    other.vocab_log.push(LogEntry { point: "theirs#r".into(), sentence: 0, ts: 3, grade: 2, answer: String::new() });
+    other.vocab_log.push(LogEntry { point: "theirs#r".into(), sentence: 0, ts: 3, grade: 2, ..Default::default() });
     p.import(&serde_json::to_string(&other).unwrap()).unwrap();
     assert!(!p.vocab.contains_key("mine#f"));
     assert_eq!(p.vocab["theirs#r"].reps, 5);

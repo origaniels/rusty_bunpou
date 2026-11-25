@@ -259,7 +259,7 @@ impl VocabSession {
             let card = progress.vocab.get(&id).cloned().unwrap_or_default();
             let next = scheduler::grade_self(&card, grade, now, progress.settings.retention);
             progress.vocab.insert(id.clone(), next);
-            progress.vocab_log.push(LogEntry { point: id.clone(), sentence: 0, ts: now, grade, answer: String::new() });
+            progress.vocab_log.push(LogEntry { point: id.clone(), sentence: 0, ts: now, grade, ..Default::default() });
             if grade == 1 {
                 self.missed += 1;
             }

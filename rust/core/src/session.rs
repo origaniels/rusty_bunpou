@@ -56,7 +56,18 @@ pub struct Session {
     /// The free retry of this item was used.
     #[serde(skip)]
     pub nudged: bool,
+    /// When the current sentence appeared (0: not timed, e.g. just after resuming; see
+    /// [`Session::start_clock`]).
+    #[serde(skip)]
+    shown_at: i64,
+    /// How long the first check of the current item took to come.
+    #[serde(skip)]
+    think_ms: Option<i64>,
 }
+
+/// User ratings of an answer, as in the usual flashcard apps.
+pub const AGAIN: u8 = 1;
+pub const EASY: u8 = 4;
 
 pub fn find_sentence<'a>(p: &'a GrammarPoint, id: u64) -> Option<&'a Sentence> {
     p.sentences.iter().find(|s| s.id == id)
@@ -91,6 +102,8 @@ impl Session {
             missed: false,
             nudge: None,
             nudged: false,
+            shown_at: 0,
+            think_ms: None,
         };
         s.advance(content, progress);
         s
@@ -137,6 +150,7 @@ impl Session {
         self.missed = false;
         self.nudge = None;
         self.nudged = false;
+        self.start_clock();
         let Some(id) = self.queue.pop_front() else {
             self.point = None;
             self.sentence = None;
@@ -162,6 +176,17 @@ impl Session {
         self.chosen.insert(id.clone(), pick.id);
         self.point = Some(id);
         self.sentence = Some(pick.id);
+    }
+
+    /// Time the current item from now (a new item, or a resumed session).
+    pub fn start_clock(&mut self) {
+        self.shown_at = now_ms();
+        self.think_ms = None;
+    }
+
+    /// The answer counts as right: the user rates it (Again … Easy) before moving on.
+    pub fn needs_rating(&self) -> bool {
+        self.verdict == Some(Verdict::Correct) && !self.missed
     }
 
     pub fn current<'a>(&self, content: &'a Content) -> Option<(&'a GrammarPoint, &'a Sentence)> {
@@ -202,6 +227,9 @@ impl Session {
         if norm.is_empty() {
             return false;
         }
+        if self.think_ms.is_none() && self.shown_at > 0 {
+            self.think_ms = Some((now_ms() - self.shown_at).max(0));
+        }
         self.last_answer = self.input.clone();
         let ok = s.answers.iter().any(|a| kana::normalize(a) == norm);
         self.nudge = None;
@@ -235,26 +263,47 @@ impl Session {
         self.raw.clear();
     }
 
-    /// Commit the verdict (grading on first attempt) and move to the next item.
+    /// Move on after an answer that needs no rating (wrong, or retried); a right one left
+    /// unrated (e.g. by leaving the quiz) is logged with rating 0.
     pub fn next(&mut self, content: &Content, progress: &mut Progress) {
+        let rating = if self.needs_rating() { 0 } else { AGAIN };
+        self.finish(content, progress, rating);
+    }
+
+    /// The user's rating of a right answer (1 Again … 4 Easy): logged only, the schedule is
+    /// that of a right answer whatever the rating. Does nothing if no rating is expected.
+    pub fn rate(&mut self, content: &Content, progress: &mut Progress, rating: u8) {
+        if self.needs_rating() {
+            self.finish(content, progress, rating.clamp(AGAIN, EASY));
+        }
+    }
+
+    /// Commit the verdict (grading on first attempt), log the answer and move to the next item.
+    fn finish(&mut self, content: &Content, progress: &mut Progress, rating: u8) {
         let (Some(pid), Some(sid), Some(v)) = (self.point.clone(), self.sentence, self.verdict) else { return };
         let correct = v == Verdict::Correct && !self.missed;
-        if self.graded.insert(pid.clone()) {
-            let now = now_ms();
-            let card = scheduler::grade(&progress.card(&pid), correct, now, progress.settings.retention, sid);
-            progress.cards.insert(pid.clone(), card);
-            progress.log.push(crate::store::LogEntry {
-                point: pid.clone(),
-                sentence: sid,
-                ts: now,
-                grade: if correct { 3 } else { 1 },
-                answer: self.last_answer.clone(),
-            });
-            progress.save();
+        let now = now_ms();
+        let card = progress.card(&pid);
+        let first = self.graded.insert(pid.clone());
+        progress.log.push(crate::store::LogEntry {
+            point: pid.clone(),
+            sentence: sid,
+            ts: now,
+            grade: if correct { 3 } else { 1 },
+            answer: self.last_answer.clone(),
+            rating,
+            ms: self.think_ms.unwrap_or(0),
+            level: card.level_name().into(),
+            practice: !first,
+        });
+        if first {
+            let graded = scheduler::grade(&card, correct, now, progress.settings.retention, sid);
+            progress.cards.insert(pid.clone(), graded);
             if correct {
                 self.correct_first_try += 1;
             }
         }
+        progress.save();
         if correct {
             self.done += 1;
         } else {
@@ -332,6 +381,9 @@ mod tests {
         assert_eq!(steps, 4);
         assert_eq!(s.correct_first_try, 2);
         assert_eq!(prog.cards.len(), 3);
-        assert_eq!(prog.log.len(), 3);
+        // every answer is logged, the repeat of the missed point as practice
+        assert_eq!(prog.log.len(), 4);
+        assert_eq!(prog.log.iter().filter(|e| e.practice).count(), 1);
+        assert!(prog.log.iter().filter(|e| !e.practice).all(|e| e.level == "New"));
     }
 }

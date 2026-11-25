@@ -45,8 +45,12 @@ fn wrong_answers_come_back_with_the_same_sentence_and_grade_once() {
     answer_current(&mut s, &c, true);
     s.next(&c, &mut prog);
     assert!(s.finished());
-    assert_eq!(prog.log.len(), 2, "each point graded once");
+    assert_eq!(prog.log.iter().filter(|e| !e.practice).count(), 2, "each point graded once");
     assert_eq!(prog.log.iter().find(|e| e.point == p0).unwrap().grade, 1);
+    // the repeat is logged too, as practice
+    let practice: Vec<_> = prog.log.iter().filter(|e| e.practice).collect();
+    assert_eq!(practice.len(), 1);
+    assert_eq!((practice[0].point.as_str(), practice[0].grade), (p0.as_str(), 3));
     assert_eq!(s.correct_first_try, 1);
     assert_eq!(s.done, 2);
 }
@@ -186,4 +190,87 @@ fn editing_a_wrong_answer_reopens_it_as_a_typo_fix() {
     assert!(s.edit_after_wrong());
     assert_eq!(s.verdict, None, "open again for the fix");
     assert!(!s.edit_after_wrong(), "once");
+}
+
+#[test]
+fn a_right_answer_waits_for_a_rating_that_is_logged_but_does_not_change_the_schedule() {
+    let c = Content::bundled();
+    let mut due = Vec::new();
+    for rating in 1..=4u8 {
+        clock::reset();
+        let mut prog = Progress::in_memory();
+        let mut s = Session::new(&c, &prog, first_ids(&c, 1), false);
+        let id = s.point.clone().unwrap();
+        clock::advance(4_200);
+        answer_current(&mut s, &c, true);
+        assert!(s.needs_rating());
+        clock::advance(9_000); // reading the feedback is not thinking time
+        s.rate(&c, &mut prog, rating);
+        assert!(s.finished());
+        let e = &prog.log[0];
+        assert_eq!((e.rating, e.grade, e.level.as_str(), e.practice), (rating, 3, "New", false));
+        assert!((4_200..5_000).contains(&e.ms), "thought for {} ms", e.ms);
+        assert!(e.ts > 1_600_000_000_000, "a UTC timestamp in ms");
+        due.push(prog.card(&id).due - e.ts);
+    }
+    clock::reset();
+    assert!(due.windows(2).all(|w| w[0] == w[1]), "same schedule whatever the rating: {due:?}");
+}
+
+#[test]
+fn wrong_and_retried_answers_are_logged_as_again_without_a_rating() {
+    let c = Content::bundled();
+    let mut prog = Progress::in_memory();
+    let mut s = Session::new(&c, &prog, first_ids(&c, 2), false);
+    answer_current(&mut s, &c, false);
+    assert!(!s.needs_rating());
+    s.rate(&c, &mut prog, 4); // ignored: nothing to rate
+    assert!(prog.log.is_empty());
+    s.retry();
+    answer_current(&mut s, &c, true);
+    assert!(!s.needs_rating(), "a retried item counts as missed");
+    s.next(&c, &mut prog);
+    assert_eq!((prog.log[0].rating, prog.log[0].grade), (1, 1));
+    // a right answer left unrated (leaving the quiz) is logged with rating 0
+    answer_current(&mut s, &c, true);
+    s.commit_pending(&c, &mut prog);
+    assert_eq!((prog.log[1].rating, prog.log[1].grade), (0, 3));
+}
+
+#[test]
+fn the_level_logged_is_the_one_before_the_answer_and_history_survives_a_reset() {
+    let c = Content::bundled();
+    let mut prog = Progress::in_memory();
+    let ids = first_ids(&c, 1);
+    let mut levels = Vec::new();
+    for _ in 0..4 {
+        let mut s = Session::new(&c, &prog, ids.clone(), false);
+        levels.push(prog.card(&ids[0]).level_name());
+        answer_current(&mut s, &c, true);
+        s.rate(&c, &mut prog, 3);
+    }
+    let logged: Vec<&str> = prog.history(&ids[0]).map(|e| e.level.as_str()).collect();
+    assert_eq!(logged, levels);
+    assert_ne!(levels[0], levels[3]);
+    prog.reset_point(&ids[0]);
+    assert_eq!(prog.history(&ids[0]).count(), 4);
+}
+
+#[test]
+fn a_resumed_session_times_from_when_it_is_shown_again() {
+    let c = Content::bundled();
+    let prog = Progress::in_memory();
+    let s = Session::new(&c, &prog, first_ids(&c, 1), false);
+    let mut back: Session = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+    let mut prog = prog;
+    answer_current(&mut back, &c, true);
+    back.rate(&c, &mut prog, 3);
+    assert_eq!(prog.log[0].ms, 0, "not timed: unknown");
+    let mut back: Session = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+    back.start_clock();
+    clock::advance(1_500);
+    answer_current(&mut back, &c, true);
+    back.rate(&c, &mut prog, 3);
+    clock::reset();
+    assert!(prog.log[1].ms >= 1_500);
 }

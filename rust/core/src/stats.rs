@@ -28,6 +28,7 @@ pub fn forecast(p: &Progress, now: i64, days: usize) -> Vec<usize> {
 /// not a review), and only since it was last (re)learned. `entries` = its log, oldest first.
 fn counted<'a>(p: &Progress, point: &str, mut entries: Vec<&'a LogEntry>) -> Vec<&'a LogEntry> {
     let card = p.card(point);
+    entries.retain(|e| !e.practice);
     if card.learned_at > 0 {
         entries.retain(|e| e.ts > card.learned_at);
     } else if !entries.is_empty() {
@@ -49,7 +50,7 @@ pub fn recent_mistakes(p: &Progress, point: &str) -> usize {
 pub fn leeches(p: &Progress) -> Vec<(String, usize)> {
     // one pass over the log (it grows with every review)
     let mut by_point: HashMap<&str, Vec<&LogEntry>> = HashMap::new();
-    for e in &p.log {
+    for e in p.log.iter().filter(|e| !e.practice) {
         by_point.entry(e.point.as_str()).or_default().push(e);
     }
     let mut out: Vec<(String, usize)> = by_point
@@ -67,7 +68,7 @@ pub fn activity(p: &Progress, now: i64, days: usize) -> Vec<usize> {
     let day = |ms| study_day(ms, p.settings.day_start);
     let today = day(now);
     let mut out = vec![0; days];
-    for e in &p.log {
+    for e in p.log.iter().filter(|e| !e.practice) {
         let back = today - day(e.ts);
         if back >= 0 && (back as usize) < days {
             out[days - 1 - back as usize] += 1;
@@ -80,7 +81,7 @@ pub fn activity(p: &Progress, now: i64, days: usize) -> Vec<usize> {
 /// still counts when today has nothing yet but yesterday had (the day isn't over).
 pub fn streak(p: &Progress, now: i64) -> (usize, usize) {
     let day = |ms| study_day(ms, p.settings.day_start);
-    let mut days: Vec<i64> = p.log.iter().map(|e| day(e.ts)).collect();
+    let mut days: Vec<i64> = p.log.iter().filter(|e| !e.practice).map(|e| day(e.ts)).collect();
     days.sort_unstable();
     days.dedup();
     let mut longest = 0;

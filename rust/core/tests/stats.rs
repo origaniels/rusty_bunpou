@@ -12,7 +12,7 @@ fn noon() -> i64 {
 }
 
 fn log(p: &mut Progress, point: &str, ts: i64, correct: bool) {
-    p.log.push(LogEntry { point: point.into(), sentence: 1, ts, grade: if correct { 3 } else { 1 }, answer: String::new() });
+    p.log.push(LogEntry { point: point.into(), sentence: 1, ts, grade: if correct { 3 } else { 1 }, ..Default::default() });
 }
 
 fn learned(p: &mut Progress, point: &str, at: i64) {
@@ -110,4 +110,22 @@ fn a_late_session_counts_for_the_day_before_when_the_day_starts_later() {
     p.settings.day_start = 4;
     assert_eq!(streak(&p, now), (3, 3), "4:00 start: the 1 AM session belongs to day 2");
     assert_eq!(activity(&p, now, 3), vec![1, 1, 1]);
+}
+
+#[test]
+fn practice_repeats_are_not_reviews() {
+    let t = noon();
+    let mut p = Progress::in_memory();
+    learned(&mut p, "x", t);
+    for i in 0..3 {
+        log(&mut p, "x", t + D + i * H, false);
+    }
+    assert_eq!(leeches(&p).len(), 1);
+    let before = (activity(&p, t + D, 2), p.reviews_since(t));
+    for i in 0..5 {
+        p.log.push(LogEntry { point: "x".into(), ts: t + D + 5 * H + i, grade: 3, practice: true, ..Default::default() });
+    }
+    assert_eq!(leeches(&p).len(), 1, "practice right answers don't clear a leech");
+    assert_eq!((activity(&p, t + D, 2), p.reviews_since(t)), before);
+    assert_eq!(p.history("x").count(), 9);
 }
