@@ -264,6 +264,11 @@ pub fn command(ui: &AppWindow, cmd: &str) -> String {
             }
             format!("digest {:016x} {}", h.finish(), els.len())
         }
+        // the size of each label containing `arg` (logical pixels), as laid out on the device
+        "sizes" => {
+            let v: Vec<String> = els.iter().filter(|e| e.label.contains(arg)).map(|e| format!("{}={:.0}x{:.0}", e.label, e.w, e.h)).collect();
+            format!("sizes {}", v.join(" | "))
+        }
         "texts" => {
             let v: Vec<String> = els.iter().map(|e| format!("{:?}:{}", e.role, e.label)).collect();
             format!("texts {}", v.join(" | "))
