@@ -582,7 +582,13 @@ component QuizBar inherits Rectangle {
             padding-left: 8px; padding-right: 18px; spacing: 6px;
             VerticalLayout { alignment: center; BackBtn { clicked => { root.back(); } } }
             Text { text: root.title; font-size: 21px * Theme.text-scale; font-weight: 700; color: Theme.fg; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; }
-            FitText { text: root.count; font-size: 17px * Theme.text-scale; font-weight: 600; color: Theme.muted; vertical-alignment: center; }
+            // room for the longest count ("999 / 999") whatever the count is: on a phone the room
+            // once seen to lag behind the text ("11 / 1" shown for "11 / 11")
+            FitText {
+                text: root.count; font-size: 17px * Theme.text-scale; font-weight: 600; color: Theme.muted;
+                vertical-alignment: center; horizontal-alignment: right; min-width: widest.preferred-width;
+            }
+            widest := Text { text: "999 / 999"; font-size: 17px * Theme.text-scale; font-weight: 600; visible: false; width: 0; }
         }
         Rectangle {
             height: 4px; background: #3a3846;
@@ -1131,7 +1137,9 @@ export component AppWindow inherits Window {
                                 tapped => { answer.open-keyboard(); }
                             }
                             if root.english || root.quiz.verdict != 0: Text { text: root.quiz.en; font-size: 17px * Theme.text-scale; color: Theme.muted; wrap: word-wrap; }
-                            HorizontalLayout { alignment: start; Pill { text: root.quiz.hint; } }
+                            // a new bubble for each hint, not the last one resized: on a phone it once kept
+                            // the size of the hint before, cutting the new one off
+                            for hint in [root.quiz.hint]: HorizontalLayout { alignment: start; Pill { text: hint; } }
                         }
                     }
                     if root.quiz.nudge != "" && root.quiz.verdict == 0: Text {
