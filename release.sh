@@ -54,7 +54,7 @@ git rev-parse -q --verify "refs/tags/$tag" >/dev/null && die "tag $tag exists al
 
 # the new version must be above every earlier tag (v0.3 counts as 0.3.0)
 three() { local v=${1#v}; while [[ $(tr -cd . <<<"$v" | wc -c) -lt 2 ]]; do v=$v.0; done; echo "$v"; }
-last=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -1)
+last=$(git tag -l 'v[0-9]*' --sort=-v:refname | awk 'NR == 1')
 if [ -n "$last" ]; then
   last3=$(three "$last")
   [ "$last3" != "$version" ] && [ "$(printf '%s\n%s\n' "$last3" "$version" | sort -V | tail -1)" = "$version" ] ||
@@ -85,11 +85,13 @@ rm -rf rust/android/app/src/main/jniLibs/x86_64
 cp rust/android/app/build/outputs/apk/release/app-release.apk "$apk"
 
 step "checking the APK"
-cert=$("$build_tools"/apksigner verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)
+# (no `head`: it would stop reading early, the writer would die of SIGPIPE and fail the pipe under
+# pipefail, exit code 141 with no message; `awk 'NR == 1'` reads everything)
+cert=$("$build_tools"/apksigner verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | awk 'NR == 1')
 want=$(grep -v '^#' rust/android/release-cert.sha256 | tr -d '[:space:]')
 [ "$cert" = "$want" ] || die "the APK is signed with another key ($cert): installed apps would refuse it as an update"
 echo "  signed with the release key"
-badging=$("$build_tools"/aapt2 dump badging "$apk" | head -1)
+badging=$("$build_tools"/aapt2 dump badging "$apk" | awk 'NR == 1')
 grep -q "versionName='$version'" <<<"$badging" || die "the APK's version isn't $version: $badging"
 echo "  $(grep -o "versionCode='[0-9]*' versionName='[^']*'" <<<"$badging")"
 libs=$(unzip -l "$apk" | grep -o 'lib/[^/]*/' | sort -u | tr '\n' ' ')
